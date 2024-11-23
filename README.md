@@ -26,3 +26,31 @@ Clone this repository to your local machine:
 ```bash
 git clone https://github.com/<your-username>/fastapi-mysql-project.git
 cd fastapi-mysql-project
+```
+
+### 2. Create a virtual environment
+
+It's highly recommended to use a virtual environment to keep dependencies isolated:
+
+Linux/macOS:
+
+bash
+Copiar código
+python3 -m venv venv
+source venv/bin/activate
+Windows:
+
+```bash
+Copiar código
+python -m venv venv
+venv\Scripts\activate
+```
+
+### 3. Install dependencies
+
+Once the virtual environment is activated, install the project dependencies:
+
+```bash
+Copiar código
+pip install -r requirements.txt
+```

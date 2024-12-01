@@ -1,3 +1,5 @@
+SET FOREIGN_KEY_CHECKS = 0;
+
 INSERT INTO
     depto_muni (
         codigo,
@@ -6,12 +8,6 @@ INSERT INTO
         lugar
     )
 VALUES (
-        '0101',
-        'Guatemala',
-        'Guatemala',
-        'Guatemala, Guatemala'
-    ),
-    (
         '0101',
         'Guatemala',
         'Guatemala',
@@ -2299,76 +2295,76 @@ INSERT INTO
         caracteristicas
     )
 VALUES (
-        'Neonato',
+        "Neonato",
         0,
         0,
-        'Adaptación a la vida fuera del útero'
+        "Adaptación a la vida fuera del útero"
     ),
     (
-        'Lactante menor',
+        "Lactante menor",
         1,
         1,
-        'Desarrollo rápido, inicio de la locomoción y el lenguaje'
+        "Desarrollo rápido, inicio de la locomoción y el lenguaje"
     ),
     (
-        'Lactante mayor',
+        "Lactante mayor",
         1,
         2,
-        'Desarrollo del caminar y mayor interacción social'
+        "Desarrollo del caminar y mayor interacción social"
     ),
     (
-        'Primera infancia',
+        "Primera infancia",
         2,
         6,
-        'Desarrollo de habilidades motoras, lenguaje y socialización'
+        "Desarrollo de habilidades motoras, lenguaje y socialización"
     ),
     (
-        'Infancia media',
+        "Infancia media",
         6,
         12,
-        'Crecimiento continuo, avance cognitivo y socialización compleja'
+        "Crecimiento continuo, avance cognitivo y socialización compleja"
     ),
     (
-        'Adolescencia temprana',
+        "Adolescencia temprana",
         12,
         15,
-        'Cambios hormonales y físicos significativos; búsqueda de identidad'
+        "Cambios hormonales y físicos significativos búsqueda de identidad"
     ),
     (
-        'Adolescencia tardía',
+        "Adolescencia tardía",
         15,
         18,
-        'Mayor madurez física y emocional; transición a la adultez'
+        "Mayor madurez física y emocional transición a la adultez"
     ),
     (
-        'Juventud',
+        "Juventud",
         18,
         25,
-        'Consolidación de independencia, educación o inicio laboral'
+        "Consolidación de independencia, educación o inicio laboral"
     ),
     (
-        'Adultez temprana',
+        "Adultez temprana",
         25,
         40,
-        'Plenitud física, estabilidad emocional y reproductiva'
+        "Plenitud física, estabilidad emocional y reproductiva"
     ),
     (
-        'Adultez media',
+        "Adultez media",
         40,
         60,
-        'Cambios progresivos por envejecimiento, estabilidad laboral y familiar'
+        "Cambios progresivos por envejecimiento, estabilidad laboral y familiar"
     ),
     (
-        'Adulto mayor joven',
+        "Adulto mayor joven",
         60,
         75,
-        'Salud razonablemente buena; actividad moderada'
+        "Salud razonablemente buena, actividad moderada"
     ),
     (
-        'Adulto mayor mayor',
+        "Adulto mayor mayor",
         75,
         NULL,
-        'Vulnerabilidad física y necesidad de cuidados específicos'
+        "Vulnerabilidad física y necesidad de cuidados específicos"
     );
 
 INSERT INTO
@@ -2510,4 +2506,181 @@ VALUES (
         'estandar',
         'Puede ver, editar y navegar, pero no crear ni eliminar usuarios',
         'editar,ver,navegar'
+    );
+
+INSERT INTO
+    nacionalidades (
+        iso,
+        nacionalidad,
+        pais,
+        cti,
+        idioma
+    )
+VALUES (
+        'USA',
+        'Estadounidense',
+        'Estados Unidos',
+        1,
+        'Inglés'
+    ),
+    (
+        'CAN',
+        'Canadiense',
+        'Canadá',
+        1,
+        'Inglés, Francés'
+    ),
+    (
+        'MEX',
+        'Mexicano',
+        'México',
+        52,
+        'Español'
+    ),
+    (
+        'BLZ',
+        'Beliceño',
+        'Belice',
+        501,
+        'Inglés'
+    ),
+    (
+        'CRI',
+        'Costarricense',
+        'Costa Rica',
+        506,
+        'Español'
+    ),
+    (
+        'SLV',
+        'Salvadoreño',
+        'El Salvador',
+        503,
+        'Español'
+    ),
+    (
+        'GTM',
+        'Guatemalteco',
+        'Guatemala',
+        502,
+        'Español'
+    ),
+    (
+        'HND',
+        'Hondureño',
+        'Honduras',
+        504,
+        'Español'
+    ),
+    (
+        'NIC',
+        'Nicaragüense',
+        'Nicaragua',
+        505,
+        'Español'
+    ),
+    (
+        'PAN',
+        'Panameño',
+        'Panamá',
+        507,
+        'Español'
+    ),
+    (
+        'DOM',
+        'Dominicano',
+        'República Dominicana',
+        1,
+        'Español'
+    ),
+    (
+        'COL',
+        'Colombiano',
+        'Colombia',
+        57,
+        'Español'
+    ),
+    (
+        'ECU',
+        'Ecuatoriano',
+        'Ecuador',
+        593,
+        'Español'
+    ),
+    (
+        'PER',
+        'Peruano',
+        'Perú',
+        51,
+        'Español'
+    ),
+    (
+        'VEN',
+        'Venezolano',
+        'Venezuela',
+        58,
+        'Español'
+    ),
+    (
+        'BOL',
+        'Boliviano',
+        'Bolivia',
+        591,
+        'Español, Quechua, Aymara'
+    ),
+    (
+        'PRY',
+        'Paraguayo',
+        'Paraguay',
+        595,
+        'Español, Guaraní'
+    ),
+    (
+        'CHL',
+        'Chileno',
+        'Chile',
+        56,
+        'Español'
+    ),
+    (
+        'ARG',
+        'Argentino',
+        'Argentina',
+        54,
+        'Español'
+    ),
+    (
+        'URY',
+        'Uruguayo',
+        'Uruguay',
+        598,
+        'Español'
+    ),
+    (
+        'BRA',
+        'Brasileño',
+        'Brasil',
+        55,
+        'Portugués'
+    ),
+    (
+        'SUR',
+        'Surinamés',
+        'Surinam',
+        597,
+        'Neerlandés'
+    ),
+    (
+        'FRA',
+        'Francés',
+        'Francia Guayana',
+        594,
+        'Francés'
+    ),
+    (
+        'GUY',
+        'Guyano',
+        'Guyana Francesa',
+        594,
+        'Francés'
     );

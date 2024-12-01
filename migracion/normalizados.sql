@@ -1,4 +1,84 @@
-CREATE TABLE parentescos (
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP TABLE IF EXISTS parentescos;
+
+DROP TABLE IF EXISTS pueblos;
+
+DROP TABLE IF EXISTS idiomas;
+
+DROP TABLE IF EXISTS nacionalidades;
+
+DROP TABLE IF EXISTS depto_muni;
+
+DROP TABLE IF EXISTS estados_civiles;
+
+DROP TABLE IF EXISTS educacion;
+
+DROP TABLE IF EXISTS roles;
+
+DROP TABLE IF EXISTS permisos;
+
+DROP TABLE IF EXISTS tipos_parto;
+
+DROP TABLE IF EXISTS clases_parto;
+
+DROP TABLE IF EXISTS tipo_lesion;
+
+DROP TABLE IF EXISTS especialidad;
+
+DROP TABLE IF EXISTS grupo_edad;
+
+DROP TABLE IF EXISTS servicios;
+
+DROP TABLE IF EXISTS tipos_cita;
+
+DROP TABLE IF EXISTS codigo_procedimientos;
+
+DROP TABLE IF EXISTS estados_salud;
+
+DROP TABLE IF EXISTS situaciones_salud;
+
+DROP TABLE IF EXISTS lugares_referencia;
+
+DROP TABLE IF EXISTS estadia_es;
+
+DROP TABLE IF EXISTS servio_es;
+
+DROP TABLE IF EXISTS tipo_consulta;
+
+DROP TABLE IF EXISTS estudios;
+
+DROP TABLE IF EXISTS estatus;
+
+DROP TABLE IF EXISTS pacientes;
+
+DROP TABLE IF EXISTS referencia_contacto;
+
+DROP TABLE IF EXISTS contacto_paciente;
+
+DROP TABLE IF EXISTS usuarios;
+
+DROP TABLE IF EXISTS madres;
+
+DROP TABLE IF EXISTS medicos;
+
+DROP TABLE IF EXISTS recien_nacidos;
+
+DROP TABLE IF EXISTS constancias_nacimiento;
+
+DROP TABLE IF EXISTS expedientes;
+
+DROP TABLE IF EXISTS consultas;
+
+DROP TABLE IF EXISTS citas;
+
+DROP TABLE IF EXISTS proce_medicos;
+
+DROP TABLE IF EXISTS uisau;
+
+DROP TABLE IF EXISTS cie10;
+
+CREATE TABLE IF NOT EXISTS parentescos (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL
 ) ENGINE = InnoDB CHARSET = utf8mb4;
@@ -39,13 +119,12 @@ CREATE TABLE educacion (
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
 CREATE TABLE roles (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(50) UNIQUE NOT NULL,
     descripcion TEXT DEFAULT NULL,
-    permisos VARCHAR(255) NOT NULL COMMENT 'Lista separada por comas o bitmask que representa permisos'
+    permisos VARCHAR(250) DEFAULT NULL
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
--- Tabla de permisos
 CREATE TABLE permisos (
     id INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(50) UNIQUE NOT NULL,
@@ -141,3 +220,5 @@ CREATE TABLE estatus (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     descripcion VARCHAR(50) NOT NULL
 ) ENGINE = InnoDB CHARSET = utf8mb4;
+
+SET FOREIGN_KEY_CHECKS = 0;

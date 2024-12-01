@@ -266,7 +266,7 @@ SELECT
     expediente,
     hoja_emergencia,
     nombre_completo
-FROM old_consultas
+FROM consultas
 WHERE
     consulta_id = 137447;
 
@@ -276,3 +276,17 @@ UPDATE nuevaconsulta nc
 JOIN nuevaexpediente ne ON nc.paciente_id = ne.paciente_id
 SET
     nc.consulta_id = NULL;
+
+SELECT
+    id,
+    exp_id,
+    tipo_consulta,
+    fecha_consulta
+FROM consultas
+WHERE
+    exp_id = 137447;
+
+UPDATE consultas nc
+JOIN expediente ne ON nc.paciente_id = ne.paciente_id
+SET
+    nc.consulta_id = ne.id;

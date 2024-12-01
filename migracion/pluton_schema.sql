@@ -144,7 +144,7 @@ CREATE TABLE expedientes (
 
 CREATE TABLE consultas (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    exp_id INT NOT NULL,
+    exp_id INT,
     fecha_consulta DATE DEFAULT NULL,
     hora TIME DEFAULT NULL,
     fecha_recepcion DATETIME DEFAULT NULL,
@@ -170,7 +170,6 @@ CREATE TABLE consultas (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     grupo_edad INT DEFAULT NULL,
     FOREIGN KEY (medico) REFERENCES medicos (colegiado),
-    FOREIGN KEY (exp_id) REFERENCES expedientes (id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (tipo_lesion) REFERENCES tipo_lesion (id),
     FOREIGN KEY (especialidad) REFERENCES especialidad (id),
     FOREIGN KEY (tipo_consulta) REFERENCES tipo_consulta (id),

@@ -1,0 +1,143 @@
+CREATE TABLE parentescos (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE pueblos (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE idiomas (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE nacionalidades (
+    iso VARCHAR(3) PRIMARY KEY,
+    nacionalidad VARCHAR(50) DEFAULT NULL,
+    pais VARCHAR(50) DEFAULT NULL,
+    cti INT(3) DEFAULT NULL,
+    idioma VARCHAR(30) DEFAULT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE depto_muni (
+    codigo CHAR(4) PRIMARY KEY,
+    departamento VARCHAR(100) NOT NULL,
+    municipio VARCHAR(100) NOT NULL,
+    lugar VARCHAR(255) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE estados_civiles (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(50) UNIQUE NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE educacion (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nivel VARCHAR(50) UNIQUE NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE roles (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(50) UNIQUE NOT NULL,
+    descripcion TEXT DEFAULT NULL,
+    permisos VARCHAR(255) NOT NULL COMMENT 'Lista separada por comas o bitmask que representa permisos'
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+-- Tabla de permisos
+CREATE TABLE permisos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(50) UNIQUE NOT NULL,
+    descripcion TEXT DEFAULT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE tipos_parto (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    descripcion VARCHAR(50) DEFAULT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE clases_parto (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    descripcion VARCHAR(50) DEFAULT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE tipo_lesion (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL UNIQUE,
+    descripcion TEXT DEFAULT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE especialidad (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    especialista VARCHAR(100) DEFAULT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE grupo_edad (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    grupo VARCHAR(50) NOT NULL,
+    edad_inicio INT NOT NULL,
+    edad_fin INT,
+    caracteristicas TEXT
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE servicios (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL UNIQUE,
+    descripcion TEXT DEFAULT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE tipos_cita (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    tipo VARCHAR(50) NOT NULL,
+    descripcion VARCHAR(255) DEFAULT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE codigo_procedimientos (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    abreviatura VARCHAR(10) NOT NULL,
+    procedimiento VARCHAR(200) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE estados_salud (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE situaciones_salud (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE lugares_referencia (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE estadia_es (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    descripcion VARCHAR(50) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE servio_es (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    descripcion VARCHAR(100) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE tipo_consulta (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    descripcion VARCHAR(100) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE estudios (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    descripcion VARCHAR(100) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE estatus (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    descripcion VARCHAR(50) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;

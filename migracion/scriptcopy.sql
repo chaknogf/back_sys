@@ -1080,6 +1080,11 @@ CREATE INDEX idx_paciente_id_expediente ON nuevaexpediente (paciente_id, expedie
 
 CREATE INDEX idx_paciente_id ON nuevaconsulta (paciente_id);
 
+UPDATE nuevaexpediente ne
+JOIN nuevapaciente np ON ne.nombre_completo = np.nombre_completo
+SET
+    ne.paciente_id = np.id;
+
 UPDATE nuevaconsulta nc
 JOIN nuevaexpediente ne ON nc.paciente_id = ne.paciente_id
 SET

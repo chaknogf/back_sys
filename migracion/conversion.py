@@ -7,7 +7,7 @@ DATABASE_URI = "mysql+pymysql://root:Prometeus.0@localhost:3306/test_api"
 
 # Ruta al archivo SQL
 base_dir = os.path.dirname(os.path.abspath(__file__))
-sql_file_path = os.path.join(base_dir, "script.sql")
+sql_file_path = os.path.join(base_dir, "scriptcopy.sql")
 if os.path.exists(sql_file_path):
     print("¡El archivo existe!")
 else:

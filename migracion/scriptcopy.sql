@@ -262,6 +262,8 @@ SELECT
     NULL AS archivado_por
 FROM pacientes;
 
+ALTER TABLE old_pacientes ENGINE = InnoDB, DEFAULT CHARSET = utf8mb4;
+
 CREATE TABLE old_consultas AS
 SELECT
     id,
@@ -327,6 +329,8 @@ SELECT
     consulta_por,
     archived_by AS archivado_por
 FROM consultas;
+
+ALTER TABLE old_consultas ENGINE = InnoDB, DEFAULT CHARSET = utf8mb4;
 
 DELETE FROM old_consultas WHERE nombre_completo = '';
 
@@ -797,48 +801,175 @@ INSERT INTO
         created_at,
         created_by
     )
-SELECT
-    MIN(nombre) AS nombre,
-    MIN(apellido) AS apellido,
+SELECT DISTINCT
+    nombre,
+    apellido,
     nombre_completo,
-    MIN(sexo) AS sexo,
-    MIN(dpi) AS dpi,
-    MIN(nacimiento) AS nacimiento,
-    MIN(direccion) AS direccion,
-    MIN(telefono) AS telefono,
-    MIN(responsable) AS responsable,
-    MIN(parentesco) AS parentesco,
-    MIN(pasaporte) AS pasaporte,
-    MIN(nacionalidad) AS nacionalidad,
-    MIN(lugar_nacimiento) AS lugar_nacimiento,
-    MIN(estado_civil) AS estado_civil,
-    MIN(educacion) AS educacion,
-    MIN(pueblo) AS pueblo,
-    MIN(idioma) AS idioma,
-    MIN(ocupacion) AS ocupacion,
-    MIN(email) AS email,
-    MIN(padre) AS padre,
-    MIN(madre) AS madre,
-    MIN(dpi_responsable) AS dpi_responsable,
-    MIN(telefono_responsable) AS telefono_responsable,
-    MIN(estado) AS estado,
-    MIN(exp_madre) AS exp_madre,
-    MIN(gemelo) AS gemelo,
-    MIN(conyugue) AS conyugue,
-    MIN(defuncion) AS defuncion,
-    MIN(exp_ref) AS exp_ref,
-    MIN(updated_at) AS updated_at,
-    MIN(created_at) AS created_at,
-    MIN(created_by) AS created_by
+    sexo,
+    dpi,
+    nacimiento,
+    direccion,
+    telefono,
+    responsable,
+    parentesco,
+    pasaporte,
+    nacionalidad,
+    lugar_nacimiento,
+    estado_civil,
+    educacion,
+    pueblo,
+    idioma,
+    ocupacion,
+    email,
+    padre,
+    madre,
+    dpi_responsable,
+    telefono_responsable,
+    estado,
+    exp_madre,
+    gemelo,
+    conyugue,
+    defuncion,
+    exp_ref,
+    updated_at,
+    created_at,
+    created_by
 FROM union_old
-GROUP BY
-    nombre_completo;
+WHERE
+    nombre_completo IS NOT NULL;
 
-CREATE TABLE nuevaconsulta AS
-SELECT *
+CREATE TABLE nuevaconsulta (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    expediente INT DEFAULT NULL,
+    nombre VARCHAR(50) DEFAULT NULL,
+    apellido VARCHAR(50) DEFAULT NULL,
+    nombre_completo VARCHAR(150) DEFAULT NULL,
+    sexo VARCHAR(2) DEFAULT NULL,
+    dpi VARCHAR(20) DEFAULT NULL,
+    nacimiento DATE DEFAULT NULL,
+    direccion VARCHAR(100) DEFAULT NULL,
+    telefono VARCHAR(50) DEFAULT NULL,
+    responsable VARCHAR(50) DEFAULT NULL,
+    parentesco VARCHAR(19) DEFAULT NULL,
+    paciente_id VARCHAR(50) DEFAULT NULL,
+    pasaporte VARCHAR(50) DEFAULT NULL,
+    nacionalidad INT DEFAULT NULL,
+    lugar_nacimiento VARCHAR(4) DEFAULT NULL,
+    estado_civil INT DEFAULT NULL,
+    educacion INT DEFAULT NULL,
+    pueblo INT DEFAULT NULL,
+    idioma INT DEFAULT NULL,
+    ocupacion VARCHAR(50) DEFAULT NULL,
+    email VARCHAR(100) DEFAULT NULL,
+    padre VARCHAR(50) DEFAULT NULL,
+    madre VARCHAR(50) DEFAULT NULL,
+    dpi_responsable BIGINT DEFAULT NULL,
+    telefono_responsable VARCHAR(18) DEFAULT NULL,
+    estado VARCHAR(2) DEFAULT NULL,
+    exp_madre VARCHAR(20) DEFAULT NULL,
+    gemelo VARCHAR(2) DEFAULT NULL,
+    conyugue VARCHAR(100) DEFAULT NULL,
+    defuncion VARCHAR(10) DEFAULT NULL,
+    exp_ref INT DEFAULT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    created_at DATETIME DEFAULT NULL,
+    created_by VARCHAR(11) DEFAULT NULL,
+    consulta_id VARCHAR(15) DEFAULT NULL,
+    hoja_emergencia VARCHAR(15) DEFAULT NULL,
+    fecha_consulta DATE DEFAULT NULL,
+    hora TIME DEFAULT NULL,
+    edad VARCHAR(200) DEFAULT NULL,
+    nota TEXT NULL,
+    especialidad INT DEFAULT NULL,
+    servicio INT DEFAULT NULL,
+    status INT DEFAULT NULL,
+    egreso DATETIME DEFAULT NULL,
+    recepcion DATETIME DEFAULT NULL,
+    tipo_consulta INT DEFAULT NULL,
+    prenatal INT DEFAULT NULL,
+    lactancia VARCHAR(2) DEFAULT NULL,
+    diagnostico VARCHAR(100) DEFAULT NULL,
+    folios VARCHAR(25) DEFAULT NULL,
+    medico VARCHAR(100) DEFAULT NULL,
+    consulta_por INT DEFAULT NULL,
+    archivado_por VARCHAR(10) DEFAULT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+INSERT INTO
+    nuevaconsulta (
+        nombre,
+        apellido,
+        nombre_completo,
+        sexo,
+        dpi,
+        nacimiento,
+        direccion,
+        telefono,
+        responsable,
+        parentesco,
+        pasaporte,
+        nacionalidad,
+        lugar_nacimiento,
+        estado_civil,
+        educacion,
+        pueblo,
+        idioma,
+        ocupacion,
+        email,
+        padre,
+        madre,
+        dpi_responsable,
+        telefono_responsable,
+        estado,
+        exp_madre,
+        gemelo,
+        conyugue,
+        defuncion,
+        exp_ref,
+        updated_at,
+        created_at,
+        created_by
+    )
+SELECT
+    nombre,
+    apellido,
+    nombre_completo,
+    sexo,
+    dpi,
+    nacimiento,
+    direccion,
+    telefono,
+    responsable,
+    parentesco,
+    pasaporte,
+    nacionalidad,
+    lugar_nacimiento,
+    estado_civil,
+    educacion,
+    pueblo,
+    idioma,
+    ocupacion,
+    email,
+    padre,
+    madre,
+    dpi_responsable,
+    telefono_responsable,
+    estado,
+    exp_madre,
+    gemelo,
+    conyugue,
+    defuncion,
+    exp_ref,
+    updated_at,
+    created_at,
+    created_by
 FROM union_old
 WHERE
     consulta_id IS NOT NULL;
+
+UPDATE nuevaconsulta SET consulta_id = NULL;
+
+UPDATE union_old SET consulta_id = NULL;
 
 CREATE INDEX idx_nombre_completo ON nuevapaciente (nombre_completo);
 
@@ -851,15 +982,15 @@ SET
 
 CREATE TABLE nuevaexpediente (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    expediente VARCHAR(15) DEFAULT NULL,
-    hoja_emergencia VARCHAR(15) DEFAULT NULL,
+    expediente VARCHAR(15) UNIQUE DEFAULT NULL,
+    hoja_emergencia VARCHAR(15) UNIQUE DEFAULT NULL,
     paciente_id INT DEFAULT NULL,
     consulta_id INT DEFAULT NULL,
     exp_madre INT DEFAULT NULL,
     created_at DATETIME DEFAULT NULL,
     exp_ref INT DEFAULT NULL,
     nombre_completo VARCHAR(125) DEFAULT NULL
-);
+) ENGINE = InnoDB CHARSET = utf8mb4;
 
 CREATE TABLE noemergencia AS
 SELECT
@@ -872,6 +1003,8 @@ SELECT
     consulta_id,
     nombre_completo
 FROM old_pacientes;
+
+ALTER TABLE noemergencia ENGINE = InnoDB, DEFAULT CHARSET = utf8mb4;
 
 UPDATE noemergencia u
 JOIN nuevapaciente np ON u.nombre_completo = np.nombre_completo
@@ -890,7 +1023,9 @@ SELECT
     nombre_completo
 FROM old_consultas;
 
-ALTER TABLE siemergencia MODIFY paciente_id INT;
+ALTER TABLE siemergencia ENGINE = InnoDB, DEFAULT CHARSET = utf8mb4;
+
+ALTER TABLE siemergencia MODIFY paciente_id BIGINT;
 
 UPDATE siemergencia u
 JOIN nuevapaciente np ON u.nombre_completo = np.nombre_completo
@@ -905,7 +1040,8 @@ INSERT INTO
         consulta_id,
         exp_madre,
         created_at,
-        exp_ref
+        exp_ref,
+        nombre_completo
     )
 SELECT
     expediente,
@@ -914,7 +1050,8 @@ SELECT
     consulta_id,
     exp_madre,
     created_at,
-    exp_ref
+    exp_ref,
+    nombre_completo
 FROM noemergencia;
 
 INSERT INTO
@@ -925,7 +1062,8 @@ INSERT INTO
         consulta_id,
         exp_madre,
         created_at,
-        exp_ref
+        exp_ref,
+        nombre_completo
     )
 SELECT
     expediente,
@@ -934,7 +1072,8 @@ SELECT
     consulta_id,
     exp_madre,
     created_at,
-    exp_ref
+    exp_ref,
+    nombre_completo
 FROM siemergencia;
 
 CREATE INDEX idx_paciente_id_expediente ON nuevaexpediente (paciente_id, expediente);

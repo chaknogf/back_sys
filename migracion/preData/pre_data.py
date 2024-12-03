@@ -3,15 +3,13 @@ from tqdm import tqdm
 import os
 
 # Configura tu conexión a la base de datos
-DATABASE_URI = "mysql+pymysql://root:Prometeus.0@localhost:3306/test_api"
+DATABASE_URI = "mysql+pymysql://root:Prometeus.0@localhost:3306/test_api" 
 
-# Ruta al archivo SQL
+# Ruta al directorio de archivos SQL
 base_dir = os.path.dirname(os.path.abspath(__file__))
-sql_file_path = os.path.join(base_dir, "scriptcopy.sql")
-if os.path.exists(sql_file_path):
-    print("¡El archivo existe!")
-else:
-    print(f"Archivo no encontrado en la ruta: {sql_file_path}")
+
+# Lista de archivos SQL en el orden deseado
+sql_files = ["correcciones.sql", "tablas_bases.sql","modificaciones.sql","preparaciones.sql"]
 
 # Conexión a la base de datos
 engine = create_engine(DATABASE_URI)
@@ -27,20 +25,10 @@ def load_and_filter_sql(file_path):
         # Leer todo el contenido del archivo y dividir por ";"
         sql_content = file.read()
 
-    # Eliminar saltos de línea y comentarios de una forma más robusta
-    commands = sql_content.split(";")
-
-    # Filtrar los comandos vacíos y comentarios
-    commands = [command.strip() for command in commands if command.strip() and not command.strip().startswith("--")]
-
-    # Imprimir los comandos para depuración
-    # print("Comandos procesados:")
-    # for command in commands:
-    #     print(command)
+    # Dividir en comandos y filtrar vacíos o comentarios
+    commands = [command.strip() for command in sql_content.split(";") if command.strip() and not command.strip().startswith("--")]
     
-    # Devolver la lista de comandos sin caracteres innecesarios al inicio o final
     return commands
-    
 
 def execute_sql_commands(commands):
     """
@@ -52,8 +40,16 @@ def execute_sql_commands(commands):
                 connection.execute(text(command))
             except Exception as e:
                 print(f"Error ejecutando el comando: {command}\n{e}")
+        
+        # Commit explícito después de la ejecución
+        connection.commit()
 
 if __name__ == "__main__":
-    sql_commands = load_and_filter_sql(sql_file_path)
-    execute_sql_commands(sql_commands)
-    
+    for sql_file in sql_files:
+        sql_file_path = os.path.join(base_dir, sql_file)
+        if os.path.exists(sql_file_path):
+            print(f"Procesando archivo: {sql_file}")
+            sql_commands = load_and_filter_sql(sql_file_path)
+            execute_sql_commands(sql_commands)
+        else:
+            print(f"Archivo no encontrado: {sql_file}")

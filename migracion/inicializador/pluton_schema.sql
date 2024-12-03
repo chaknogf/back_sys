@@ -169,14 +169,17 @@ CREATE TABLE consultas (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     grupo_edad INT DEFAULT NULL,
+    -- Llaves foráneas
     FOREIGN KEY (medico) REFERENCES medicos (colegiado),
+    FOREIGN KEY (exp_id) REFERENCES expedientes (id),
     FOREIGN KEY (tipo_lesion) REFERENCES tipo_lesion (id),
     FOREIGN KEY (especialidad) REFERENCES especialidad (id),
     FOREIGN KEY (tipo_consulta) REFERENCES tipo_consulta (id),
     FOREIGN KEY (servicio) REFERENCES servicios (id),
     FOREIGN KEY (grupo_edad) REFERENCES grupo_edad (id),
     FOREIGN KEY (estatus) REFERENCES estatus (id),
-    INDEX idx_consultas_exp_id (id),
+    -- Índices
+    INDEX idx_consultas_exp_id (exp_id),
     INDEX idx_consultas_medico (medico),
     INDEX idx_consultas_fecha_consulta (fecha_consulta),
     INDEX idx_consultas_tipo_consulta (tipo_consulta)

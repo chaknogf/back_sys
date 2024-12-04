@@ -8,7 +8,10 @@ xxx,
 old_consultas,
 old_pacientes,
 temp_duplicados,
-nuevacitas;
+nuevacitas,
+nuevamedicos,
+nuevausuario,
+nuevarn;
 
 UPDATE pacientes
 SET

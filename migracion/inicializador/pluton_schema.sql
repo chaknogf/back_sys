@@ -63,13 +63,14 @@ CREATE TABLE contacto_paciente (
 CREATE TABLE usuarios (
     id INT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(10) UNIQUE NOT NULL,
-    name VARCHAR(100) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    rol_id INT NOT NULL,
+    dpi BIGINT UNIQUE DEFAULT NULL,
+    contraseña VARCHAR(255) NOT NULL,
+    rol INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (rol_id) REFERENCES roles (id)
+    FOREIGN KEY (rol) REFERENCES roles (id)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
 CREATE TABLE madres (
@@ -85,15 +86,16 @@ CREATE TABLE madres (
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
 CREATE TABLE medicos (
-    colegiado INT NOT NULL PRIMARY KEY,
+    id INT NOT NULL PRIMARY KEY,
+    colegiado INT NOT NULL UNIQUE,
     nombre VARCHAR(200) DEFAULT NULL,
     dpi BIGINT DEFAULT NULL,
-    especialidad_id INT DEFAULT NULL,
+    especialidad INT DEFAULT NULL,
     pasaporte VARCHAR(30) DEFAULT NULL,
     sexo ENUM('M', 'F') DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_medicos_especialidad FOREIGN KEY (especialidad_id) REFERENCES especialidad (id)
+    CONSTRAINT fk_medicos_especialidad FOREIGN KEY (especialidad) REFERENCES especialidad (id)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
 CREATE TABLE recien_nacidos (
@@ -104,11 +106,9 @@ CREATE TABLE recien_nacidos (
     peso_onzas INT DEFAULT NULL,
     tipo_parto_id INT DEFAULT NULL,
     clase_parto_id INT DEFAULT NULL,
-    medico_id INT DEFAULT NULL,
     FOREIGN KEY (paciente_id) REFERENCES pacientes (id),
     FOREIGN KEY (tipo_parto_id) REFERENCES tipos_parto (id),
     FOREIGN KEY (clase_parto_id) REFERENCES clases_parto (id),
-    FOREIGN KEY (medico_id) REFERENCES medicos (colegiado),
     UNIQUE INDEX idx_recien_nacido_paciente (paciente_id)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
@@ -118,15 +118,18 @@ CREATE TABLE constancias_nacimiento (
     doc VARCHAR(15) DEFAULT NULL UNIQUE,
     madre_id INT NOT NULL,
     recien_nacido_id INT NOT NULL,
-    usuario_id INT NOT NULL, -- Usuario que crea la constancia
+    usuario_id INT NOT NULL,
+    medico INT DEFAULT NULL,
     created_by VARCHAR(10) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (madre_id) REFERENCES madres (id),
-    FOREIGN KEY (recien_nacido_id) REFERENCES recien_nacidos (id),
-    FOREIGN KEY (usuario_id) REFERENCES usuarios (id),
-    INDEX idx_constancias_nacimiento_madre_id (madre_id),
-    INDEX idx_constancias_nacimiento_recien_nacido_id (recien_nacido_id)
+    CONSTRAINT fk_const_nac_madre FOREIGN KEY (madre_id) REFERENCES madres (id),
+    CONSTRAINT fk_const_nac_recien_nacido FOREIGN KEY (recien_nacido_id) REFERENCES recien_nacidos (id),
+    CONSTRAINT fk_const_nac_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id),
+    CONSTRAINT fk_const_nac_medico FOREIGN KEY (medico) REFERENCES medicos (colegiado),
+    INDEX idx_const_nac_madre (madre_id),
+    INDEX idx_const_nac_recien_nacido (recien_nacido_id),
+    INDEX idx_const_nac_medico (medico)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
 CREATE TABLE expedientes (
@@ -169,7 +172,6 @@ CREATE TABLE consultas (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     grupo_edad INT DEFAULT NULL,
-    -- Llaves foráneas
     FOREIGN KEY (medico) REFERENCES medicos (colegiado),
     FOREIGN KEY (exp_id) REFERENCES expedientes (id),
     FOREIGN KEY (tipo_lesion) REFERENCES tipo_lesion (id),
@@ -178,7 +180,6 @@ CREATE TABLE consultas (
     FOREIGN KEY (servicio) REFERENCES servicios (id),
     FOREIGN KEY (grupo_edad) REFERENCES grupo_edad (id),
     FOREIGN KEY (estatus) REFERENCES estatus (id),
-    -- Índices
     INDEX idx_consultas_exp_id (exp_id),
     INDEX idx_consultas_medico (medico),
     INDEX idx_consultas_fecha_consulta (fecha_consulta),
@@ -206,28 +207,28 @@ CREATE TABLE citas (
     INDEX idx_citas_tipo_cita (tipo_cita)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
-CREATE TABLE proce_medicos (
-    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    fecha DATE DEFAULT NULL,
-    servicio_id INT DEFAULT NULL,
-    sexo ENUM('M', 'F') DEFAULT NULL,
-    codigo_procedimiento_id INT NOT NULL,
-    especialidad_id INT DEFAULT NULL,
-    cantidad INT DEFAULT NULL,
-    medico_id INT DEFAULT NULL,
-    grupo_edad ENUM('N', 'A') DEFAULT NULL,
-    created_by VARCHAR(10) DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (servicio_id) REFERENCES servicios (id),
-    FOREIGN KEY (codigo_procedimiento_id) REFERENCES codigo_procedimientos (id),
-    FOREIGN KEY (especialidad_id) REFERENCES especialidad (id),
-    FOREIGN KEY (medico_id) REFERENCES medicos (colegiado),
-    INDEX idx_proce_medicos_servicio (servicio_id),
-    INDEX idx_proce_medicos_codigo (codigo_procedimiento_id),
-    INDEX idx_proce_medicos_especialidad (especialidad_id),
-    INDEX idx_proce_medicos_medico (medico_id)
-) ENGINE = InnoDB CHARSET = utf8mb4;
+-- CREATE TABLE proce_medicos (
+--     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+--     fecha DATE DEFAULT NULL,
+--     servicio_id INT DEFAULT NULL,
+--     sexo ENUM('M', 'F') DEFAULT NULL,
+--     codigo_procedimiento_id INT NOT NULL,
+--     especialidad_id INT DEFAULT NULL,
+--     cantidad INT DEFAULT NULL,
+--     medico_id INT DEFAULT NULL,
+--     grupo_edad ENUM('N', 'A') DEFAULT NULL,
+--     created_by VARCHAR(10) DEFAULT NULL,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+--     FOREIGN KEY (servicio_id) REFERENCES servicios (id),
+--     FOREIGN KEY (codigo_procedimiento_id) REFERENCES codigo_procedimientos (id),
+--     FOREIGN KEY (especialidad_id) REFERENCES especialidad (id),
+--     FOREIGN KEY (medico_id) REFERENCES medicos (colegiado),
+--     INDEX idx_proce_medicos_servicio (servicio_id),
+--     INDEX idx_proce_medicos_codigo (codigo_procedimiento_id),
+--     INDEX idx_proce_medicos_especialidad (especialidad_id),
+--     INDEX idx_proce_medicos_medico (medico_id)
+-- ) ENGINE = InnoDB CHARSET = utf8mb4;
 
 CREATE TABLE uisau (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,

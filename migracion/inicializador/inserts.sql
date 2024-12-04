@@ -2105,15 +2105,6 @@ VALUES ('COEX'),
     ('Maternidad');
 
 INSERT INTO
-    tipos_cita (tipo)
-VALUES ('Consulta'),
-    ('Ingreso - Operatorio'),
-    ('USG Obstetrico'),
-    ('USG Pelvico'),
-    ('Colposcopia'),
-    ('Especial');
-
-INSERT INTO
     estados_salud (nombre)
 VALUES ('Estable'),
     ('Delicado'),
@@ -2279,6 +2270,16 @@ VALUES ('USG Obstetrico'),
     ('USG Pelvico'),
     ('Colposcopia'),
     ('Rayos X');
+
+INSERT INTO
+    tipo_citas (descripcion)
+VALUES ('consulta'),
+    ('ingreso - operatorio'),
+    ('USG Obstetrico'),
+    ('USG Pelvico'),
+    ('Colposcopia'),
+    ('especial'),
+    ('con recordatorio');
 
 INSERT INTO
     estatus (descripcion)

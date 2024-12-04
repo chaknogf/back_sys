@@ -1,82 +1,45 @@
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS parentescos;
-
-DROP TABLE IF EXISTS pueblos;
-
-DROP TABLE IF EXISTS idiomas;
-
-DROP TABLE IF EXISTS nacionalidades;
-
-DROP TABLE IF EXISTS depto_muni;
-
-DROP TABLE IF EXISTS estados_civiles;
-
-DROP TABLE IF EXISTS educacion;
-
-DROP TABLE IF EXISTS roles;
-
-DROP TABLE IF EXISTS permisos;
-
-DROP TABLE IF EXISTS tipos_parto;
-
-DROP TABLE IF EXISTS clases_parto;
-
-DROP TABLE IF EXISTS tipo_lesion;
-
-DROP TABLE IF EXISTS especialidad;
-
-DROP TABLE IF EXISTS grupo_edad;
-
-DROP TABLE IF EXISTS servicios;
-
-DROP TABLE IF EXISTS tipos_cita;
-
-DROP TABLE IF EXISTS codigo_procedimientos;
-
-DROP TABLE IF EXISTS estados_salud;
-
-DROP TABLE IF EXISTS situaciones_salud;
-
-DROP TABLE IF EXISTS lugares_referencia;
-
-DROP TABLE IF EXISTS estadia_es;
-
-DROP TABLE IF EXISTS servio_es;
-
-DROP TABLE IF EXISTS tipo_consulta;
-
-DROP TABLE IF EXISTS estudios;
-
-DROP TABLE IF EXISTS estatus;
-
-DROP TABLE IF EXISTS pacientes;
-
-DROP TABLE IF EXISTS referencia_contacto;
-
-DROP TABLE IF EXISTS contacto_paciente;
-
-DROP TABLE IF EXISTS usuarios;
-
-DROP TABLE IF EXISTS madres;
-
-DROP TABLE IF EXISTS medicos;
-
-DROP TABLE IF EXISTS recien_nacidos;
-
-DROP TABLE IF EXISTS constancias_nacimiento;
-
-DROP TABLE IF EXISTS expedientes;
-
-DROP TABLE IF EXISTS consultas;
-
-DROP TABLE IF EXISTS citas;
-
-DROP TABLE IF EXISTS proce_medicos;
-
-DROP TABLE IF EXISTS uisau;
-
-DROP TABLE IF EXISTS cie10;
+DROP TABLE IF EXISTS parentescos,
+pueblos,
+idiomas,
+nacionalidades,
+depto_muni,
+estados_civiles,
+educacion,
+roles,
+permisos,
+tipos_parto,
+clases_parto,
+tipo_lesion,
+especialidad,
+grupo_edad,
+servicios,
+tipos_cita,
+codigo_procedimientos,
+estados_salud,
+situaciones_salud,
+lugares_referencia,
+estadia_es,
+servio_es,
+tipo_consulta,
+estudios,
+estatus,
+pacientes,
+referencia_contacto,
+contacto_paciente,
+usuarios,
+madres,
+medicos,
+recien_nacidos,
+constancias_nacimiento,
+expedientes,
+consultas,
+citas,
+proce_medicos,
+uisau,
+cie10,
+tipo_citas;
 
 CREATE TABLE IF NOT EXISTS parentescos (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -167,12 +130,6 @@ CREATE TABLE servicios (
     descripcion TEXT DEFAULT NULL
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
-CREATE TABLE tipos_cita (
-    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    tipo VARCHAR(50) NOT NULL,
-    descripcion VARCHAR(255) DEFAULT NULL
-) ENGINE = InnoDB CHARSET = utf8mb4;
-
 CREATE TABLE codigo_procedimientos (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     abreviatura VARCHAR(10) NOT NULL,
@@ -219,6 +176,11 @@ CREATE TABLE estudios (
 CREATE TABLE estatus (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     descripcion VARCHAR(50) NOT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE tipo_citas (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    descripcion VARCHAR(100) NOT NULL
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 0;

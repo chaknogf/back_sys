@@ -17,6 +17,7 @@ new_metadata = MetaData()
 old_pacientes = Table("nuevapaciente", old_metadata, autoload_with=old_engine)
 old_consultas = Table("nuevaconsulta", old_metadata, autoload_with=old_engine)
 old_expedientes = Table("nuevaexpediente", old_metadata, autoload_with=old_engine)
+old_citas = Table("nuevacitas", old_metadata, autoload_with=old_engine)
 
 # Tablas de la base nueva
 new_pacientes = Table("pacientes", new_metadata, autoload_with=new_engine)
@@ -24,6 +25,7 @@ referencia_contacto = Table("referencia_contacto", new_metadata, autoload_with=n
 contacto_paciente = Table("contacto_paciente", new_metadata, autoload_with=new_engine)
 new_expedientes = Table("expedientes", new_metadata, autoload_with=new_engine)
 new_consultas = Table("consultas", new_metadata, autoload_with=new_engine)
+new_citas = Table("citas", new_metadata, autoload_with=new_engine, autoload_replace=False)
 
 
 # Función para dividir los números de teléfono
@@ -147,20 +149,53 @@ def migrate_consultas(old_consultas_list, consulta_mapping):
         except Exception as e:
                 print(f"Error al migrar consulta {old_consulta.id}: {e}")
                 
+def migrate_citas(old_citas_list, citas_mapping=None):
+    from sqlalchemy.dialects.mysql import insert  # Usar dialecto correcto si es necesario
+
+    for old_cita in tqdm(old_citas_list, desc="Migrando citas", unit="cita"):
+        try:
+            with new_session.begin():  # Transacción independiente
+                # Preparar datos de citas
+                citas_data = {
+                    "id": old_cita.id,
+                    "paciente_id": old_cita.paciente_id,
+                    "especialidad": old_cita.especialidad,
+                    "fecha_cita": old_cita.fecha,
+                    "tipo_cita": old_cita.tipo,
+                    "nota": old_cita.nota,
+                    "created_at": old_cita.created_at,
+                    "updated_at": old_cita.updated_at,
+                    "created_by": old_cita.created_by,
+                }
+
+                # # Validar datos
+                # if not all([citas_data["id"], citas_data["paciente_id"], citas_data["fecha_cita"]]):
+                #     print(f"Datos incompletos para cita {old_cita.id}. Saltando...")
+                #     continue
+
+                # Insertar cita
+                new_session.execute(insert(new_citas).values(citas_data))
+        except Exception as e:
+            print(f"Error al migrar cita {old_cita.id if old_cita.id else 'desconocida'}: {e}")
+                
+
 
 # Migración
 try:
     paciente_mapping = {}
     consulta_mapping = {}
     expediente_mapping = {}
+    citas_mapping = {}
     old_pacientes_list = old_session.execute(select(old_pacientes)).fetchall()
     old_expedientes_list = old_session.execute(select(old_expedientes)).fetchall()
     old_consultas_list = old_session.execute(select(old_consultas)).fetchall()
+    old_citas_list = old_session.execute(select(old_citas)).fetchall()
    
 
     migrate_pacientes(old_pacientes_list, paciente_mapping)
     migrate_expedientes(old_expedientes_list, expediente_mapping)
     migrate_consultas(old_consultas_list, consulta_mapping)
+    migrate_citas( old_citas_list, citas_mapping)
    
     
     

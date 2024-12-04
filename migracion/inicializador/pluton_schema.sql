@@ -188,22 +188,22 @@ CREATE TABLE consultas (
 CREATE TABLE citas (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     paciente_id INT NOT NULL,
-    especialidad_id INT DEFAULT NULL,
+    especialidad INT DEFAULT NULL,
     fecha_cita DATE DEFAULT NULL,
-    tipo_cita_id INT DEFAULT NULL,
+    tipo_cita INT DEFAULT NULL,
+    doble_fecha ENUM('S', 'N') DEFAULT 'N',
     laboratorio VARCHAR(50) DEFAULT NULL,
     fecha_laboratorio DATE DEFAULT NULL,
     nota TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     created_by VARCHAR(8) DEFAULT NULL,
-    FOREIGN KEY (paciente_id) REFERENCES paciente (id),
-    FOREIGN KEY (especialidad_id) REFERENCES especialidad (id),
-    FOREIGN KEY (tipo_cita_id) REFERENCES tipos_cita (id),
-    INDEX idx_citas_expediente (id),
+    FOREIGN KEY (paciente_id) REFERENCES pacientes (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (especialidad) REFERENCES especialidad (id),
+    FOREIGN KEY (tipo_cita) REFERENCES tipo_citas (id),
     INDEX idx_citas_paciente_id (paciente_id),
-    INDEX idx_citas_especialidad (especialidad_id),
-    INDEX idx_citas_tipo_cita (tipo_cita_id)
+    INDEX idx_citas_especialidad (especialidad),
+    INDEX idx_citas_tipo_cita (tipo_cita)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
 CREATE TABLE proce_medicos (

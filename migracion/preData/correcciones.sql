@@ -11,17 +11,84 @@ temp_duplicados,
 nuevacitas,
 nuevamedicos,
 nuevausuario,
-nuevarn;
+nuevarn,
+temp_union_old,
+sin_rn,
+filtro_rn;
 
+-- Eliminar espacios al principio, al final y reducir múltiples espacios intermedios a uno en `pacientes`
 UPDATE pacientes
 SET
-    nombre = TRIM(nombre),
-    apellido = TRIM(apellido);
+    nombre = TRIM(
+        REPLACE (
+                REPLACE (
+                        REPLACE (nombre, '    ', ' '),
+                            '   ',
+                            ' '
+                    ),
+                    '  ',
+                    ' '
+            )
+    ),
+    apellido = TRIM(
+        REPLACE (
+                REPLACE (
+                        REPLACE (apellido, '    ', ' '),
+                            '   ',
+                            ' '
+                    ),
+                    '  ',
+                    ' '
+            )
+    )
+WHERE
+    nombre LIKE '%  %'
+    OR apellido LIKE '%  %';
 
+-- Eliminar espacios al principio, al final y reducir múltiples espacios intermedios a uno en `consultas`
 UPDATE consultas
 SET
-    nombres = TRIM(nombres),
-    apellidos = TRIM(apellidos);
+    nombres = TRIM(
+        REPLACE (
+                REPLACE (
+                        REPLACE (nombres, '    ', ' '),
+                            '   ',
+                            ' '
+                    ),
+                    '  ',
+                    ' '
+            )
+    ),
+    apellidos = TRIM(
+        REPLACE (
+                REPLACE (
+                        REPLACE (apellidos, '    ', ' '),
+                            '   ',
+                            ' '
+                    ),
+                    '  ',
+                    ' '
+            )
+    )
+WHERE
+    nombres LIKE '%  %'
+    OR apellidos LIKE '%  %';
+
+UPDATE cons_nac
+SET
+    madre = TRIM(
+        REPLACE (
+                REPLACE (
+                        REPLACE (madre, '    ', ' '),
+                            '   ',
+                            ' '
+                    ),
+                    '  ',
+                    ' '
+            )
+    )
+WHERE
+    madre LIKE '%  %';
 
 UPDATE pacientes
 SET

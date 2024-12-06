@@ -60,14 +60,16 @@ CREATE TABLE contacto_paciente (
     FOREIGN KEY (paciente_id) REFERENCES pacientes (id)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
+SET FOREIGN_KEY_CHECKS = 0;
+
 CREATE TABLE usuarios (
     id INT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(10) UNIQUE NOT NULL,
     nombre VARCHAR(100) NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
+    email VARCHAR(100) DEFAULT NULL,
     dpi BIGINT UNIQUE DEFAULT NULL,
-    contraseña VARCHAR(255) NOT NULL,
-    rol INT NOT NULL,
+    contraseña VARCHAR(255) DEFAULT NULL,
+    rol INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (rol) REFERENCES roles (id)
@@ -77,12 +79,12 @@ CREATE TABLE madres (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     paciente_id INT NOT NULL,
     vecindad VARCHAR(4) DEFAULT NULL,
-    hijos_total INT DEFAULT 0,
+    hijos INT DEFAULT 0,
     vivos INT DEFAULT 0,
     muertos INT DEFAULT 0,
     edad INT DEFAULT NULL,
     FOREIGN KEY (paciente_id) REFERENCES pacientes (id),
-    UNIQUE INDEX idx_madres_paciente (id)
+    INDEX idx_madres_paciente (id)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
 CREATE TABLE medicos (
@@ -104,11 +106,11 @@ CREATE TABLE recien_nacidos (
     hora TIME DEFAULT NULL,
     peso_libras INT DEFAULT NULL,
     peso_onzas INT DEFAULT NULL,
-    tipo_parto_id INT DEFAULT NULL,
-    clase_parto_id INT DEFAULT NULL,
+    tipo_parto INT DEFAULT NULL,
+    clase_parto INT DEFAULT NULL,
     FOREIGN KEY (paciente_id) REFERENCES pacientes (id),
-    FOREIGN KEY (tipo_parto_id) REFERENCES tipos_parto (id),
-    FOREIGN KEY (clase_parto_id) REFERENCES clases_parto (id),
+    FOREIGN KEY (tipo_parto) REFERENCES tipos_parto (id),
+    FOREIGN KEY (clase_parto) REFERENCES clases_parto (id),
     UNIQUE INDEX idx_recien_nacido_paciente (paciente_id)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
@@ -120,7 +122,6 @@ CREATE TABLE constancias_nacimiento (
     recien_nacido_id INT NOT NULL,
     usuario_id INT NOT NULL,
     medico INT DEFAULT NULL,
-    created_by VARCHAR(10) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_const_nac_madre FOREIGN KEY (madre_id) REFERENCES madres (id),
@@ -188,7 +189,7 @@ CREATE TABLE consultas (
 
 CREATE TABLE citas (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    paciente_id INT NOT NULL,
+    paciente_id INT DEFAULT NULL,
     especialidad INT DEFAULT NULL,
     fecha_cita DATE DEFAULT NULL,
     tipo_cita INT DEFAULT NULL,

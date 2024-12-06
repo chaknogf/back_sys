@@ -2498,13 +2498,25 @@ VALUES (
     ),
     (
         2,
+        'estandar',
+        'Puede ver, editar y navegar, pero no crear ni eliminar usuarios',
+        'editar,ver,navegar'
+    ),
+    (
+        3,
         'Observador',
         'Solo puede ver y navegar',
         'ver,navegar'
     ),
     (
-        3,
-        'estandar',
+        4,
+        'registrador',
+        'Puede ver, editar y navegar, pero no crear ni eliminar usuarios',
+        'editar,ver,navegar'
+    ),
+    (
+        5,
+        'informacion',
         'Puede ver, editar y navegar, pero no crear ni eliminar usuarios',
         'editar,ver,navegar'
     );

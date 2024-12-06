@@ -137,6 +137,7 @@ CREATE TABLE nuevarn (
     tipo_parto INT DEFAULT NULL,
     clase_parto INT DEFAULT NULL,
     certifica VARCHAR(200) DEFAULT NULL,
+    usuario_id INT DEFAULT NULL,
     create_by VARCHAR(10) NULL,
     expediente INT DEFAULT NULL,
     nacionalidad VARCHAR(25) DEFAULT NULL,
@@ -232,7 +233,7 @@ SELECT
     ao,
     doc,
     fecha_parto,
-    madre,
+    TRIM(madre) AS madre,
     dpi,
     passport,
     libro,
@@ -263,18 +264,68 @@ SELECT
     updated_at
 FROM cons_nac;
 
+DELETE FROM nuevarn
+WHERE
+    doc IN (
+        '0952-2024',
+        '1163-2024',
+        '1841-2024'
+    );
+
 CREATE INDEX idx_nuevarn_expediente ON nuevarn (expediente);
 
 CREATE INDEX idx_union_old_expediente ON union_old (expediente);
 
 CREATE INDEX idx_union_old_exp_madre ON union_old (exp_madre);
 
-UPDATE nuevarn nr
-JOIN union_old np ON nr.expediente = np.expediente
-SET
-    nr.madre_id = np.paciente_id;
+CREATE INDEX idx_nuevarn_create_by ON nuevarn (create_by);
+
+CREATE INDEX idx_nuevausuario_username ON nuevausuario (username);
 
 UPDATE nuevarn nr
-JOIN union_old np ON nr.expediente = np.exp_madre
+JOIN nuevaexpediente np ON nr.expediente = np.expediente
 SET
-    nr.rn_id = np.paciente_id;
+    nr.madre_id = np.paciente_id
+WHERE
+    nr.id IS NOT NULL;
+
+UPDATE nuevarn nr
+JOIN nuevaexpediente np ON nr.expediente = np.exp_ref
+SET
+    nr.madre_id = np.paciente_id
+WHERE
+    nr.id IS NOT NULL;
+
+UPDATE nuevarn nr
+JOIN nuevaexpediente np ON nr.expediente = np.exp_madre
+SET
+    nr.rn_id = np.paciente_id
+WHERE
+    np.id IS NOT NULL;
+
+UPDATE nuevarn nr
+JOIN nuevausuario nu ON nr.create_by = nu.username
+SET
+    nr.usuario_id = nu.id;
+
+CREATE TABLE sin_rn AS
+SELECT madre, expediente, rn_id
+FROM nuevarn
+WHERE
+    rn_id IS NULL;
+
+CREATE TABLE filtro_rn AS
+SELECT
+    m.*,
+    e.paciente_id AS paciente_id,
+    e.nombre_completo AS nombre_completo
+FROM sin_rn m
+    JOIN nuevaexpediente e ON e.nombre_completo LIKE CONCAT('%', m.madre, '%')
+WHERE
+    e.nombre_completo LIKE 'hijo de%'
+    OR e.nombre_completo LIKE 'hija de%';
+
+UPDATE nuevarn nr
+JOIN filtro_rn frn ON nr.expediente = frn.expediente
+SET
+    nr.rn_id = frn.paciente_id;

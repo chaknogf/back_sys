@@ -18,6 +18,9 @@ old_pacientes = Table("nuevapaciente", old_metadata, autoload_with=old_engine)
 old_consultas = Table("nuevaconsulta", old_metadata, autoload_with=old_engine)
 old_expedientes = Table("nuevaexpediente", old_metadata, autoload_with=old_engine)
 old_citas = Table("nuevacitas", old_metadata, autoload_with=old_engine)
+old_medicos = Table("nuevamedicos", old_metadata, autoload_with=old_engine)
+old_usuarios = Table("nuevausuario", old_metadata, autoload_with=old_engine)
+old_constancias = Table("nuevarn", old_metadata, autoload_with=old_engine)
 
 # Tablas de la base nueva
 new_pacientes = Table("pacientes", new_metadata, autoload_with=new_engine)
@@ -26,6 +29,11 @@ contacto_paciente = Table("contacto_paciente", new_metadata, autoload_with=new_e
 new_expedientes = Table("expedientes", new_metadata, autoload_with=new_engine)
 new_consultas = Table("consultas", new_metadata, autoload_with=new_engine)
 new_citas = Table("citas", new_metadata, autoload_with=new_engine, autoload_replace=False)
+new_medicos = Table("medicos", new_metadata, autoload_with=new_engine, autoload_replace=False)
+new_usuarios = Table("usuarios", new_metadata, autoload_with=new_engine, autoload_replace=False)
+new_madres = Table("madres",new_metadata, autoload_with=new_engine, autoload_replace=False)
+new_recien = Table("recien_nacidos",new_metadata, autoload_with=new_engine, autoload_replace=False)
+new_constancia = Table("constancias_nacimiento", new_metadata, autoload_with=new_engine, autoload_replace=False)
 
 
 # Función para dividir los números de teléfono
@@ -168,16 +176,107 @@ def migrate_citas(old_citas_list, citas_mapping=None):
                     "created_by": old_cita.created_by,
                 }
 
-                # # Validar datos
-                # if not all([citas_data["id"], citas_data["paciente_id"], citas_data["fecha_cita"]]):
-                #     print(f"Datos incompletos para cita {old_cita.id}. Saltando...")
-                #     continue
-
                 # Insertar cita
                 new_session.execute(insert(new_citas).values(citas_data))
         except Exception as e:
             print(f"Error al migrar cita {old_cita.id if old_cita.id else 'desconocida'}: {e}")
                 
+def migrate_medicos(old_medicos_list, medicos_mapping=None):
+    from sqlalchemy.dialects.mysql import insert  # Usar dialecto correcto si es necesario
+
+    for old_medico in tqdm(old_medicos_list, desc="Migrando medicos", unit="medico"):
+        try:
+            with new_session.begin():  # Transacción independiente
+                # Preparar datos de citas
+                medicos_data = {
+                    "id": old_medico.id,
+                    "colegiado": old_medico.colegiado,
+                    "nombre": old_medico.nombre,
+                    "dpi": old_medico.dpi,
+                    "especialidad": old_medico.especialidad,    
+                    "pasaporte": old_medico.pasaporte,
+                    "sexo": old_medico.sexo,
+                    "updated_at": old_medico.updated_at,
+                    "created_at": old_medico.created_at,
+                }
+
+                # Insertar cita
+                new_session.execute(insert(new_medicos).values(medicos_data))
+        except Exception as e:
+            print(f"Error al migrar cita {old_medico.id if old_medico.id else 'desconocida'}: {e}")
+                
+def migrate_usuarios(old_usuarios_list, usuarios_mapping=None):
+    from sqlalchemy.dialects.mysql import insert  # Usar dialecto correcto si es necesario
+
+    for old_usuario in tqdm(old_usuarios_list, desc="Migrando usuarios", unit="usuario"):
+        try:
+            with new_session.begin():  # Transacción independiente
+                # Preparar datos de citas
+                usuarios_data = {
+                    "id": old_usuario.id,
+                    "username": old_usuario.username,
+                    "nombre": old_usuario.nombre,
+                    "email": old_usuario.email,
+                    "dpi": old_usuario.dpi,
+                    "contraseña": old_usuario.contraseña,
+                    "rol": old_usuario.rol,
+                    "updated_at": old_usuario.updated_at,
+                    "created_at": old_usuario.created_at,
+                }
+
+                # Insertar cita
+                new_session.execute(insert(new_usuarios).values(usuarios_data))
+        except Exception as e:
+            print(f"Error al migrar cita {old_usuario.id if old_usuario.id else 'desconocida'}: {e}")
+                
+
+def migrate_constancias(old_constancias_list, constancias_mapping=None):
+    from sqlalchemy.dialects.mysql import insert  # Usar dialecto correcto si es necesario
+
+    for old_constancia in tqdm(old_constancias_list, desc="Migrando constancias", unit="constancia"):
+        try:
+            with new_session.begin():  # Transacción independiente
+
+                # Preparar datos de madres
+                madres_data = {
+                    "paciente_id": old_constancia.madre_id,
+                    "vecindad": old_constancia.vecindad,
+                    "hijos": old_constancia.hijos,
+                    "vivos": old_constancia.vivos,
+                    "muertos": old_constancia.muertos,
+                    "edad": old_constancia.edad,
+                }
+                new_session.execute(insert(new_madres).values(madres_data))
+
+                # Preparar datos de recién nacidos
+                # rn_data = {
+                #     "paciente_id": old_constancia.rn_id,
+                #     "hora": old_constancia.hora,
+                #     "peso_libras": old_constancia.lb,
+                #     "peso_onzas": old_constancia.onz,
+                #     "tipo_parto": old_constancia.tipo_parto,
+                #     "clase_parto": old_constancia.clase_parto,
+                # }
+                # new_session.execute(insert(new_recien).values(rn_data))
+
+                # Preparar datos de constancias
+                # const_data = {
+                #     "id": old_constancia.id,
+                #     "fecha": old_constancia.fecha,
+                #     "doc": old_constancia.doc,
+                #     "madre_id": old_constancia.madre_id,
+                #     "recien_nacido_id": old_constancia.rn_id,
+                #     "usuario_id": old_constancia.usuario_id,
+                #     "medico": old_constancia.colegiado,
+                #     "created_at": old_constancia.created_at,
+                #     "updated_at": old_constancia.updated_at,
+                # }
+                # new_session.execute(insert(new_constancia).values(const_data))
+
+        except Exception as e:
+            print(f"Error al migrar constancia {old_constancia.id if old_constancia.id else 'desconocida'}: {e}")
+
+
 
 
 # Migración
@@ -186,16 +285,25 @@ try:
     consulta_mapping = {}
     expediente_mapping = {}
     citas_mapping = {}
+    medicos_mapping = {}
+    usuarios_mapping = {}
+    constancias_mapping = {}
     old_pacientes_list = old_session.execute(select(old_pacientes)).fetchall()
     old_expedientes_list = old_session.execute(select(old_expedientes)).fetchall()
     old_consultas_list = old_session.execute(select(old_consultas)).fetchall()
     old_citas_list = old_session.execute(select(old_citas)).fetchall()
+    old_medicos_list = old_session.execute(select(old_medicos)).fetchall()
+    old_usuarios_list = old_session.execute(select(old_usuarios)).fetchall()
+    old_constancias_list = old_session.execute(select(old_constancias)).fetchall()
    
 
     migrate_pacientes(old_pacientes_list, paciente_mapping)
     migrate_expedientes(old_expedientes_list, expediente_mapping)
     migrate_consultas(old_consultas_list, consulta_mapping)
     migrate_citas( old_citas_list, citas_mapping)
+    migrate_medicos( old_medicos_list, medicos_mapping)
+    migrate_usuarios( old_usuarios_list, usuarios_mapping)
+    migrate_constancias ( old_constancias_list, constancias_mapping)
    
     
     

@@ -298,6 +298,24 @@ JOIN nuevapaciente np ON uo.nombre_completo = np.nombre_completo
 SET
     uo.paciente_id = np.id;
 
+UPDATE nuevapaciente np
+JOIN union_old uo ON np.id = uo.paciente_id
+SET
+    np.dpi = COALESCE(np.dpi, uo.dpi),
+    np.nacimiento = COALESCE(np.nacimiento, uo.nacimiento);
+
+CREATE TABLE temp_union_old AS
+SELECT
+    nombre_completo,
+    MAX(expediente) AS expediente,
+    paciente_id,
+    MIN(expediente) AS exp_ref,
+    MAX(exp_madre) AS exp_madre
+FROM union_old
+GROUP BY
+    paciente_id,
+    nombre_completo;
+
 CREATE TABLE nuevaconsulta (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     expediente INT DEFAULT NULL,
@@ -541,3 +559,12 @@ CREATE INDEX idx_hoja_emergencia_nuevaconsulta ON nuevaconsulta (hoja_emergencia
 CREATE INDEX idx_expediente_nuevaexpediente ON nuevaexpediente (expediente);
 
 CREATE INDEX idx_hoja_emergencia_nuevaexpediente ON nuevaexpediente (hoja_emergencia);
+
+UPDATE nuevaexpediente ne
+JOIN temp_union_old tuo ON ne.id = tuo.paciente_id
+SET
+    ne.expediente = tuo.expediente,
+    ne.exp_madre = tuo.exp_madre,
+    ne.exp_ref = tuo.exp_ref
+WHERE
+    ne.expediente IS NULL;

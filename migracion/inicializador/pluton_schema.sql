@@ -208,28 +208,28 @@ CREATE TABLE citas (
     INDEX idx_citas_tipo_cita (tipo_cita)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
--- CREATE TABLE proce_medicos (
---     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
---     fecha DATE DEFAULT NULL,
---     servicio_id INT DEFAULT NULL,
---     sexo ENUM('M', 'F') DEFAULT NULL,
---     codigo_procedimiento_id INT NOT NULL,
---     especialidad_id INT DEFAULT NULL,
---     cantidad INT DEFAULT NULL,
---     medico_id INT DEFAULT NULL,
---     grupo_edad ENUM('N', 'A') DEFAULT NULL,
---     created_by VARCHAR(10) DEFAULT NULL,
---     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
---     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
---     FOREIGN KEY (servicio_id) REFERENCES servicios (id),
---     FOREIGN KEY (codigo_procedimiento_id) REFERENCES codigo_procedimientos (id),
---     FOREIGN KEY (especialidad_id) REFERENCES especialidad (id),
---     FOREIGN KEY (medico_id) REFERENCES medicos (colegiado),
---     INDEX idx_proce_medicos_servicio (servicio_id),
---     INDEX idx_proce_medicos_codigo (codigo_procedimiento_id),
---     INDEX idx_proce_medicos_especialidad (especialidad_id),
---     INDEX idx_proce_medicos_medico (medico_id)
--- ) ENGINE = InnoDB CHARSET = utf8mb4;
+CREATE TABLE proce_medicos (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    fecha DATE DEFAULT NULL,
+    servicio_id INT DEFAULT NULL,
+    sexo ENUM('M', 'F') DEFAULT NULL,
+    codigo_procedimiento_id INT NOT NULL,
+    especialidad_id INT DEFAULT NULL,
+    cantidad INT DEFAULT NULL,
+    medico_id INT DEFAULT NULL,
+    grupo_edad ENUM('N', 'A') DEFAULT NULL,
+    created_by VARCHAR(10) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (servicio_id) REFERENCES servicios (id),
+    FOREIGN KEY (codigo_procedimiento_id) REFERENCES codigo_procedimientos (id),
+    FOREIGN KEY (especialidad_id) REFERENCES especialidad (id),
+    FOREIGN KEY (medico_id) REFERENCES medicos (colegiado),
+    INDEX idx_proce_medicos_servicio (servicio_id),
+    INDEX idx_proce_medicos_codigo (codigo_procedimiento_id),
+    INDEX idx_proce_medicos_especialidad (especialidad_id),
+    INDEX idx_proce_medicos_medico (medico_id)
+) ENGINE = InnoDB CHARSET = utf8mb4;
 
 CREATE TABLE uisau (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
@@ -16,6 +16,11 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"charset": "utf8mb
 # Crear una sesión local para interactuar con la base de datos
 Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Inspeccionar la base de datos
+inspector = inspect(engine)
 # Crear la clase base para los modelos
 Base = declarative_base()
+
+
+   
 

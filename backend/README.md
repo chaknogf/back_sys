@@ -54,3 +54,26 @@ Once the virtual environment is activated, install the project dependencies:
 Copiar código
 pip install -r requirements.txt
 ```
+
+### 4. sqlacodegen
+
+parche para python 3.11
+
+/venv/lib/python3.11/site-packages/sqlacodegen/codegen.py
+remplazar
+
+```bash
+from inspect import ArgSpec
+```
+
+por
+
+```bash
+from inspect import getfullargspec as ArgSpec
+```
+
+si generar nuevos modelos
+
+```bash
+sqlacodegen mysql+pymysql://user:contraseña@localhost:3306/database --tables nombre_tabla > nombre_models.py
+```

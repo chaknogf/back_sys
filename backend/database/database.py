@@ -14,13 +14,19 @@ SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{USER}:{PASSWORD}@{HOST}:{PORT}/{DAT
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"charset": "utf8mb4"})  # Añadir charset para compatibilidad
 
 # Crear una sesión local para interactuar con la base de datos
-Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Inspeccionar la base de datos
 inspector = inspect(engine)
 # Crear la clase base para los modelos
 Base = declarative_base()
 
+def get_db():
+   db = SessionLocal()
+   try:
+       yield db
+   finally:
+       db.close()
 
    
 

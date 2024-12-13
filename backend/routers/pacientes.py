@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, desc
 from fastapi.encoders import jsonable_encoder
 from database.database import SessionLocal, get_db
-from models.pacientes_models import Paciente, CardPaciente
+from models.pacientes_models import Paciente, CardPaciente, VistaPaciente
 from models.consultas_models import Expediente
 from pydantic import BaseModel
 from typing import List, Optional
@@ -80,15 +80,41 @@ class ReferenciaContactoModel(BaseModel):
     class Config:
         orm_mode = True
 
+class CardPacienteBase(BaseModel):
+    nombre: str | None = None
+    apellido: str | None = None
+    dpi: int | None = None
+    sexo: SexoEnum = SexoEnum.M
+    nacimiento: date
+    defuncion: Optional[date] = None
+    estado: EstadoEnum = EstadoEnum.V
+    direccion: str | None = None
+    telefono1: str | None = None
+    telefono2: str | None = None
+    telefono3: str | None = None
+    email: str | None = None
+    expediente_id: int | None = None
+    expediente: str | None = None
+    hoja_emergencia: str | None = None
+    referencia_anterior: str | None = None
+    expediente_madre: int | None = None
+    paciente_created_at: str | None = None
+    paciente_updated_at: str | None = None
+    contacto_created_at: str | None = None
+    contacto_updated_at: str | None = None
+    expediente_created_at: str | None = None
+    expediente_updated_at: str | None = None
 
+    class Config:
+        orm_mode = True 
 
 # Ruta para obtener todos los pacientes
 @router.get("/pacientes/", tags=["Pacientes"])
 def get_pacientes(db: Session = Depends(get_db)):
     try:
         result = (
-            db.query(Paciente)
-            .order_by(desc(Paciente.id)) 
+            db.query(VistaPaciente)
+            .order_by(desc(VistaPaciente.id)) 
             .limit(300)
             .all()
         )
@@ -127,7 +153,7 @@ async def get_paciente(db: Session = Depends(get_db),
             query = query.filter(CardPaciente.dpi.ilike(f"%{dpi}%"))
 
         result = query.limit(800).all()
-        return result
+        return JSONResponse(status_code=200, content=jsonable_encoder({"results": result}))
     except SQLAlchemyError as e:
         # Manejar errores específicos de SQLAlchemy, si es necesario
         return {"error": str(e)}
@@ -136,7 +162,7 @@ async def get_paciente(db: Session = Depends(get_db),
         return {"error": str(e)}
     
 @router.post("/registrarPaciente", tags=["Pacientes"])
-def crear_paciente(paciente: Paciente, db: Session = Depends(get_db)):
+def crear_paciente(paciente: PacienteModel, db: Session = Depends(get_db)):
     try:
         nuevo_paciente = Paciente(**paciente.dict())
         db.add(nuevo_paciente)
@@ -146,3 +172,4 @@ def crear_paciente(paciente: Paciente, db: Session = Depends(get_db)):
     except SQLAlchemyError as error:
         db.rollback()  # Revertir cualquier cambio en caso de error
         return JSONResponse(status_code=500, content={"message": f"Error al crear paciente: {str(error)}"})
+    

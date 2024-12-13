@@ -16,6 +16,7 @@ CREATE TABLE pacientes (
     idioma INT DEFAULT NULL,
     ocupacion VARCHAR(50) DEFAULT NULL,
     estado ENUM('V', 'M') DEFAULT 'V',
+    gemelo INT DEFAULT NULL,
     padre VARCHAR(100) DEFAULT NULL,
     madre VARCHAR(100) DEFAULT NULL,
     conyugue VARCHAR(100) DEFAULT NULL,

@@ -1,18 +1,3 @@
-CREATE TABLE nuevacitas (
-    id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    paciente_id INT DEFAULT NULL,
-    expediente INT DEFAULT NULL,
-    especialidad INT DEFAULT NULL,
-    fecha DATE DEFAULT NULL,
-    nota TEXT DEFAULT NULL,
-    tipo INT DEFAULT NULL,
-    lab INT DEFAULT NULL,
-    fecha_lab DATE DEFAULT NULL,
-    created_at DATETIME DEFAULT NULL,
-    updated_at DATETIME DEFAULT NULL,
-    created_by VARCHAR(8) DEFAULT NULL
-) ENGINE = InnoDB CHARSET = utf8mb4;
-
 INSERT INTO
     nuevacitas (
         expediente,
@@ -80,71 +65,6 @@ UPDATE usuarios SET rol = 4 WHERE rol = 0;
 UPDATE usuarios SET dpi = NULL WHERE dpi = 0;
 
 DELETE FROM medicos WHERE colegiado = 0;
-
-CREATE TABLE nuevausuario (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    username VARCHAR(10) UNIQUE NOT NULL,
-    nombre VARCHAR(100) DEFAULT NULL,
-    email VARCHAR(100) DEFAULT NULL,
-    contraseña VARCHAR(255) DEFAULT NULL,
-    dpi BIGINT UNIQUE DEFAULT NULL,
-    rol INT NOT NULL,
-    created_at DATETIME,
-    updated_at DATETIME
-) ENGINE = InnoDB CHARSET = utf8mb4;
-
-CREATE TABLE nuevamedicos (
-    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, -- Hacemos que sea autoincremental
-    colegiado INT NOT NULL,
-    nombre VARCHAR(200) DEFAULT NULL,
-    dpi BIGINT DEFAULT NULL,
-    especialidad INT DEFAULT NULL,
-    pasaporte VARCHAR(30) DEFAULT NULL,
-    sexo ENUM('M', 'F') DEFAULT NULL,
-    created_at DATETIME,
-    updated_at DATETIME
-) ENGINE = InnoDB CHARSET = utf8mb4;
-
-CREATE TABLE nuevarn (
-    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    fecha DATE DEFAULT NULL,
-    cor INT DEFAULT NULL,
-    ao INT DEFAULT NULL,
-    doc VARCHAR(12) DEFAULT NULL UNIQUE,
-    fecha_parto DATE DEFAULT NULL,
-    madre VARCHAR(100) DEFAULT NULL,
-    madre_id INT DEFAULT NULL,
-    rn_id INT DEFAULT NULL,
-    dpi BIGINT DEFAULT NULL,
-    passport VARCHAR(30) DEFAULT NULL,
-    libro INT DEFAULT NULL,
-    folio INT DEFAULT NULL,
-    partida VARCHAR(20) DEFAULT NULL,
-    depto INT DEFAULT NULL,
-    muni INT DEFAULT NULL,
-    edad INT DEFAULT NULL,
-    vecindad INT DEFAULT NULL,
-    sexo_rn VARCHAR(1) DEFAULT NULL,
-    lb INT DEFAULT NULL,
-    onz INT DEFAULT NULL,
-    hora TIME DEFAULT NULL,
-    medico VARCHAR(200) DEFAULT NULL,
-    colegiado INT DEFAULT NULL,
-    dpi_medico BIGINT DEFAULT NULL,
-    hijos INT DEFAULT NULL,
-    vivos INT DEFAULT NULL,
-    muertos INT DEFAULT NULL,
-    tipo_parto INT DEFAULT NULL,
-    clase_parto INT DEFAULT NULL,
-    certifica VARCHAR(200) DEFAULT NULL,
-    usuario_id INT DEFAULT NULL,
-    create_by VARCHAR(10) NULL,
-    expediente INT DEFAULT NULL,
-    nacionalidad VARCHAR(25) DEFAULT NULL,
-    pais VARCHAR(25) DEFAULT NULL,
-    created_at DATETIME,
-    updated_at DATETIME
-) ENGINE = InnoDB CHARSET = utf8mb4;
 
 INSERT INTO
     nuevausuario (
@@ -282,12 +202,42 @@ CREATE INDEX idx_nuevarn_create_by ON nuevarn (create_by);
 
 CREATE INDEX idx_nuevausuario_username ON nuevausuario (username);
 
+-- Índice para la tabla 'nuevarn' para las columnas madre, expediente, rn_id
+CREATE INDEX idx_nuevarn_madre_expediente_rn_id ON nuevarn (madre, expediente, rn_id);
+
+-- Índice para la tabla 'listado_pacientes' para las columnas exp_madre y nacimiento
+CREATE INDEX idx_listado_pacientes_exp_madre_nacimiento ON listado_pacientes (exp_madre, nacimiento);
+
+-- Índice para la tabla 'nuevarn' para la columna fecha_parto (si es utilizada)
+CREATE INDEX idx_nuevarn_fecha_parto ON nuevarn (fecha_parto);
+
 UPDATE expedientes e
-JOIN listado_pacientes uo ON e.expediente = uo.exp_madre
+JOIN union_old uo ON e.expediente = uo.exp_madre
 SET
     e.exp_madre = uo.exp_madre
 WHERE
     e.exp_madre IS NULL;
+
+UPDATE nuevarn nr
+JOIN consultas_pacientes cp ON nr.expediente = cp.historia_clinica
+SET
+    nr.madre_id = cp.paciente_id
+WHERE
+    nr.madre_id IS NULL;
+
+UPDATE nuevarn nr
+JOIN consultas_pacientes cp ON nr.madre LIKE CONCAT('%', cp.nombre_completo, '%')
+SET
+    nr.madre_id = cp.paciente_id
+WHERE
+    nr.madre_id IS NULL;
+
+UPDATE nuevarn nr
+JOIN listado_pacientes lp ON nr.madre LIKE CONCAT('%', lp.nombre_completo, '%')
+SET
+    nr.madre_id = lp.id
+WHERE
+    nr.madre_id IS NULL;
 
 UPDATE nuevarn nr
 JOIN expedientes np ON nr.expediente = np.expediente
@@ -311,18 +261,18 @@ WHERE
     nr.rn_id IS NULL;
 
 UPDATE nuevarn nr
-JOIN listado_pacientes np ON nr.expediente = np.exp_madre
+JOIN listado_pacientes lp ON nr.expediente = lp.exp_madre
 SET
-    nr.rn_id = np.paciente_id
+    nr.rn_id = lp.id
 WHERE
     nr.rn_id IS NULL;
 
--- UPDATE expedientes nr
--- JOIN union_old np ON nr.expediente = np.exp_madre
--- SET
---     nr.exp_madre = np.exp_madre
--- WHERE
---     nr.exp_madre IS NULL;
+UPDATE nuevarn nr
+JOIN listado_pacientes lp ON nr.expediente = lp.exp_madre
+SET
+    nr.rn_id = lp.id
+WHERE
+    nr.rn_id IS NULL;
 
 UPDATE nuevarn nr
 JOIN nuevausuario nu ON nr.create_by = nu.username
@@ -350,3 +300,98 @@ UPDATE nuevarn nr
 JOIN filtro_rn frn ON nr.expediente = frn.expediente
 SET
     nr.rn_id = frn.paciente_id;
+
+CREATE TABLE malos_cons_nac AS
+SELECT
+    nr.id,
+    nr.madre,
+    nr.expediente,
+    nr.onz,
+    nr.madre_id,
+    nr.rn_id,
+    nr.fecha_parto,
+    e.id as paciente_id,
+    e.nombre_completo,
+    e.nacimiento,
+    e.expediente
+FROM
+    nuevarn nr
+    JOIN listado_pacientes e ON nr.expediente = e.exp_madre
+WHERE
+    nr.rn_id IN (
+        SELECT rn_id
+        FROM nuevarn
+        GROUP BY
+            rn_id
+        HAVING
+            COUNT(rn_id) > 1
+    )
+ORDER BY nr.rn_id;
+
+DELETE FROM nuevarn WHERE id = 303;
+
+UPDATE nuevarn SET rn_id = 34028 WHERE id = 201;
+
+UPDATE nuevarn SET rn_id = 42157 WHERE id = 1220;
+
+UPDATE nuevarn SET rn_id = 34028 WHERE id = 201;
+
+UPDATE nuevarn SET rn_id = 42157 WHERE id = 1220;
+
+DELETE FROM nuevarn WHERE id = 1219;
+
+UPDATE nuevarn SET rn_id = 42365 WHERE id = 1776;
+
+UPDATE nuevarn SET rn_id = 42365 WHERE id = 1776;
+
+------+------------------------------------------+------------+------+----------+-------+-------------+----------------------------------------+
+
+| id   | madre                                    | expediente | onz  | madre_id | rn_id | paciente_id | nombre_completo                        |
++------+------------------------------------------+------------+------+----------+-------+-------------+----------------------------------------+
+| 1997 | Ana Maria Tep� Raxjal                   |      74636 |   14 |     4480 | 39622 |       39622 | HIJA DE ANA MARIA TEPAZ RAXJAL         |
+| 1997 | Ana Maria Tep� Raxjal                   |      74636 |   14 |     4480 | 39622 |       39622 | HIJA DE ANA MARIA TEPAZ RAXJAL         |
+| 1996 | Ana Maria Tep� Raxjal                   |      74636 |    6 |     4480 | 39622 |       39622 | HIJA DE ANA MARIA TEPAZ RAXJAL         |
+| 1996 | Ana Maria Tep� Raxjal                   |      74636 |    6 |     4480 | 39622 |       39622 | HIJA DE ANA MARIA TEPAZ RAXJAL         |
+|  393 | Sara Lucia Mux Bala                      |      22145 |    4 |    92164 | 42205 |       92164 | SARA LUCIA MUX BALA                    |
+|  393 | Sara Lucia Mux Bala                      |      22145 |    4 |    92164 | 42205 |        4308 | ANA LUISA MUX                          |
+|  394 | Sara Lucia Mux Bala                      |      22145 |    4 |    92164 | 42205 |       92164 | SARA LUCIA MUX BALA                    |
+|  394 | Sara Lucia Mux Bala                      |      22145 |    4 |    92164 | 42205 |        4308 | ANA LUISA MUX                          |
+|  321 | Haidy Esmeralda Socoy Mel�drez          |      65819 |    2 |    37807 | 43824 |       24692 | ELIAN DARIEL CALEL SOCOY               |
+|  324 | Haidy Esmeralda Socoy Mel�drez          |      65819 |    2 |    37807 | 43824 |       24692 | ELIAN DARIEL CALEL SOCOY               |
+| 1702 | Sebastiana P�ez Morales                 |      70352 |    2 |    92631 | 45544 |       45544 | HIJO DE SEBASTIANA PEREZ MORALES       |
+| 1702 | Sebastiana P�ez Morales                 |      70352 |    2 |    92631 | 45544 |       45544 | HIJO DE SEBASTIANA PEREZ MORALES       |
+| 1703 | Sebastiana P�ez Morales                 |      70352 |    5 |    92631 | 45544 |       45544 | HIJO DE SEBASTIANA PEREZ MORALES       |
+| 1703 | Sebastiana P�ez Morales                 |      70352 |    5 |    92631 | 45544 |       45544 | HIJO DE SEBASTIANA PEREZ MORALES       |
+| 1317 | Alida Emiliana Velasquez Jutzutz         |      37592 |    4 |     2493 | 47606 |        2493 | ALIDA EMILIANA VELASQUEZ JUTZUTZ       |
+| 1317 | Alida Emiliana Velasquez Jutzutz         |      37592 |    4 |     2493 | 47606 |       47606 | IAN CAMILO ORDO�Z VELASQUEZ           |
+| 1317 | Alida Emiliana Velasquez Jutzutz         |      37592 |    4 |     2493 | 47606 |       26763 | EMILI BELEN ORDO�Z VELASQUEZ          |
+| 1318 | Alida Emiliana Velasquez Jutzutz         |      37592 |    3 |     2493 | 47606 |        2493 | ALIDA EMILIANA VELASQUEZ JUTZUTZ       |
+| 1318 | Alida Emiliana Velasquez Jutzutz         |      37592 |    3 |     2493 | 47606 |       47606 | IAN CAMILO ORDO�Z VELASQUEZ           |
+| 1318 | Alida Emiliana Velasquez Jutzutz         |      37592 |    3 |     2493 | 47606 |       26763 | EMILI BELEN ORDO�Z VELASQUEZ          |
+|  719 | Juana Juliana Morales Algua              |      69025 |    1 |    58042 | 57931 |       40938 | JUANA EMILIANA VALERIA LASTOR MORALES  |
+|  718 | Juana Juliana Morales Algua              |      69025 |    1 |    58042 | 57931 |       40938 | JUANA EMILIANA VALERIA LASTOR MORALES  |
+| 1633 | Mariana Ang�ica Chut�Tart� De Cuxil   |      36297 |   11 |    74377 | 74377 |       74377 | MARIANA ANG�ICA CHUT TART� DE CUXIL |
+| 1633 | Mariana Ang�ica Chut�Tart� De Cuxil   |      36297 |   11 |    74377 | 74377 |       44837 | JUAN ENRIQUE CUXIL CHUTA               |
+| 1633 | Mariana Ang�ica Chut�Tart� De Cuxil   |      36297 |   11 |    74377 | 74377 |       44837 | JOSUE ALEJANDRO CUXIL CHUTA            |
+| 1634 | Mariana Ang�ica Chut�Tart� De Cuxil   |      36297 |    7 |    74377 | 74377 |       74377 | MARIANA ANG�ICA CHUT TART� DE CUXIL |
+| 1634 | Mariana Ang�ica Chut�Tart� De Cuxil   |      36297 |    7 |    74377 | 74377 |       44837 | JUAN ENRIQUE CUXIL CHUTA               |
+| 1634 | Mariana Ang�ica Chut�Tart� De Cuxil   |      36297 |    7 |    74377 | 74377 |       44837 | JOSUE ALEJANDRO CUXIL CHUTA            |
+| 1365 | Rosa Paola Sotz Morales                  |      39643 |    0 |    89123 | 79117 |       89123 | ROSA PAOLA SOTZ MORALES                |
+| 1365 | Rosa Paola Sotz Morales                  |      39643 |    0 |    89123 | 79117 |       18828 | DARLYN GABRIELA SANIC SOTZ             |
+| 1365 | Rosa Paola Sotz Morales                  |      39643 |    0 |    89123 | 79117 |       79117 | MEREDIT DAYANA SANIC SOTZ              |
+| 1366 | Rosa Paola Sotz Morales                  |      39643 |    8 |    89123 | 79117 |       89123 | ROSA PAOLA SOTZ MORALES                |
+| 1366 | Rosa Paola Sotz Morales                  |      39643 |    8 |    89123 | 79117 |       18828 | DARLYN GABRIELA SANIC SOTZ             |
+| 1366 | Rosa Paola Sotz Morales                  |      39643 |    8 |    89123 | 79117 |       79117 | MEREDIT DAYANA SANIC SOTZ              |
+| 1034 | Dina Mar� Xico Nix                      |      38934 |    8 |    21252 | 84309 |       21252 | DINA MARIA XICO NIX                    |
+| 1034 | Dina Mar� Xico Nix                      |      38934 |    8 |    21252 | 84309 |       47757 | IKER LEONEL PEREZ XICO                 |
+| 1034 | Dina Mar� Xico Nix                      |      38934 |    8 |    21252 | 84309 |       43246 | OLIVER ABIMAEL PEREZ XICO              |
+| 1033 | Dina Mar� Xico Nix                      |      38934 |    0 |    21252 | 84309 |       21252 | DINA MARIA XICO NIX                    |
+| 1033 | Dina Mar� Xico Nix                      |      38934 |    0 |    21252 | 84309 |       47757 | IKER LEONEL PEREZ XICO                 |
+| 1033 | Dina Mar� Xico Nix                      |      38934 |    0 |    21252 | 84309 |       43246 | OLIVER ABIMAEL PEREZ XICO              |
+|   72 | Rosalina Miculax Xico                    |      48670 |   12 |    89387 | 89387 |       89387 | ROSALINA MICULAX XICO                  |
+|   72 | Rosalina Miculax Xico                    |      48670 |   12 |    89387 | 89387 |        NULL | FRANCISCO GAEL DIAZ MICULAX            |
+|   72 | Rosalina Miculax Xico                    |      48670 |   12 |    89387 | 89387 |        NULL | ERIK BENJAMIN DIAZ MICULAX             |
+|   73 | Rosalina Miculax Xico                    |      48670 |   11 |    89387 | 89387 |       89387 | ROSALINA MICULAX XICO                  |
+|   73 | Rosalina Miculax Xico                    |      48670 |   11 |    89387 | 89387 |        NULL | FRANCISCO GAEL DIAZ MICULAX            |
+|   73 | Rosalina Miculax Xico                    |      48670 |   11 |    89387 | 89387 |        NULL | ERIK BENJAMIN DIAZ MICULAX             |
++------+------------------------------------------+------------+------+----------+------

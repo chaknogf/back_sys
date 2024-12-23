@@ -20,6 +20,12 @@ CREATE TABLE pacientes (
     padre VARCHAR(100) DEFAULT NULL,
     madre VARCHAR(100) DEFAULT NULL,
     conyugue VARCHAR(100) DEFAULT NULL,
+    direccion VARCHAR(150) DEFAULT NULL,
+    municipio VARCHAR(4) DEFAULT NULL,
+    telefono1 VARCHAR(10) DEFAULT NULL,
+    telefono2 VARCHAR(10) DEFAULT NULL,
+    telefono3 VARCHAR(15) DEFAULT NULL,
+    email VARCHAR(150) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (nacionalidad_iso) REFERENCES nacionalidades (iso),
@@ -46,19 +52,6 @@ CREATE TABLE referencia_contacto (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (paciente_id) REFERENCES pacientes (id),
     FOREIGN KEY (parentesco_id) REFERENCES parentescos (id)
-) ENGINE = InnoDB CHARSET = utf8mb4;
-
-CREATE TABLE contacto_paciente (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    paciente_id INT NOT NULL,
-    direccion VARCHAR(150) DEFAULT NULL,
-    telefono1 VARCHAR(10) DEFAULT NULL,
-    telefono2 VARCHAR(10) DEFAULT NULL,
-    telefono3 VARCHAR(15) DEFAULT NULL,
-    email VARCHAR(150) DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (paciente_id) REFERENCES pacientes (id)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -119,18 +112,14 @@ CREATE TABLE constancias_nacimiento (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     fecha DATE NOT NULL,
     doc VARCHAR(15) DEFAULT NULL UNIQUE,
-    madre_id INT NOT NULL,
-    recien_nacido_id INT NOT NULL,
-    usuario_id INT NOT NULL,
+    madre INT NOT NULL,
+    recien_nacido INT NOT NULL,
+    usuario INT NOT NULL,
     medico INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_const_nac_madre FOREIGN KEY (madre_id) REFERENCES madres (id),
-    CONSTRAINT fk_const_nac_recien_nacido FOREIGN KEY (recien_nacido_id) REFERENCES recien_nacidos (id),
-    CONSTRAINT fk_const_nac_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id),
-    CONSTRAINT fk_const_nac_medico FOREIGN KEY (medico) REFERENCES medicos (colegiado),
-    INDEX idx_const_nac_madre (madre_id),
-    INDEX idx_const_nac_recien_nacido (recien_nacido_id),
+    INDEX idx_const_nac_madre (madre),
+    INDEX idx_const_nac_recien_nacido (recien_nacido),
     INDEX idx_const_nac_medico (medico)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
@@ -149,7 +138,9 @@ CREATE TABLE expedientes (
 
 CREATE TABLE consultas (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    exp_id INT,
+    exp_id INT DEFAULT NULL,
+    paciente_id INT DEFAULT NULL,
+    historia_clinica VARCHAR(15) DEFAULT NULL,
     fecha_consulta DATE DEFAULT NULL,
     hora TIME DEFAULT NULL,
     fecha_recepcion DATETIME DEFAULT NULL,
@@ -174,8 +165,7 @@ CREATE TABLE consultas (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     grupo_edad INT DEFAULT NULL,
-    FOREIGN KEY (medico) REFERENCES medicos (colegiado),
-    FOREIGN KEY (exp_id) REFERENCES expedientes (id),
+    FOREIGN KEY (paciente_id) REFERENCES pacientes (id),
     FOREIGN KEY (tipo_lesion) REFERENCES tipo_lesion (id),
     FOREIGN KEY (especialidad) REFERENCES especialidad (id),
     FOREIGN KEY (tipo_consulta) REFERENCES tipo_consulta (id),
@@ -183,7 +173,7 @@ CREATE TABLE consultas (
     FOREIGN KEY (grupo_edad) REFERENCES grupo_edad (id),
     FOREIGN KEY (estatus) REFERENCES estatus (id),
     INDEX idx_consultas_exp_id (exp_id),
-    INDEX idx_consultas_medico (medico),
+    INDEX idx_consulta_paciente (id),
     INDEX idx_consultas_fecha_consulta (fecha_consulta),
     INDEX idx_consultas_tipo_consulta (tipo_consulta)
 ) ENGINE = InnoDB CHARSET = utf8mb4;

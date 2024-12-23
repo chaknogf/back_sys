@@ -278,6 +278,24 @@ DELETE FROM old_consultas WHERE nombre_completo LIKE '%anula%';
 
 DELETE FROM old_consultas WHERE nombre_completo = '';
 
+ALTER TABLE old_pacientes MODIFY COLUMN nacionalidad VARCHAR(3);
+
+UPDATE old_pacientes
+SET
+    nacionalidad = CASE
+        WHEN nacionalidad = 1 THEN 'GTM'
+        WHEN nacionalidad = 2 THEN 'BLZ'
+        WHEN nacionalidad = 3 THEN 'SLV'
+        WHEN nacionalidad = 4 THEN 'HND'
+        WHEN nacionalidad = 5 THEN 'NIC'
+        WHEN nacionalidad = 6 THEN 'CRI'
+        WHEN nacionalidad = 7 THEN 'PAN'
+        WHEN nacionalidad = 8 THEN 'MEX'
+        WHEN nacionalidad = 9 THEN 'OTR'
+        WHEN nacionalidad = 0 THEN NULL
+        ELSE nacionalidad
+    END;
+
 UPDATE old_consultas oc
 JOIN old_pacientes op ON oc.expediente = op.expediente
 SET

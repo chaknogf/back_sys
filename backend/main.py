@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from routers.pacientes import router as pacientes_router
+from routers.consultas import router as consultas_router
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -23,5 +24,6 @@ async def redirect_to_docs():
 
 # Incluir el router de pacientes en la aplicación FastAPI
 app.include_router(pacientes_router)
+app.include_router(consultas_router)
 
 

@@ -25,7 +25,6 @@ old_constancias = Table("nuevarn", old_metadata, autoload_with=old_engine)
 # Tablas de la base nueva
 new_pacientes = Table("pacientes", new_metadata, autoload_with=new_engine)
 referencia_contacto = Table("referencia_contacto", new_metadata, autoload_with=new_engine)
-contacto_paciente = Table("contacto_paciente", new_metadata, autoload_with=new_engine)
 new_expedientes = Table("expedientes", new_metadata, autoload_with=new_engine)
 new_consultas = Table("consultas", new_metadata, autoload_with=new_engine)
 new_citas = Table("citas", new_metadata, autoload_with=new_engine, autoload_replace=False)
@@ -49,6 +48,7 @@ def migrate_pacientes(old_pacientes_list, paciente_mapping):
     for old_paciente in tqdm(old_pacientes_list, desc="Migrando pacientes", unit="paciente"):
         try:
             with new_session.begin():  # Transacción independiente
+                telefono1, telefono2, telefono3 = split_phone_number(old_paciente.telefono)
                 # Preparar datos del paciente
                 paciente_data = {
                     "id": old_paciente.id,
@@ -71,6 +71,11 @@ def migrate_pacientes(old_pacientes_list, paciente_mapping):
                     "pueblo": None if old_paciente.pueblo == 0 else old_paciente.pueblo,
                     "idioma": None if old_paciente.idioma == 0 else old_paciente.idioma,
                     "ocupacion": old_paciente.ocupacion,
+                    "municipio": old_paciente.municipio,
+                    "direccion": old_paciente.direccion,
+                    "telefono1": telefono1,
+                    "telefono2": telefono2,
+                    "telefono3": telefono3,
                 }
 
                 # Insertar paciente
@@ -88,21 +93,10 @@ def migrate_pacientes(old_pacientes_list, paciente_mapping):
                     }
                     new_session.execute(insert(referencia_contacto).values(referencia_data))
 
-                # Insertar en contacto_paciente
-                telefono1, telefono2, telefono3 = split_phone_number(old_paciente.telefono)
-                contacto_data = {
-                    "paciente_id": new_paciente_id,
-                    "direccion": old_paciente.direccion,
-                    "telefono1": telefono1,
-                    "telefono2": telefono2,
-                    "telefono3": telefono3,
-                    "email": old_paciente.email,
-                }
-                new_session.execute(insert(contacto_paciente).values(contacto_data))
- 
+                
                
         except Exception as e:
-            print(f"Error al migrar paciente {new_pacientes.id}: {e}")
+            print(f"Error al migrar paciente {new_pacientes}: {e}")
             
 def migrate_expedientes(old_expedientes_list, expediente_mapping):
         for old_expediente in tqdm(old_expedientes_list, desc="Migrando expedientes y emergencias", unit="expedientes"):
@@ -135,6 +129,8 @@ def migrate_consultas(old_consultas_list, consulta_mapping):
                 consultas_data = {
                     "id": old_consulta.id,
                     "exp_id": old_consulta.expediente_id,
+                    "paciente_id": old_consulta.paciente_id,
+                    "historia_clinica": old_consulta.historia_clinica,
                     "fecha_consulta": old_consulta.fecha_consulta,
                     "hora": old_consulta.hora,
                     "fecha_recepcion": old_consulta.fecha_recepcion,
@@ -237,7 +233,7 @@ def migrate_constancias(old_constancias_list, constancias_mapping=None):
         try:
             with new_session.begin():  # Transacción independiente
 
-                # Preparar datos de madres
+               # Insertar datos en madres
                 madres_data = {
                     "paciente_id": old_constancia.madre_id,
                     "vecindad": old_constancia.vecindad,
@@ -246,9 +242,10 @@ def migrate_constancias(old_constancias_list, constancias_mapping=None):
                     "muertos": old_constancia.muertos,
                     "edad": old_constancia.edad,
                 }
-                new_session.execute(insert(new_madres).values(madres_data))
+                madre_result = new_session.execute(insert(new_madres).values(madres_data))
+                new_madre_id = madre_result.lastrowid  # ID generado para madre
 
-                # Preparar datos de recién nacidos
+                # Insertar datos en recién nacidos
                 rn_data = {
                     "paciente_id": old_constancia.rn_id,
                     "hora": old_constancia.hora,
@@ -257,16 +254,17 @@ def migrate_constancias(old_constancias_list, constancias_mapping=None):
                     "tipo_parto": old_constancia.tipo_parto,
                     "clase_parto": old_constancia.clase_parto,
                 }
-                new_session.execute(insert(new_recien).values(rn_data))
+                recien_result = new_session.execute(insert(new_recien).values(rn_data))
+                new_recien_id = recien_result.lastrowid  # ID generado para recién nacido
 
-                # Preparar datos de constancias
+                # Insertar datos en constancias
                 const_data = {
                     "id": old_constancia.id,
                     "fecha": old_constancia.fecha,
                     "doc": old_constancia.doc,
-                    "madre_id": old_constancia.madre_id,
-                    "recien_nacido_id": old_constancia.rn_id,
-                    "usuario_id": old_constancia.usuario_id,
+                    "madre": old_constancia.madre_id,
+                    "recien_nacido": old_constancia.rn_id,  
+                    "usuario": old_constancia.usuario_id,
                     "medico": old_constancia.colegiado,
                     "created_at": old_constancia.created_at,
                     "updated_at": old_constancia.updated_at,

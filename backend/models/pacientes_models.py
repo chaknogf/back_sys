@@ -85,6 +85,12 @@ class Paciente(Base):
     padre = Column(String(100))
     madre = Column(String(100))
     conyugue = Column(String(100))
+    direccion = Column(String(4))
+    municipio = Column(String(100))
+    telefono1 = Column(String(10))
+    telefono2 = Column(String(10))
+    telefono3 = Column(String(15))
+    email = Column(String(150))
     created_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
     updated_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))
 
@@ -100,22 +106,6 @@ class Paciente(Base):
     def validar_nombres(self, key, value):
         return trim_str(value)
     
-
-
-class ContactoPaciente(Base):
-    __tablename__ = 'contacto_paciente'
-
-    id = Column(Integer, primary_key=True)
-    paciente_id = Column(ForeignKey('pacientes.id'), nullable=False, index=True)
-    direccion = Column(String(150))
-    telefono1 = Column(String(10))
-    telefono2 = Column(String(10))
-    telefono3 = Column(String(15))
-    email = Column(String(150))
-    created_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
-    updated_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))
-
-    paciente = relationship('Paciente')
 
 
 class ReferenciaContacto(Base):
@@ -136,71 +126,39 @@ class ReferenciaContacto(Base):
     def validar_contacto(self, key, value):
         return trim_str(value)
     
-class VistaPaciente(Base):
-    __tablename__ = 'vi_paciente'  # Nombre de la vista
-
-    id = Column(Integer, primary_key=True)
-    nombre = Column(String(100))
-    apellido = Column(String(100))
-    dpi = Column(BigInteger)
-    pasaporte = Column(String(50))
-    sexo = Column(String(1))
-    nacimiento = Column(Date)
-    defuncion = Column(Date)
-    tiempo_defuncion = Column(Time)
-    nacionalidad_iso = Column(String(3))
-    nacionalidad = Column(String(50))
-    lugar_nacimiento = Column(CHAR(4))
-    lugar = Column(String(255))
-    estado_civil = Column(Integer)
-    e_civil = Column(String(50))
-    educacion = Column(Integer)
-    nivel_educacion = Column(String(50))
-    pueblo = Column(Integer)
-    pueblo_ = Column(String(50))
-    idioma = Column(Integer)
-    idioma_ = Column(String(50))
-    ocupacion = Column(String(50))
-    estado = Column(Enum('V', 'M'), server_default=text("'V'"))
-    padre = Column(String(100))
-    madre = Column(String(100))
-    conyugue = Column(String(100))
-    created_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
-    updated_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))
-    direccion = Column(String(150))
-    telefono1 = Column(String(10))
-    telefono2 = Column(String(10))
-    telefono3 = Column(String(15))
-    email = Column(String(150))
-    nombre_contacto = Column(String(100))
-    telefono_contacto = Column(String(10))
-    parentesco_id = Column(Integer)
-    parentesco_nombre = Column(String(50))
-    
-class CardPaciente(Base):
-    __tablename__ = 'card_paciente'
+class VistaPacientes(Base):
+    __tablename__ = 'vista_pacientes'
 
     paciente_id = Column(Integer, primary_key=True)
     nombre = Column(String(100))
     apellido = Column(String(100))
     dpi = Column(BigInteger)
+    pasaporte = Column(String(50)),
     sexo = Column(Enum('M', 'F'), server_default=text("'M'"))
     nacimiento = Column(Date)
-    defuncion = Column(Date, nullable=True)
+    nacionalidad = Column(String(3))
+    lugar_nacimiento = Column(String(4))
+    defuncion = Column(Date)
     estado = Column(Enum('V', 'M'), server_default=text("'V'"))
-    direccion = Column(String(150), nullable=True)
-    telefono1 = Column(String(10), nullable=True)
-    telefono2 = Column(String(10), nullable=True)
-    telefono3 = Column(String(15), nullable=True)
-    email = Column(String(150), nullable=True)
-    expediente_id = Column(Integer, nullable=True)
-    expediente = Column(String(15), nullable=True)
-    hoja_emergencia = Column(String(15), nullable=True)
-    referencia_anterior = Column(String(11), nullable=True)
-    expediente_madre = Column(String(11), nullable=True)
-    paciente_created_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
-    paciente_updated_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))
-    contacto_created_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
-    contacto_updated_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))
-    expediente_created_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
-    expediente_updated_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))
+    gemelo = Column(Integer)
+    direccion = Column(String(4))
+    municipio = Column(String(4))
+    telefono = Column(String(10))
+    email = Column(String(150))
+    expediente = Column(String(50))
+    referencia_anterior = Column(String(50))
+    expediente_madre = Column(String(50))
+    consulta_id = Column(Integer)
+    exp_id = Column(Integer)
+    historia_clinica = Column(String(15))
+    fecha_consulta = Column(Date)
+    hora = Column(Time)
+    fecha_recepcion = Column(TIMESTAMP)
+    fecha_egreso = Column(TIMESTAMP)
+    tipo_consulta = Column(Integer)
+    estatus = Column(Integer)
+    created_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
+    
+    
+    
+    

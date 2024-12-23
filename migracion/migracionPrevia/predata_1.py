@@ -9,7 +9,7 @@ DATABASE_URI = "mysql+pymysql://root:Prometeus.0@localhost:3306/test_api"
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Lista de archivos SQL en el orden deseado
-sql_files = ["1_iniciador.sql","2_corrector.sql","3_modificaciones.sql","4_otras_tablas.sql"]
+sql_files = ["1_iniciador.sql","2_corrector.sql"]
 
 # Conexión a la base de datos
 engine = create_engine(DATABASE_URI)

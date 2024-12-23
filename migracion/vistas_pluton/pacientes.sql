@@ -1,6 +1,6 @@
-CREATE VIEW vi_paciente AS
+CREATE OR REPLACE VIEW vista_pacientes AS
 SELECT
-    p.id,
+    p.id AS paciente_id,
     p.nombre,
     p.apellido,
     p.dpi,
@@ -8,74 +8,126 @@ SELECT
     p.sexo,
     p.nacimiento,
     p.defuncion,
-    p.tiempo_defuncion,
-    p.nacionalidad_iso,
-    n.nacionalidad AS nacionalidad,
+    p.nacionalidad_iso AS nacionalidad,
     p.lugar_nacimiento,
-    dm.lugar,
-    p.estado_civil,
-    ec.nombre AS e_civil,
-    p.educacion,
-    e.nivel AS nivel_educacion,
-    p.pueblo,
-    pu.nombre AS pueblo_,
-    p.idioma,
-    i.nombre AS idioma_,
-    p.ocupacion,
-    p.estado,
-    p.padre,
-    p.madre,
-    p.conyugue,
+    p.estado AS estado,
+    p.gemelo,
+    p.direccion,
+    p.municipio,
     p.created_at,
-    p.updated_at,
-    cp.direccion,
-    cp.telefono1,
-    cp.telefono2,
-    cp.telefono3,
-    cp.email,
-    rc.nombre_contacto,
-    rc.telefono_contacto,
-    rc.parentesco_id,
-    pa.nombre AS parentesco_nombre
-FROM
-    pacientes p
-    LEFT JOIN contacto_paciente cp ON p.id = cp.paciente_id
-    LEFT JOIN referencia_contacto rc ON p.id = rc.paciente_id
-    LEFT JOIN nacionalidades n ON p.nacionalidad_iso = n.iso
-    LEFT JOIN depto_muni dm ON p.lugar_nacimiento = dm.codigo
-    LEFT JOIN estados_civiles ec ON p.estado_civil = ec.id
-    LEFT JOIN educacion e ON p.educacion = e.id
-    LEFT JOIN pueblos pu ON p.pueblo = pu.id
-    LEFT JOIN idiomas i ON p.idioma = i.id
-    LEFT JOIN parentescos pa ON rc.parentesco_id = pa.id;
+    CONCAT(
+        p.telefono1,
+        ', ',
+        p.telefono2,
+        ', ',
+        p.telefono3
+    ) AS telefono,
+    p.email,
+    -- Concatenamos los expedientes, referencias y expedientes madre asociados con el paciente
+    COALESCE(
+        GROUP_CONCAT(
+            DISTINCT e.expediente
+            ORDER BY e.expediente
+        ),
+        'Sin expediente'
+    ) AS expediente,
+    COALESCE(
+        GROUP_CONCAT(
+            DISTINCT e.referencia_anterior
+            ORDER BY e.referencia_anterior
+        ),
+        'No aplica'
+    ) AS referencia_anterior,
+    COALESCE(
+        GROUP_CONCAT(
+            DISTINCT e.expediente_madre
+            ORDER BY e.expediente_madre
+        ),
+        'Sin expediente madre'
+    ) AS expediente_madre
+FROM pacientes p
+    JOIN expedientes e ON p.id = e.paciente_id -- Establece la relación entre paciente y expediente
+GROUP BY
+    p.id;
 
-CREATE VIEW card_paciente AS
+CREATE INDEX idx_pacientes_id ON pacientes (id);
+
+CREATE INDEX idx_expedientes_paciente_id ON expedientes (paciente_id);
+
+CREATE OR REPLACE VIEW vr_consultas (
+    id,
+    exp_id,
+    paciente_id,
+    historia_clinica,
+    fecha_consulta,
+    hora,
+    fecha_recepcion,
+    fecha_egreso,
+    tipo_consulta,
+    estatus,
+    FROM consultas;
+
+CREATE OR REPLACE VIEW vista_pacientes AS
 SELECT
     p.id AS paciente_id,
     p.nombre,
     p.apellido,
     p.dpi,
+    p.pasaporte,
     p.sexo,
     p.nacimiento,
     p.defuncion,
-    p.estado,
-    cp.direccion,
-    cp.telefono1,
-    cp.telefono2,
-    cp.telefono3,
-    cp.email,
-    e.id AS expediente_id,
-    e.expediente,
-    e.hoja_emergencia,
-    e.referencia_anterior,
-    e.expediente_madre,
-    p.created_at AS paciente_created_at,
-    p.updated_at AS paciente_updated_at,
-    cp.created_at AS contacto_created_at,
-    cp.updated_at AS contacto_updated_at,
-    e.created_at AS expediente_created_at,
-    e.updated_at AS expediente_updated_at
+    p.nacionalidad_iso AS nacionalidad,
+    p.lugar_nacimiento,
+    p.estado AS estado,
+    p.gemelo,
+    p.direccion,
+    p.municipio,
+    p.created_at,
+    CONCAT(
+        p.telefono1,
+        ', ',
+        p.telefono2,
+        ', ',
+        p.telefono3
+    ) AS telefono,
+    p.email,
+    -- Concatenamos los expedientes, referencias y expedientes madre asociados con el paciente
+    COALESCE(
+        GROUP_CONCAT(
+            DISTINCT e.expediente
+            ORDER BY e.expediente
+        ),
+        'Sin expediente'
+    ) AS expediente,
+    COALESCE(
+        GROUP_CONCAT(
+            DISTINCT e.referencia_anterior
+            ORDER BY e.referencia_anterior
+        ),
+        'No aplica'
+    ) AS referencia_anterior,
+    COALESCE(
+        GROUP_CONCAT(
+            DISTINCT e.expediente_madre
+            ORDER BY e.expediente_madre
+        ),
+        'Sin expediente madre'
+    ) AS expediente_madre,
+    -- Datos de la consulta
+    c.id AS consulta_id,
+    c.exp_id,
+    c.historia_clinica,
+    c.fecha_consulta,
+    c.hora,
+    c.fecha_recepcion,
+    c.fecha_egreso,
+    c.tipo_consulta,
+    c.estatus
 FROM
     pacientes p
-    LEFT JOIN contacto_paciente cp ON p.id = cp.paciente_id
-    LEFT JOIN expedientes e ON p.id = e.paciente_id;
+    JOIN expedientes e ON p.id = e.paciente_id -- Relación entre pacientes y expedientes
+    LEFT JOIN consultas c ON e.id = c.exp_id -- Relación entre expedientes y consultas
+GROUP BY
+    p.id,
+    c.id;

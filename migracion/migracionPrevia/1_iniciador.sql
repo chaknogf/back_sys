@@ -37,7 +37,7 @@ CREATE TABLE union_old (
     parentesco VARCHAR(19) DEFAULT NULL,
     paciente_id VARCHAR(50) DEFAULT NULL,
     pasaporte VARCHAR(50) DEFAULT NULL,
-    nacionalidad INT DEFAULT NULL,
+    nacionalidad VARCHAR(3) DEFAULT NULL,
     lugar_nacimiento VARCHAR(4) DEFAULT NULL,
     estado_civil INT DEFAULT NULL,
     educacion INT DEFAULT NULL,
@@ -91,13 +91,18 @@ CREATE TABLE expedientes (
     exp_madre INT DEFAULT NULL,
     created_at DATETIME DEFAULT NULL,
     exp_ref INT DEFAULT NULL,
+    user_crated VARCHAR(15) DEFAULT NULL,
     nombre_completo VARCHAR(125) DEFAULT NULL
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
 CREATE TABLE consultas_pacientes (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    expediente_id INT,
+    paciente_id INT DEFAULT NULL,
+    expediente_id INT DEFAULT NULL,
+    nombre_completo VARCHAR(200) DEFAULT NULL,
+    nacimiento DATE DEFAULT null,
     fecha_consulta DATE DEFAULT NULL,
+    historia_clinica VARCHAR(15) DEFAULT NULL,
     hora TIME DEFAULT NULL,
     fecha_recepcion DATETIME DEFAULT NULL,
     fecha_egreso DATETIME DEFAULT NULL,
@@ -123,40 +128,40 @@ CREATE TABLE consultas_pacientes (
     grupo_edad INT DEFAULT NULL
 ) ENGINE = InnoDB CHARSET = utf8mb4;
 
--- CREATE TABLE listado_pacientes (
---     id INT PRIMARY KEY AUTO_INCREMENT,
---     nombre VARCHAR(100) DEFAULT NULL,
---     apellido VARCHAR(100) DEFAULT NULL,
---     nombre_completo VARCHAR(200) DEFAULT NULL,
---     dpi BIGINT DEFAULT NULL,
---     pasaporte VARCHAR(50) DEFAULT NULL,
---     sexo VARCHAR(2) DEFAULT NULL,
---     nacimiento DATE,
---     defuncion DATE DEFAULT NULL,
---     tiempo_defuncion TIME DEFAULT NULL,
---     nacionalidad VARCHAR(3) DEFAULT NULL,
---     lugar_nacimiento CHAR(4) DEFAULT NULL,
---     estado_civil INT DEFAULT NULL,
---     educacion INT DEFAULT NULL,
---     pueblo INT DEFAULT NULL,
---     idioma INT DEFAULT NULL,
---     ocupacion VARCHAR(50) DEFAULT NULL,
---     estado VARCHAR(2) DEFAULT NULL,
---     padre VARCHAR(100) DEFAULT NULL,
---     madre VARCHAR(100) DEFAULT NULL,
---     conyugue VARCHAR(100) DEFAULT NULL,
---     gemelo INT DEFAULT NULL,
---     direccion VARCHAR(100) DEFAULT NULL,
---     email VARCHAR(100) DEFAULT NULL,
---     telefono VARCHAR(50) DEFAULT NULL,
---     responsable VARCHAR(50) DEFAULT NULL,
---     telefono_responsable VARCHAR(50) DEFAULT NULL,
---     parentesco VARCHAR(19) DEFAULT NULL,
---     created_at DATETIME DEFAULT NULL,
---     updated_at DATETIME DEFAULT NULL,
---     uo_id INT DEFAULT NULL,
---     expediente_id INT DEFAULT NULL
--- ) ENGINE = InnoDB CHARSET = utf8mb4;
+CREATE TABLE listado_pacientes (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(100) DEFAULT NULL,
+    apellido VARCHAR(100) DEFAULT NULL,
+    nombre_completo VARCHAR(200) DEFAULT NULL,
+    dpi BIGINT DEFAULT NULL,
+    pasaporte VARCHAR(50) DEFAULT NULL,
+    sexo VARCHAR(2) DEFAULT NULL,
+    nacimiento DATE DEFAULT NULL,
+    defuncion DATE DEFAULT NULL,
+    hora_defuncion TIME DEFAULT NULL,
+    nacionalidad VARCHAR(3) DEFAULT NULL,
+    lugar_nacimiento CHAR(4) DEFAULT NULL,
+    estado_civil INT DEFAULT NULL,
+    educacion INT DEFAULT NULL,
+    pueblo INT DEFAULT NULL,
+    idioma INT DEFAULT NULL,
+    ocupacion VARCHAR(50) DEFAULT NULL,
+    estado VARCHAR(2) DEFAULT NULL,
+    gemelo INT DEFAULT NULL,
+    padre VARCHAR(100) DEFAULT NULL,
+    madre VARCHAR(100) DEFAULT NULL,
+    direccion VARCHAR(200) DEFAULT NULL,
+    municipio INT DEFAULT NULL,
+    telefono VARCHAR(30) DEFAULT NULL,
+    tel_contacto VARCHAR(10) DEFAULT NULL,
+    conyugue VARCHAR(100) DEFAULT NULL,
+    user_created VARCHAR(20) DEFAULT NULL,
+    created_at DATETIME DEFAULT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    exp_madre INT DEFAULT NULL,
+    exp_ref INT DEFAULT NULL,
+    expediente VARCHAR(10) DEFAULT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
 
 CREATE Table sin_expedientes AS
 SELECT *
@@ -164,3 +169,83 @@ FROM consultas
 WHERE
     expediente IS NULL
     AND hoja_emergencia IS NULL;
+
+CREATE TABLE nuevacitas (
+    id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    paciente_id INT DEFAULT NULL,
+    expediente INT DEFAULT NULL,
+    especialidad INT DEFAULT NULL,
+    fecha DATE DEFAULT NULL,
+    nota TEXT DEFAULT NULL,
+    tipo INT DEFAULT NULL,
+    lab INT DEFAULT NULL,
+    fecha_lab DATE DEFAULT NULL,
+    created_at DATETIME DEFAULT NULL,
+    updated_at DATETIME DEFAULT NULL,
+    created_by VARCHAR(8) DEFAULT NULL
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE nuevausuario (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(10) UNIQUE NOT NULL,
+    nombre VARCHAR(100) DEFAULT NULL,
+    email VARCHAR(100) DEFAULT NULL,
+    contraseña VARCHAR(255) DEFAULT NULL,
+    dpi BIGINT UNIQUE DEFAULT NULL,
+    rol INT NOT NULL,
+    created_at DATETIME,
+    updated_at DATETIME
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE nuevamedicos (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    colegiado INT NOT NULL,
+    nombre VARCHAR(200) DEFAULT NULL,
+    dpi BIGINT DEFAULT NULL,
+    especialidad INT DEFAULT NULL,
+    pasaporte VARCHAR(30) DEFAULT NULL,
+    sexo ENUM('M', 'F') DEFAULT NULL,
+    created_at DATETIME,
+    updated_at DATETIME
+) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE TABLE nuevarn (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    fecha DATE DEFAULT NULL,
+    cor INT DEFAULT NULL,
+    ao INT DEFAULT NULL,
+    doc VARCHAR(12) DEFAULT NULL UNIQUE,
+    fecha_parto DATE DEFAULT NULL,
+    madre VARCHAR(100) DEFAULT NULL,
+    madre_id INT DEFAULT NULL,
+    rn_id INT DEFAULT NULL,
+    dpi BIGINT DEFAULT NULL,
+    passport VARCHAR(30) DEFAULT NULL,
+    libro INT DEFAULT NULL,
+    folio INT DEFAULT NULL,
+    partida VARCHAR(20) DEFAULT NULL,
+    depto INT DEFAULT NULL,
+    muni INT DEFAULT NULL,
+    edad INT DEFAULT NULL,
+    vecindad INT DEFAULT NULL,
+    sexo_rn VARCHAR(1) DEFAULT NULL,
+    lb INT DEFAULT NULL,
+    onz INT DEFAULT NULL,
+    hora TIME DEFAULT NULL,
+    medico VARCHAR(200) DEFAULT NULL,
+    colegiado INT DEFAULT NULL,
+    dpi_medico BIGINT DEFAULT NULL,
+    hijos INT DEFAULT NULL,
+    vivos INT DEFAULT NULL,
+    muertos INT DEFAULT NULL,
+    tipo_parto INT DEFAULT NULL,
+    clase_parto INT DEFAULT NULL,
+    certifica VARCHAR(200) DEFAULT NULL,
+    usuario_id INT DEFAULT NULL,
+    create_by VARCHAR(10) NULL,
+    expediente INT DEFAULT NULL,
+    nacionalidad VARCHAR(25) DEFAULT NULL,
+    pais VARCHAR(25) DEFAULT NULL,
+    created_at DATETIME,
+    updated_at DATETIME
+) ENGINE = InnoDB CHARSET = utf8mb4;

@@ -1,7 +1,9 @@
 # coding: utf-8
 from sqlalchemy import BigInteger, CHAR, Column, Date, DateTime, Enum, ForeignKey, Integer, String, TIMESTAMP, Text, Time, text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from sqlalchemy.ext.declarative import declarative_base
+from tools.validador import trim_str 
+
 
 Base = declarative_base()
 metadata = Base.metadata
@@ -141,6 +143,12 @@ class Paciente(Base):
     padre = Column(String(100))
     madre = Column(String(100))
     conyugue = Column(String(100))
+    direccion = Column(String(4))
+    municipio = Column(String(100))
+    telefono1 = Column(String(10))
+    telefono2 = Column(String(10))
+    telefono3 = Column(String(15))
+    email = Column(String(150))
     created_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
     updated_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))
 
@@ -150,6 +158,12 @@ class Paciente(Base):
     depto_muni = relationship('DeptoMuni')
     nacionalidade = relationship('Nacionalidade')
     pueblo1 = relationship('Pueblo')
+    
+    # Validaciones de nombre y apellido
+    @validates('nombre', 'apellido')
+    def validar_nombres(self, key, value):
+        return trim_str(value)
+    
 
 
 class Expediente(Base):
@@ -172,6 +186,8 @@ class Consulta(Base):
 
     id = Column(Integer, primary_key=True)
     exp_id = Column(ForeignKey('expedientes.id'), index=True)
+    paciente_id = Column(ForeignKey('pacientes.id'), index=True)
+    historia_clinica = Column(String(15))
     fecha_consulta = Column(Date, index=True)
     hora = Column(Time)
     fecha_recepcion = Column(DateTime)
@@ -205,3 +221,20 @@ class Consulta(Base):
     servicio1 = relationship('Servicio')
     tipo_consulta1 = relationship('TipoConsulta')
     tipo_lesion1 = relationship('TipoLesion')
+
+
+class VistaConsultas(Base):
+    __tablename__ = 'vr_consultas'
+
+    id = Column(Integer, primary_key=True)
+    exp_id = Column(Integer)
+    paciente_id = Column(Integer)
+    historia_clinica = Column(String(15))
+    fecha_consulta = Column(Date)
+    hora = Column(Time)
+    fecha_recepcion = Column(DateTime)
+    fecha_egreso = Column(DateTime)
+    tipo_consulta = Column(Integer)
+    estatus = Column(Integer)
+
+

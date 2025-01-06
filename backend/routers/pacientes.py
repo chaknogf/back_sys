@@ -4,8 +4,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, desc
 from fastapi.encoders import jsonable_encoder
 from database.database import SessionLocal, get_db
-from models.pacientes_models import Paciente, VistaPacientes
-from models.consultas_models import Expediente, VistaConsultas
+from models.pacientes_models import Paciente, VistaPacientes, ConsultaRapida
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import date, time
@@ -50,6 +49,12 @@ class PacienteModel(BaseModel):
     conyugue: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+    direccion: Optional[str] = None
+    municipio: Optional[str] = None
+    telefono: Optional[str] = None
+    email: Optional[str] = None
+    telefono2: Optional[str] = None
+    telefono3: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -98,65 +103,122 @@ class VistaPaciente(BaseModel):
     tipo_consulta: Optional[int] = None
     estatus: Optional[int] = None
     created_at: Optional[str] = None
+class CosnultaRapida(BaseModel):
+    consulta_id: Optional[int] = None
+    paciente_id: Optional[int] = None
+    exp_id: Optional[int] = None
+    historia_clinica: Optional[str] = None
+    fecha_consulta: Optional[date] = None
+    hora: Optional[time] = None
+    fecha_recepcion: Optional[str] = None
+    fecha_egreso: Optional[str] = None
+    tipo_consulta: Optional[int] = None
+    estatus: Optional[int] = None
+    
    
     class Config:
         orm_mode = True
-        
+    
 
 
 
-# Ruta para obtener todos los pacientes
+# # Ruta para obtener todos los pacientes
+
 @router.get("/pacientes/", tags=["Pacientes"])
 def get_pacientes(db: Session = Depends(get_db)):
     try:
         result = (
             db.query(VistaPacientes)
             .order_by(desc(VistaPacientes.created_at)) 
-            .limit(300)
+            .limit(200)
             .all()
+        )
+        return JSONResponse(status_code=200, content=jsonable_encoder(result))
+    except SQLAlchemyError as error:
+        raise HTTPException(status_code=500, detail=f"Error al consultar: {error}")
+    
+    
+@router.get("/datapaciente/{id}", tags=["Pacientes"])
+def get_pacientes(id: int, db: Session = Depends(get_db)):
+    try:
+        result = (
+            db.query(Paciente)
+            .filter(Paciente.id == id)
+            .first()
+        )
+        return JSONResponse(status_code=200, content=jsonable_encoder(result))
+    except SQLAlchemyError as error:
+        raise HTTPException(status_code=500, detail=f"Error al consultar: {error}")
+    
+@router.get("/consultarapida/", tags=["Pacientes"])
+def get_consultaRapida(paciente_id: int, db: Session = Depends(get_db)):
+    try:        
+        result = (
+            db.query(ConsultaRapida)  # Corregido el nombre del modelo
+            .filter(ConsultaRapida.paciente_id == paciente_id)  
+            .all()  # Ejecuta la consulta y obtiene todos los resultados
         )
         return JSONResponse(status_code=200, content=jsonable_encoder(result))
     except SQLAlchemyError as error:
         raise HTTPException(status_code=500, detail=f"Error al consultar: {error}")
 
 @router.get("/paciente_id/", tags=["Pacientes"])
-async def get_paciente(db: Session = Depends(get_db),
-                 id: int = Query(None, description="Id"),
-    expediente: str = Query(None, description="Número de Expediente"),
-    hoja: str = Query(None, description="Hoja de emergencia"),
-    nombre: str = Query(None, description="Nombres"),
-    apellido: str = Query(None, description="Apellidos"),
-    dpi: str = Query(None, description="DPI"),
-    nacimiento: str = Query(None, description="Fecha de nacimiento")):
+async def get_paciente(
+    db: Session = Depends(get_db),
+    id: Optional[int] = Query(None, description="Id del paciente"),
+    expediente: Optional[str] = Query(None, description="Número de expediente"),
+    madre: Optional[str] = Query(None, description="Número de expediente de la madre"),
+    consulta: Optional[str] = Query(None, description="Consulta"),
+    nombre: Optional[str] = Query(None, description="Nombre del paciente"),
+    apellido: Optional[str] = Query(None, description="Apellido del paciente"),
+    dpi: Optional[str] = Query(None, description="DPI del paciente"),
+    nacimiento: Optional[str] = Query(None, description="Fecha de nacimiento en formato YYYY-MM-DD")
+):
     try:
-        query = db.query(Paciente).order_by(desc(Paciente.paciente_id))
+        # Construir la consulta base
+        query = db.query(VistaPacientes)
 
+        # Aplicar filtros dinámicos según los parámetros recibidos
         if id is not None:
-            query = query.filter(Paciente.paciente_id == id)
-            
+            query = query.filter(VistaPacientes.paciente_id == id)
+
         if expediente is not None:
-            query = query.filter(Paciente.expediente == expediente)
-            
-        if hoja is not None:
-            query = query.filter(Paciente.hoja_emergencia.ilike(f"{hoja}%"))
+            # Si expediente tiene un valor, buscar en expediente
+            query = query.filter(VistaPacientes.expediente == expediente)
+        else:
+            # Si expediente es None, buscar en referencia_anterior
+            query = query.filter(VistaPacientes.referencia_anterior.isnot(None))
 
-        if nombre:
-            query = query.filter(Paciente.nombre.ilike(f"%{nombre}%"))
+        if madre is not None:
+            query = query.filter(VistaPacientes.expediente_madre == madre)
+        if consulta is not None:
+            query = query.filter(VistaPacientes.historia_clinica == consulta)
+        if nombre is not None:
+            query = query.filter(VistaPacientes.nombre.ilike(f"%{nombre}%"))
+        if apellido is not None:
+            query = query.filter(VistaPacientes.apellido.ilike(f"%{apellido}%"))
+        if dpi is not None:
+            query = query.filter(VistaPacientes.dpi.ilike(f"%{dpi}%"))
+        if nacimiento is not None:
+            query = query.filter(VistaPacientes.nacimiento == nacimiento)
+        # Obtener resultados con un límite
+        result = query.all()
 
-        if apellido:
-            query = query.filter(Paciente.apellido.ilike(f"%{apellido}%"))
+        # Validar si no hay resultados
+        if not result:
+            raise HTTPException(status_code=404, detail="No hay coincidencias")
 
-        if dpi:
-            query = query.filter(Paciente.dpi.ilike(f"%{dpi}%"))
-
-        result = query.limit(800).all()
-        return JSONResponse(status_code=200, content=jsonable_encoder({"results": result}))
+        # Retornar resultados en una estructura descriptiva
+        return JSONResponse(
+            status_code=200,
+            content=jsonable_encoder(result)
+        )
     except SQLAlchemyError as e:
-        # Manejar errores específicos de SQLAlchemy, si es necesario
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=f"Error al consultar la base de datos: {str(e)}")
     except Exception as e:
-        # Manejar otros errores inesperados
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=f"Error inesperado: {str(e)}")
+    
+    
     
 @router.post("/registrarPaciente", tags=["Pacientes"])
 def crear_paciente(paciente: PacienteModel, db: Session = Depends(get_db)):
@@ -170,3 +232,26 @@ def crear_paciente(paciente: PacienteModel, db: Session = Depends(get_db)):
         db.rollback()  # Revertir cualquier cambio en caso de error
         return JSONResponse(status_code=500, content={"message": f"Error al crear paciente: {str(error)}"})
     
+@router.put("/actualizarPaciente/{id}", tags=["Pacientes"])
+def actualizar_paciente(id: int, paciente: PacienteModel, db: Session = Depends(get_db)):
+    try:
+        paciente_actualizado = (
+            db.query(Paciente)
+            .filter(Paciente.id == id)
+            .update(paciente.dict())
+        )
+        db.commit()
+        return JSONResponse(status_code=200, content={"message": "Se ha actualizado el paciente"})
+    except SQLAlchemyError as error:
+        db.rollback()
+        return JSONResponse(status_code=500, content={"message": f"Error al actualizar paciente: {str(error)}"})
+    
+@router.delete("/eliminarPaciente/{id}", tags=["Pacientes"])
+def eliminar_paciente(id: int, db: Session = Depends(get_db)):
+    try:
+        paciente_eliminado = db.query(Paciente).filter(Paciente.id == id).delete()
+        db.commit()
+        return JSONResponse(status_code=200, content={"message": "Se ha eliminado el paciente"})
+    except SQLAlchemyError as error:
+        db.rollback()
+        return JSONResponse(status_code=500, content={"message": f"Error al eliminar paciente: {str(error)}"})

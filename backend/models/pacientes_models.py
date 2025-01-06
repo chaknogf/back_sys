@@ -159,6 +159,18 @@ class VistaPacientes(Base):
     estatus = Column(Integer)
     created_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
     
-    
-    
+
+class ConsultaRapida(Base):
+    __tablename__ = 'consulta_rapida'
+
+    consulta_id = Column(Integer, primary_key=True)
+    paciente_id = Column(ForeignKey('pacientes.id'), index=True)
+    exp_id = Column(Integer)
+    historia_clinica = Column(String(15))
+    fecha_consulta = Column(Date)    
+    hora = Column(Time)
+    fecha_recepcion = Column(TIMESTAMP)
+    fecha_egreso = Column(TIMESTAMP)
+    tipo_consulta = Column(Integer)
+    estatus = Column(Integer)           
     

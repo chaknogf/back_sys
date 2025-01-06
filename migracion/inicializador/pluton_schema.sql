@@ -279,3 +279,85 @@ CREATE TABLE cie10 (
     INDEX idx_cie10_grupo (grupo),
     INDEX idx_cie10_especialidad (especialidad_id)
 ) ENGINE = InnoDB CHARSET = utf8mb4;
+
+CREATE OR REPLACE VIEW vista_pacientes AS
+SELECT
+    p.id AS paciente_id,
+    p.nombre,
+    p.apellido,
+    p.dpi,
+    p.pasaporte,
+    p.sexo,
+    p.nacimiento,
+    p.defuncion,
+    p.nacionalidad_iso AS nacionalidad,
+    p.lugar_nacimiento,
+    p.estado AS estado,
+    p.gemelo,
+    p.direccion,
+    p.municipio,
+    p.created_at,
+    CONCAT(
+        p.telefono1,
+        ', ',
+        p.telefono2,
+        ', ',
+        p.telefono3
+    ) AS telefono,
+    p.email,
+    -- Concatenamos los expedientes, referencias y expedientes madre asociados con el paciente
+    COALESCE(
+        GROUP_CONCAT(
+            DISTINCT NULLIF(e.expediente, NULL) 
+            ORDER BY e.expediente
+        ),
+        'Sin expediente'
+    ) AS expediente,  -- Aquí agregamos la coma
+    COALESCE(
+        GROUP_CONCAT(
+            DISTINCT e.referencia_anterior
+            ORDER BY e.referencia_anterior
+        ),
+        'No aplica'
+    ) AS referencia_anterior,
+    COALESCE(
+        GROUP_CONCAT(
+            DISTINCT e.expediente_madre
+            ORDER BY e.expediente_madre
+        ),
+        'Sin expediente madre'
+    ) AS expediente_madre,
+    -- Datos de la consulta
+    c.id AS consulta_id,
+    c.exp_id,
+    c.historia_clinica,
+    c.fecha_consulta,
+    c.hora,
+    c.fecha_recepcion,
+    c.fecha_egreso,
+    c.tipo_consulta,
+    c.estatus
+FROM
+    pacientes p
+    JOIN expedientes e ON p.id = e.paciente_id -- Relación entre pacientes y expedientes
+    LEFT JOIN consultas c ON e.id = c.exp_id -- Relación entre expedientes y consultas
+GROUP BY
+    p.id,
+    c.id;
+
+-- Índice compuesto en la tabla `pacientes` para optimizar orden y búsqueda por ID y created_at
+CREATE INDEX idx_pacientes_id_created_at ON pacientes (id, created_at);
+
+-- Índice básico en `expedientes.paciente_id` para mejorar el JOIN con `pacientes`
+CREATE INDEX idx_expedientes_paciente_id ON expedientes (paciente_id);
+
+-- Índice compuesto en `consultas` para optimizar búsquedas por `exp_id` y consultas por fecha
+CREATE INDEX idx_consultas_exp_id_created_at ON consultas (exp_id, fecha_consulta);
+
+-- Índice compuesto adicional en `pacientes` para consultas frecuentes y ordenación
+CREATE INDEX idx_pacientes_optimizado ON pacientes (created_at, nombre, apellido, sexo);
+
+-- Índices opcionales para mejorar operaciones de agregación en `expedientes`
+CREATE INDEX idx_expedientes_expediente ON expedientes (expediente);
+CREATE INDEX idx_expedientes_referencia ON expedientes (referencia_anterior);
+CREATE INDEX idx_expedientes_expediente_madre ON expedientes (expediente_madre);

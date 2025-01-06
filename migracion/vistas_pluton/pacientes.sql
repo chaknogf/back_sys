@@ -95,11 +95,11 @@ SELECT
     -- Concatenamos los expedientes, referencias y expedientes madre asociados con el paciente
     COALESCE(
         GROUP_CONCAT(
-            DISTINCT e.expediente
+            DISTINCT NULLIF(e.expediente, NULL) 
             ORDER BY e.expediente
         ),
         'Sin expediente'
-    ) AS expediente,
+    ) AS expediente,  -- Aquí agregamos la coma
     COALESCE(
         GROUP_CONCAT(
             DISTINCT e.referencia_anterior
@@ -131,3 +131,16 @@ FROM
 GROUP BY
     p.id,
     c.id;
+
+CREATE or REPLACE VIEW consulta_rapida AS
+SELECT id AS consulta_id,
+exp_id,
+historia_clinica,
+fecha_consulta, 
+hora, 
+fecha_recepcion, 
+fecha_egreso, 
+tipo_consulta, 
+estatus,
+paciente_id 
+FROM consultas;

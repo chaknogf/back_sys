@@ -1,10 +1,7 @@
-
-from sqlalchemy import Column, Integer, String, Date, Time, TIMESTAMP, ForeignKey, JSON, text
-from sqlalchemy import Column, Integer, String, Text, JSON, CHAR
+from sqlalchemy import Column, Integer, String, Date, Time, TIMESTAMP, ForeignKey, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.database.db import Base
-
 
 class ConsultaModel(Base):
     __tablename__ = 'consultas'
@@ -29,5 +26,5 @@ class ConsultaModel(Base):
     created_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
     updated_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
 
-    paciente = relationship("Paciente", back_populates="consultas")
-    eventos = relationship("EventoConsulta", back_populates="consulta")
+    paciente = relationship("PacienteModel", back_populates="consultas")
+    eventos = relationship("EventoConsultaModel", back_populates="consulta", cascade="all, delete-orphan")

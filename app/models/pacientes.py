@@ -1,29 +1,25 @@
-from sqlalchemy import Column, Integer, String, Date, TIMESTAMP, JSON
-from sqlalchemy.sql import func
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String, Date, Time, TIMESTAMP, ForeignKey, JSON, text
+from sqlalchemy import Column, Integer, String, Text, JSON, CHAR
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
+from app.database.db import Base
 
-Base = declarative_base()
 
+# 🧍‍♂️ Modelo: Paciente
 class PacienteModel(Base):
-    __tablename__ = "pacientes"
+    __tablename__ = 'pacientes'
 
-    id = Column(Integer, primary_key=True, index=True)
-    identificadores = Column(JSON, nullable=False)
-
-    primer_nombre = Column(String(50))
-    segundo_nombre = Column(String(50))
-    otros_nombres = Column(String(100))
-    primer_apellido = Column(String(50))
-    segundo_apellido = Column(String(50))
+    id = Column(Integer, primary_key=True)
+    identificadores = Column(JSONB, nullable=False)
+    nombre = Column(JSONB)
     sexo = Column(String(2))
     fecha_nacimiento = Column(Date)
-
-    contacto = Column(JSON)
-    referencias = Column(JSON)
-    datos_extra = Column(JSON)
-
+    contacto = Column(JSONB)
+    referencias = Column(JSONB)
+    datos_extra = Column(JSONB)
     estado = Column(String(2), default='A')
-    creado_por = Column(String(50))
-    actualizado_por = Column(String(50))
-    # creado_en = Column(TIMESTAMP, server_default=func.now())
-    # actualizado_en = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    metadatos = Column(JSONB)
+    creado_en = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"))
+    actualizado_en = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"))
+    consultas = relationship("Consulta", back_populates="paciente")
+    

@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignorar archivos de entorno virtual
+venv/
+env/
+*.env
+
+# Ignorar archivos de IDEs y editores
+.vscode/
+.idea/
+
+# Ignorar archivos de logs
+*.log
+
+# Ignorar archivos de sistema
+.DS_Store
+Thumbs.db%

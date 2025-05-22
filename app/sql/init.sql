@@ -1,4 +1,4 @@
-CREATE DATABASE hospital;
+CREATE DATABASE IF NOT EXISTS hospital;
 
 CREATE TABLE users (
     id integer NOT NULL,

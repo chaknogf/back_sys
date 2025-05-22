@@ -1,12 +1,8 @@
-
-from sqlalchemy import Column, Integer, String, Date, Time, TIMESTAMP, ForeignKey, JSON, text
-from sqlalchemy import Column, Integer, String, Text, JSON, CHAR
+from sqlalchemy import Column, Integer, String, TIMESTAMP, ForeignKey, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.database.db import Base
 
-
-# 🧾 Modelo: EventoConsulta
 class EventoConsultaModel(Base):
     __tablename__ = 'eventos_consulta'
 
@@ -19,4 +15,4 @@ class EventoConsultaModel(Base):
     actualizado_en = Column(TIMESTAMP(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
     estado = Column(String(2), default='A')
 
-    consulta = relationship("Consulta", back_populates="eventos")
+    consulta = relationship("ConsultaModel", back_populates="eventos")

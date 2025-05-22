@@ -1,11 +1,8 @@
-from sqlalchemy import Column, Integer, String, Date, Time, TIMESTAMP, ForeignKey, JSON, text
-from sqlalchemy import Column, Integer, String, Text, JSON, CHAR
+from sqlalchemy import Column, Integer, String, Date, TIMESTAMP, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.database.db import Base
 
-
-# 🧍‍♂️ Modelo: Paciente
 class PacienteModel(Base):
     __tablename__ = 'pacientes'
 
@@ -21,5 +18,6 @@ class PacienteModel(Base):
     metadatos = Column(JSONB)
     creado_en = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"))
     actualizado_en = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"))
-    consultas = relationship("Consulta", back_populates="paciente")
-    
+
+    # relación con ConsultaModel
+    consultas = relationship("ConsultaModel", back_populates="paciente", cascade="all, delete-orphan")

@@ -1,30 +1,68 @@
-from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
+from pydantic import BaseModel, ConfigDict
 from datetime import date, time, datetime
+
+
+class ciclo(BaseModel):
+    clave: str
+    valor: str
+
+class indicador(BaseModel):
+    clave: str
+    valor: str
+    
+class signos_vitales(BaseModel):
+    clave: str
+    valor: str
+    
+class ansigmas(BaseModel):
+    clave: str
+    valor: str
+    
+class antecedentes(BaseModel):
+    clave: str
+    valor: str
+    
+class ordenes(BaseModel):
+    clave: str
+    valor: str
+class estudios(BaseModel):
+    clave: str
+    valor: str
+    
+class detalle_clinico(BaseModel):
+    clave: str
+    valor: str
+    
+class sistema(BaseModel):
+    usuario: str
+    accion: str
+    fecha: datetime
 
 class ConsultaBase(BaseModel):
     paciente_id: int
-    tipo_consulta: Optional[int] = None
-    especialidad: Optional[int] = None
-    servicio: Optional[int] = None
-    documento: Optional[str] = None
-    fecha_consulta: Optional[date] = None
-    hora_consulta: Optional[time] = None
-    ciclo: Optional[Dict[str, datetime]] = None
-    indicadores: Optional[Dict[str, Any]] = None
-    detalle_clinico: Optional[Dict[str, Any]] = None
-    sistema: Optional[Dict[str, Any]] = None
+    tipo_consulta: Optional[int]
+    especialidad: Optional[int]
+    servicio: Optional[int]
+    documento: Optional[str]
+    fecha_consulta: Optional[date]
+    hora_consulta: Optional[time]
+    ciclo: Optional[ciclo]
+    indicadores: Optional[indicador]
+    detalle_clinico: Optional[detalle_clinico]
+    sistema: Optional[sistema]
+    signos_vitales: Optional[signos_vitales]
+    ansigmas: Optional[ansigmas]
+    antecedentes: Optional[antecedentes]
+    ordenes: Optional[ordenes]
+    estudios: Optional[estudios]
 
 class ConsultaCreate(ConsultaBase):
     pass
 
-class ConsultaUpdate(ConsultaBase):
-    pass
-
 class ConsultaOut(ConsultaBase):
     id: int
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

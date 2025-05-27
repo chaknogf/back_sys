@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, ConfigDict
 from datetime import date, time, datetime
 
@@ -37,9 +37,10 @@ class detalle_clinico(BaseModel):
 class sistema(BaseModel):
     usuario: str
     accion: str
-    fecha: datetime
+    fecha: str
 
 class ConsultaBase(BaseModel):
+    id: Optional[int] = None
     paciente_id: int
     tipo_consulta: Optional[int]
     especialidad: Optional[int]
@@ -47,15 +48,15 @@ class ConsultaBase(BaseModel):
     documento: Optional[str]
     fecha_consulta: Optional[date]
     hora_consulta: Optional[time]
-    ciclo: Optional[ciclo]
-    indicadores: Optional[indicador]
-    detalle_clinico: Optional[detalle_clinico]
-    sistema: Optional[sistema]
-    signos_vitales: Optional[signos_vitales]
-    ansigmas: Optional[ansigmas]
-    antecedentes: Optional[antecedentes]
-    ordenes: Optional[ordenes]
-    estudios: Optional[estudios]
+    ciclo: Optional[List[ciclo]]
+    indicadores: Optional[List[indicador]]
+    detalle_clinico: Optional[List[detalle_clinico]]
+    sistema: Optional[List[sistema]]
+    signos_vitales: Optional[List[signos_vitales]]
+    ansigmas: Optional[List[ansigmas]]
+    antecedentes: Optional[List[antecedentes]]
+    ordenes: Optional[List[ordenes]]
+    estudios: Optional[List[estudios]]
 
 class ConsultaCreate(ConsultaBase):
     pass

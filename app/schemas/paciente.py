@@ -15,38 +15,33 @@ class Nombre(BaseModel):
     casada: Optional[str]
 
 class Contacto(BaseModel):
-    telefono: Optional[str]
-    email: Optional[str]
-    municipio: Optional[str]
-    direccion: Optional[str]
+    clave: str
+    valor: str
 
 class Referencia(BaseModel):
     nombre: str
-    parentesco: str
+    parentesco: Optional[str]
     telefono: Optional[str]
 
 class DatosExtra(BaseModel):
-    nacionalidad: Optional[str]
-    ocupacion: Optional[str]
-    idiomas: Optional[str]
-    fecha_defuncion: Optional[date]
-    otros: Optional[str]
-    covid: Optional[Union[dict, str]]  # según cómo manejes esa estructura
+    tipo: str
+    valor: str
 
 class Metadata(BaseModel):
     usuario: Optional[str]
     registro: Optional[str]
 
 class PacienteBase(BaseModel):
-    identificadores: List[Identificador]
+    id: Optional[int] = None
+    identificadores: Optional[List[Identificador]]
     nombre: Nombre
     sexo: Optional[str]
     fecha_nacimiento: Optional[date]
-    contacto: Optional[Contacto]
+    contacto: Optional[List[Contacto]]
     referencias: Optional[List[Referencia]]
-    datos_extra: Optional[DatosExtra]
+    datos_extra: Optional[List[DatosExtra]]
     estado: Optional[str] = "A"
-    metadatos: Optional[Metadata]
+    metadatos: Optional[List[Metadata]]
 
 class PacienteCreate(PacienteBase):
     pass

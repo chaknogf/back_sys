@@ -11,7 +11,11 @@ from app.auth.login import router as login
 
 
 
-app = FastAPI()
+app = FastAPI(
+    title="backend-fah",
+    version="3.0.0",
+    description="Documentación de la API FAH"
+)
 
 app.add_middleware(
     CORSMiddleware,

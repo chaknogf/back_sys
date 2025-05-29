@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from typing import Optional, List
 from app.database.db import SessionLocal
 from app.models.pacientes import PacienteModel
-from app.schemas.paciente import PacienteBase, PacienteCreate, PacienteOut
+from app.schemas.paciente import PacienteBase, PacienteCreate, PacienteOut, PacienteUpdate
 from fastapi.security import OAuth2PasswordBearer
 
 router = APIRouter()
@@ -21,7 +21,7 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/pacientes/", response_model=List[PacienteBase], tags=["pacientes"])
+@router.get("/pacientes/", response_model=List[PacienteUpdate], tags=["pacientes"])
 async def get_pacientes(
     id: Optional[int] = Query(None),
     identificador: Optional[str] = Query(None),
@@ -93,7 +93,7 @@ async def create_paciente(
 @router.put("/paciente/actualizar/{paciente_id}", tags=["pacientes"])
 async def update_paciente(
     paciente_id: int,
-    paciente: PacienteBase,
+    paciente: PacienteUpdate,
     token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):

@@ -15,7 +15,7 @@ app = FastAPI(
     title="backend-fah",
     version="3.0.0",
     description="Documentación de la API FAH",
-    #root_path="/fah"
+    root_path="/fah"
 )
 
 app.add_middleware(

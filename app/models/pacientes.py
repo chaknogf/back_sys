@@ -6,7 +6,7 @@ from app.database.db import Base
 class PacienteModel(Base):
     __tablename__ = 'pacientes'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     identificadores = Column(JSONB, nullable=False)
     nombre = Column(JSONB)
     sexo = Column(String(2))

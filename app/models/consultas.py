@@ -6,7 +6,7 @@ from app.database.db import Base
 class ConsultaModel(Base):
     __tablename__ = 'consultas'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     paciente_id = Column(Integer, ForeignKey('pacientes.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     tipo_consulta = Column(Integer)
     especialidad = Column(Integer)

@@ -6,7 +6,7 @@ from app.database.db import Base
 class EventoConsultaModel(Base):
     __tablename__ = 'eventos_consulta'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     consulta_id = Column(Integer, ForeignKey('consultas.id', ondelete="CASCADE"), nullable=False)
     tipo_evento = Column(Integer, nullable=False)
     datos = Column(JSONB)

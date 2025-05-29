@@ -32,6 +32,17 @@ class Metadata(BaseModel):
     registro: Optional[str]
 
 class PacienteBase(BaseModel):
+    identificadores: Optional[List[Identificador]]
+    nombre: Nombre
+    sexo: Optional[str]
+    fecha_nacimiento: Optional[date]
+    contacto: Optional[List[Contacto]]
+    referencias: Optional[List[Referencia]]
+    datos_extra: Optional[List[DatosExtra]]
+    estado: Optional[str] = "A"
+    metadatos: Optional[List[Metadata]] 
+    
+class PacienteUpdate(BaseModel):
     id: Optional[int] = None
     identificadores: Optional[List[Identificador]]
     nombre: Nombre
@@ -41,7 +52,8 @@ class PacienteBase(BaseModel):
     referencias: Optional[List[Referencia]]
     datos_extra: Optional[List[DatosExtra]]
     estado: Optional[str] = "A"
-    metadatos: Optional[List[Metadata]]
+    metadatos: Optional[List[Metadata]] 
+
 
 class PacienteCreate(PacienteBase):
     pass

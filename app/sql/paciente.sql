@@ -2,6 +2,7 @@ CREATE DATABASE hospital;
 
 CREATE TABLE pacientes (
     id SERIAL PRIMARY KEY,
+    unidad INT,
     -- 🔐 Identificadores múltiples
     identificadores JSONB NOT NULL, -- Ej: [{ "tipo": "DPI", "valor": "1234567890101" }, { "tipo": "expediente", "valor": "20250001" }]
     -- 🧍‍♂️ Identificación personal

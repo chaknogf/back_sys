@@ -32,6 +32,7 @@ class Metadata(BaseModel):
     registro: Optional[str]
 
 class PacienteBase(BaseModel):
+    unidad: Optional[int]
     identificadores: Optional[List[Identificador]]
     nombre: Nombre
     sexo: Optional[str]
@@ -45,6 +46,7 @@ class PacienteBase(BaseModel):
     
 class PacienteUpdate(BaseModel):
     id: Optional[int] = None
+    unidad: Optional[int]
     identificadores: Optional[List[Identificador]]
     nombre: Nombre
     sexo: Optional[str]

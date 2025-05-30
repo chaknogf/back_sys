@@ -8,6 +8,7 @@ class PacienteModel(Base):
     __tablename__ = 'pacientes'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    unidad = Column(Integer)
     identificadores = Column(JSONB, nullable=False)
     nombre = Column(JSONB)
     sexo = Column(String(2))

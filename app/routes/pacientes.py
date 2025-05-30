@@ -30,6 +30,7 @@ async def get_pacientes(
     segundo_nombre: Optional[str] = Query(None),
     primer_apellido: Optional[str] = Query(None),
     segundo_apellido: Optional[str] = Query(None),
+    nombre_completo: Optional[str] = Query(None),
     estado: Optional[str] = Query(None),
     fecha_nacimiento: Optional[str] = Query(None),
     fecha_defuncion: Optional[str] = Query(None),
@@ -52,6 +53,20 @@ async def get_pacientes(
             query = query.filter(
                 cast(PacienteModel.identificadores, JSONB).contains([{"valor": identificador}])
             )
+            
+        if nombre_completo:
+            query = query.filter(
+                text("""
+                    (
+                        (pacientes.nombre->>'primer') || ' ' ||
+                        COALESCE(pacientes.nombre->>'segundo', '') || ' ' ||
+                        COALESCE(pacientes.nombre->>'otro', '') || ' ' ||
+                        (pacientes.nombre->>'apellido_primero') || ' ' ||
+                        COALESCE(pacientes.nombre->>'apellido_segundo', '') || ' ' ||
+                        COALESCE(pacientes.nombre->>'casada', '')
+                    ) ILIKE :nombre_completo
+                """)
+            ).params(nombre_completo=f"%{nombre_completo}%")
 
         if primer_nombre:
             query = query.filter(
@@ -72,6 +87,7 @@ async def get_pacientes(
             query = query.filter(
                 PacienteModel.nombre["apellido_segundo"].astext.ilike(f"%{segundo_apellido}%")
             )
+        if 
 
         if referencia:
             query = query.filter(
@@ -88,6 +104,10 @@ async def get_pacientes(
 
         if sexo:
             query = query.filter(PacienteModel.sexo == sexo)
+        if fecha_nacimiento:
+            query = query.filter(PacienteModel.fecha_nacimiento == fecha_nacimiento)
+        if fecha_defuncion:
+            query = query.filter(PacienteModel.fecha_defuncion == fecha_defuncion)
 
         result = query.offset(skip).limit(limit).all()
         return result

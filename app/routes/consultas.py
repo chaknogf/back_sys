@@ -61,19 +61,33 @@ async def get_consultas(
         if fecha_consulta:
             query = query.filter(ConsultaModel.fecha_consulta == fecha_consulta)
         if clico:
-            query = query.filter(ConsultaModel.ciclo.op('->>')('clave') == clico)
+            query = query.filter(
+                cast(ConsultaModel.clico, JSONB).contains([{"clave": clico}])
+            )
         if signo:
-            query = query.filter(ConsultaModel.signos_vitales.op('->>')('clave') == signo)
+            query = query.filter(
+                cast(ConsultaModel.signos, JSONB).contains([{"clave": signo}])
+            )
         if antecedente:
-            query = query.filter(ConsultaModel.antecedentes.op('->>')('clave') == antecedente)
+            query = query.filter(
+                cast(ConsultaModel.antecedentes, JSONB).contains([{"clave": antecedente}])
+            )
         if orden:
-            query = query.filter(ConsultaModel.ordenes.op('->>')('clave') == orden)
+            query = query.filter(
+                cast(ConsultaModel.ordenes, JSONB).contains([{"clave": orden}])
+            )
         if estudio:
-            query = query.filter(ConsultaModel.estudios.op('->>')('clave') == estudio)
+            query = query.filter(
+                cast(ConsultaModel.estudios, JSONB).contains([{"clave": estudio}])
+            )
         if detalle_clinico:
-            query = query.filter(ConsultaModel.detalle_clinico.op('->>')('clave') == detalle_clinico)
+            query = query.filter(
+                cast(ConsultaModel.detalle_clinico, JSONB).contains([{"clave": detalle_clinico}])
+            )
         if sistema:
-            query = query.filter(ConsultaModel.sistema.op('->>')('clave') == sistema)
+            query = query.filter(
+                cast(ConsultaModel.sistema, JSONB).contains([{"clave": sistema}])
+            )
     
         result = query.offset(skip).limit(limit).all()
         return result

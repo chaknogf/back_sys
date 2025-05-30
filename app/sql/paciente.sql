@@ -57,3 +57,38 @@ CREATE INDEX idx_pacientes_referencias_gin ON pacientes USING GIN (referencias);
 
 -- Índice GIN para datos_extra (para filtros por nacionalidad, ocupación, idiomas, etc.)
 CREATE INDEX idx_pacientes_datos_extra_gin ON pacientes USING GIN (datos_extra);
+
+ALTER TABLE pacientes ADD COLUMN nombre_completo TEXT;
+
+CREATE OR REPLACE FUNCTION actualizar_nombre_completo()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.nombre_completo := 
+    COALESCE(NEW.nombre->>'primer', '') || ' ' ||
+    COALESCE(NEW.nombre->>'segundo', '') || ' ' ||
+    COALESCE(NEW.nombre->>'otro', '') || ' ' ||
+    COALESCE(NEW.nombre->>'apellido_primero', '') || ' ' ||
+    COALESCE(NEW.nombre->>'apellido_segundo', '') || ' ' ||
+    COALESCE(NEW.nombre->>'casada', '');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_nombre_completo
+BEFORE INSERT OR UPDATE ON pacientes
+FOR EACH ROW
+EXECUTE FUNCTION actualizar_nombre_completo();
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX idx_nombre_completo_gin ON pacientes USING gin (nombre_completo gin_trgm_ops);
+
+UPDATE pacientes
+SET
+    nombre_completo = COALESCE(nombre ->> 'primer', '') || ' ' || COALESCE(nombre ->> 'segundo', '') || ' ' || COALESCE(nombre ->> 'otro', '') || ' ' || COALESCE(
+        nombre ->> 'apellido_primero',
+        ''
+    ) || ' ' || COALESCE(
+        nombre ->> 'apellido_segundo',
+        ''
+    ) || ' ' || COALESCE(nombre ->> 'casada', '');

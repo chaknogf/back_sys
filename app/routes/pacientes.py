@@ -29,7 +29,6 @@ async def get_pacientes(
     segundo_nombre: Optional[str] = Query(None),
     primer_apellido: Optional[str] = Query(None),
     segundo_apellido: Optional[str] = Query(None),
-    nombre_completo: Optional[str] = Query(None),
     estado: Optional[str] = Query(None),
     fecha_nacimiento: Optional[str] = Query(None),
     fecha_defuncion: Optional[str] = Query(None),
@@ -43,33 +42,50 @@ async def get_pacientes(
     try:
         query = db.query(PacienteModel).order_by(desc(PacienteModel.id))
 
+        # Filtro directo por ID
         if id:
             query = query.filter(PacienteModel.id == id)
+
+       # Filtros en listas de objetos
         if identificador:
-            query = query.filter(PacienteModel.identificadores.op('->>')('valor') == identificador)
+            query = query.filter(
+                cast(PacienteModel.identificadores, JSONB).contains([{"valor": identificador}])
+            )
+
         if primer_nombre:
-            query = query.filter(PacienteModel.identificadores.op('->>')('primer').ilike(f'%{primer_nombre}%'))  # Use ilike for case-insensitive search (primer_nombre)
+            query = query.filter(
+                PacienteModel.nombre["primer"].astext.ilike(f"%{primer_nombre}%")
+            )
+
         if segundo_nombre:
-            query = query.filter(PacienteModel.identificadores.op('->>')('segundo').ilike(f'%{segundo_nombre}%'))
+            query = query.filter(
+                PacienteModel.nombre["segundo"].astext.ilike(f"%{segundo_nombre}%")
+            )
+
         if primer_apellido:
-            query = query.filter(PacienteModel.identificadores.op('->>')('apellido_primero').ilike(f'%{primer_apellido}%'))
+            query = query.filter(
+                PacienteModel.nombre["apellido_primero"].astext.ilike(f"%{primer_apellido}%")
+            )
+
         if segundo_apellido:
-            query = query.filter(PacienteModel.identificadores.op('->>')('apellido_segundo').ilike(f'%{segundo_apellido}%'))
-        if nombre_completo:
-            query = query.filter(PacienteModel.identificadores.op('->>')('concat(primer, " ", segundo, " ", apellido_primero, " ", apellido_segundo)').ilike(f'%{nombre_completo}%'))
+            query = query.filter(
+                PacienteModel.nombre["apellido_segundo"].astext.ilike(f"%{segundo_apellido}%")
+            )
+
+        if referencia:
+            query = query.filter(
+                cast(PacienteModel.referencias, JSONB).contains([{"nombre": referencia}])
+            )
+
         if estado:
             query = query.filter(PacienteModel.estado == estado)
-        if fecha_nacimiento:
-            query = query.filter(PacienteModel.detalles.op('->>')('fecha_nacimiento') == fecha_nacimiento)
-        if fecha_defuncion:
-            query = query.filter(PacienteModel.detalles.op('->>')('fecha_defuncion') == fecha_defuncion)
+
         if sexo:
             query = query.filter(PacienteModel.sexo == sexo)
-        if referencia:
-            query = query.filter(PacienteModel.referencias.op('->>')('nombre').ilike(f'%{referencia}%'))
 
         result = query.offset(skip).limit(limit).all()
         return result
+
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=str(e))
     

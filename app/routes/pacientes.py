@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import desc, cast
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.sql import text
 from typing import Optional, List
 from app.database.db import SessionLocal
 from app.models.pacientes import PacienteModel
@@ -49,7 +50,7 @@ async def get_pacientes(
        # Filtros en listas de objetos
         if identificador:
             query = query.filter(
-                PacienteModel.identificadores["valor"].astext.ilike(f"%{identificador}%")
+                cast(PacienteModel.identificadores, JSONB).contains([{"valor": identificador}])
             )
 
         if primer_nombre:
@@ -74,8 +75,13 @@ async def get_pacientes(
 
         if referencia:
             query = query.filter(
-                PacienteModel.referencia["valor"].astext.ilike(f"%{referencia}%")
-            )
+                text("""
+                    EXISTS (
+                        SELECT 1 FROM jsonb_array_elements("pacientes"."referencias") AS ref
+                        WHERE ref->>'nombre' ILIKE :referencia
+                    )
+                """)
+            ).params(referencia=f"%{referencia}%")
 
         if estado:
             query = query.filter(PacienteModel.estado == estado)

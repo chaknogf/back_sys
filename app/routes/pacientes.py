@@ -56,17 +56,8 @@ async def get_pacientes(
             
         if nombre_completo:
             query = query.filter(
-                text("""
-                    (
-                        (pacientes.nombre->>'primer') || ' ' ||
-                        COALESCE(pacientes.nombre->>'segundo', '') || ' ' ||
-                        COALESCE(pacientes.nombre->>'otro', '') || ' ' ||
-                        (pacientes.nombre->>'apellido_primero') || ' ' ||
-                        COALESCE(pacientes.nombre->>'apellido_segundo', '') || ' ' ||
-                        COALESCE(pacientes.nombre->>'casada', '')
-                    ) ILIKE :nombre_completo
-                """)
-            ).params(nombre_completo=f"%{nombre_completo}%")
+                PacienteModel.nombre_completo.ilike(f"%{nombre_completo}%")
+            )
 
         if primer_nombre:
             query = query.filter(
@@ -87,7 +78,7 @@ async def get_pacientes(
             query = query.filter(
                 PacienteModel.nombre["apellido_segundo"].astext.ilike(f"%{segundo_apellido}%")
             )
-        if 
+        
 
         if referencia:
             query = query.filter(

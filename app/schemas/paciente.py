@@ -42,6 +42,7 @@ class PacienteBase(BaseModel):
     estado: Optional[str] = "A"
     metadatos: Optional[List[Metadata]] 
     
+    
 class PacienteUpdate(BaseModel):
     id: Optional[int] = None
     identificadores: Optional[List[Identificador]]
@@ -53,6 +54,7 @@ class PacienteUpdate(BaseModel):
     datos_extra: Optional[List[DatosExtra]]
     estado: Optional[str] = "A"
     metadatos: Optional[List[Metadata]] 
+    nombre_completo: Optional[str]
 
 
 class PacienteCreate(PacienteBase):

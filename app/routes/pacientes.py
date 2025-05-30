@@ -49,7 +49,7 @@ async def get_pacientes(
        # Filtros en listas de objetos
         if identificador:
             query = query.filter(
-                cast(PacienteModel.identificadores, JSONB).contains([{"valor": identificador}])
+                PacienteModel.identificadores["valor"].astext.ilike(f"%{identificador}%")
             )
 
         if primer_nombre:
@@ -74,7 +74,7 @@ async def get_pacientes(
 
         if referencia:
             query = query.filter(
-                cast(PacienteModel.referencias, JSONB).contains([{"nombre": referencia}])
+                PacienteModel.referencia["valor"].astext.ilike(f"%{referencia}%")
             )
 
         if estado:

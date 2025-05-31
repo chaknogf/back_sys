@@ -20,7 +20,21 @@ def get_db():
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/auth/login",
+    scopes={"default": "Permiso general"}
+)
+
+# oauth2_scheme = OAuth2PasswordBearer(
+#     tokenUrl="/auth/login",
+#     scopes={
+#         "admin": "Acceso total",
+#         "read": "Lectura de recursos",
+#         "write": "Creación y edición de recursos"
+#     }
+# )
 
 @router.post("/login")
 def login(

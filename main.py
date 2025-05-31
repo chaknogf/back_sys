@@ -18,7 +18,7 @@ app = FastAPI(
     description="Documentación de la API FAH",
     root_path="/fah",
     docs_url="/docs",
-    redoc_url=None
+    
 )
 
 app.add_middleware(

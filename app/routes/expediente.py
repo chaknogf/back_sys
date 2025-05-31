@@ -16,9 +16,9 @@ def get_db():
 @router.post("/generar/expediente")
 def nuevo_expediente(db: Session = Depends(get_db)):
     expediente = generar_expediente(db)
-    return {"correlativo de expediente": expediente}
+    return {"correlativo": expediente}
 
 @router.post("/generar/emergencia")
 def nuevo_expediente(db: Session = Depends(get_db)):
     hoja = generar_emergencia(db)
-    return {"correlativo de emergencia": hoja}
+    return {"correlativo": hoja}

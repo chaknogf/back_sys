@@ -22,6 +22,7 @@ class UserBase(BaseModel):
     email: EmailStr
     password: str
     role: str
+    unidad: int
     estado: str = "A"
 
 class UserCreate(UserBase):

@@ -7,6 +7,7 @@ CREATE TABLE users (
     email character varying(100) NOT NULL,
     password character varying(255) NOT NULL,
     role character varying(50) NOT NULL,
+    unidad INTEGER,
     estado character(1),
     creado_en timestamp without time zone DEFAULT now(),
     actualizado_en timestamp without time zone DEFAULT now()

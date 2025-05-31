@@ -10,4 +10,5 @@ class UserModel(Base):
    email = Column(String(100), unique=True, nullable=False)
    password = Column(String(255), nullable=False)
    role = Column(String(50), nullable=False)
+   unidad = Column(Integer)
    estado = Column(CHAR(1), default='A')

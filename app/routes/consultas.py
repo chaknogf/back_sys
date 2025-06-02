@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from typing import Optional, List
 from app.database.db import SessionLocal
 from app.models.consultas import ConsultaModel
-from app.schemas.consultas import ConsultaBase, ConsultaCreate, ConsultaOut
+from app.schemas.consultas import ConsultaBase, ConsultaCreate, ConsultaOut, ConsultaUpdate
 from fastapi.security import OAuth2PasswordBearer
 
 router = APIRouter()
@@ -21,7 +21,7 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/consultas/", response_model=List[ConsultaBase], tags=["consultas"])
+@router.get("/consultas/", response_model=List[ConsultaUpdate], tags=["consultas"])
 async def get_consultas(
     id: Optional[int] = Query(None),
     consulta_id: Optional[int] = Query(None),
@@ -114,7 +114,7 @@ async def create_consulta(
 @router.put("/consulta/actualizar/{consulta_id}", tags=["consultas"])
 async def update_consulta(
     consulta_id: int,
-    consulta: ConsultaBase,
+    consulta: ConsultaUpdate,
     token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):

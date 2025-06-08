@@ -61,7 +61,7 @@ class PacienteUpdate(BaseModel):
     datos_extra: Optional[Dict[str,DatosExtra]] = Field(default=None)
     estado: Optional[str] = "V"
     metadatos: Optional[Dict[str, Metadata]] = Field(default=None)
-    nombre_completo: Optional[str]
+    # nombre_completo: Optional[str] = Field(default=None)
 
 
 class PacienteCreate(PacienteBase):

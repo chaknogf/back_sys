@@ -24,7 +24,7 @@ def get_db():
         
 @router.get("/municipios/", response_model=List[MunicipioSchema], name="municipios", tags=["municipios"])
 async def get_municipios(
-    codigo: Optional[int] = Query(None, description="Código del municipio"),
+    codigo: Optional[str] = Query(None, description="Código del municipio"),
     municipio: Optional[str] = Query(None, description="Municipio"),
     departamento: Optional[str] = Query(None, description="Departamento"),
     skip: int = Query(0, ge=0),

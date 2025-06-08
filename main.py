@@ -7,6 +7,7 @@ from app.routes.pacientes import router as pacientes
 from app.routes.consultas import router as consultas
 from app.routes.eventos import router as eventos
 from app.routes.expediente import router as expediente
+from app.routes.municipios import router as municipios
 
 from app.auth.login import router as login
 
@@ -36,6 +37,7 @@ app.include_router(pacientes)
 app.include_router(expediente)
 app.include_router(consultas)
 app.include_router(eventos)
+app.include_router(municipios)
 
 
 

@@ -1,19 +1,20 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 
-# Ignorar archivos de entorno virtual
+# Virtual environment folders
 venv/
 env/
-*.env
+.venv/
+.env/
 
-# Ignorar archivos de IDEs y editores
+# IDE/editor folders
 .vscode/
 .idea/
 
-# Ignorar archivos de logs
+# Logs
 *.log
 
-# Ignorar archivos de sistema
+# OS files
 .DS_Store
-Thumbs.db%
+Thumbs.db

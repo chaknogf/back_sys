@@ -1,95 +1,84 @@
-CREATE DATABASE hospital;
+DROP TABLE IF EXISTS pacientes CASCADE;
 
-CREATE TABLE pacientes (
+CREATE TABLE IF NOT EXISTS pacientes (
     id SERIAL PRIMARY KEY,
     unidad INT,
-    -- 🔐 Identificadores múltiples
-    identificadores JSONB NOT NULL, -- Ej: [{ "tipo": "DPI", "valor": "1234567890101" }, { "tipo": "expediente", "valor": "20250001" }]
-    -- 🧍‍♂️ Identificación personal
-    nombre JSONB, -- { "primer": "...", "segundo": "...", "otros": ["..."], "apellido": "..." }
+    cui BIGINT UNIQUE,
+    expediente VARCHAR UNIQUE,
+    pasaporte VARCHAR UNIQUE,
+    otro_id VARCHAR UNIQUE,
+    identificadores JSONB,
+    nombre JSONB NOT NULL,
     sexo VARCHAR(2),
     fecha_nacimiento DATE,
-    -- ☎️ Contacto
-    contacto JSONB, -- { "telefono": "...", "email": "...", "direccion": "..." }
-    -- 👪 Referencias
-    referencias JSONB, -- [{ "nombre": "...", "parentesco": "...", "telefono": "..." }]
-    -- 🌍 Otros datos del paciente
-    datos_extra JSONB, -- { "nacionalidad": "...", "ocupacion": "...", "idiomas": [...], covid }
-    -- ⚙️ Metadatos del sistema
-    estado VARCHAR(2) DEFAULT 'A', -- 'A'=Activo, 'I'=Inactivo, 'F'=Fallecido
-    metadatos JSONB, -- { "creado_por": "...", "actualizado_por": "..." }
+    contacto JSONB,
+    referencias JSONB,
+    datos_extra JSONB,
+    estado VARCHAR(2) DEFAULT 'V',
+    metadatos JSONB,
     creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
--- 🔎 Índice para búsqueda eficiente dentro del campo 'identificadores'
--- Índice para buscar por identificadores (ej. DPI, expediente)
-CREATE INDEX idx_pacientes_identificadores_gin ON pacientes USING GIN (identificadores);
-
--- Índice específico para buscar por valor dentro del arreglo de identificadores
--- Ejemplo: WHERE identificadores @> '[{"tipo": "DPI", "valor": "1234567890101"}]'
-CREATE INDEX idx_pacientes_identificadores_tipo_valor ON pacientes USING GIN (
-    (identificadores ->> 'tipo'),
-    (identificadores ->> 'valor')
+    actualizado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    nombre_completo TEXT
 );
 
--- Índices por claves del campo nombre
-CREATE INDEX idx_pacientes_nombre_primer ON pacientes ((nombre ->> 'primer'));
+-- Índices JSONB (uso frecuente de GIN para búsquedas parciales)
+CREATE INDEX idx_identificadores_gin ON pacientes USING GIN (identificadores);
 
-CREATE INDEX idx_pacientes_nombre_segundo ON pacientes ((nombre ->> 'segundo'));
+CREATE INDEX idx_referencias_gin ON pacientes USING GIN (referencias);
 
-CREATE INDEX idx_pacientes_nombre_apellido ON pacientes ((nombre ->> 'apellido'));
+CREATE INDEX idx_datos_extra_gin ON pacientes USING GIN (datos_extra);
 
--- Índices por contacto (en caso de que se busque por email o teléfono)
-CREATE INDEX idx_pacientes_contacto_telefono ON pacientes ((contacto ->> 'telefono'));
+-- Índices funcionales sobre claves JSON
+CREATE INDEX idx_nombre_primer ON pacientes ((nombre ->> 'primer'));
 
-CREATE INDEX idx_pacientes_contacto_email ON pacientes ((contacto ->> 'email'));
+CREATE INDEX idx_nombre_apellido1 ON pacientes (
+    (nombre ->> 'apellido_primero')
+);
 
--- Índice por estado (activo/inactivo/fallecido)
-CREATE INDEX idx_pacientes_estado ON pacientes (estado);
+CREATE INDEX idx_contacto_telefono ON pacientes ((contacto ->> 'telefono'));
 
--- Índice por fecha de nacimiento
-CREATE INDEX idx_pacientes_fecha_nacimiento ON pacientes (fecha_nacimiento);
+-- Índices básicos
+CREATE INDEX idx_estado ON pacientes (estado);
 
--- Índice por fecha de creación
-CREATE INDEX idx_pacientes_creado_en ON pacientes (creado_en);
+CREATE INDEX idx_fecha_nacimiento ON pacientes (fecha_nacimiento);
 
--- Índice GIN general para búsquedas avanzadas por referencias
-CREATE INDEX idx_pacientes_referencias_gin ON pacientes USING GIN (referencias);
+CREATE INDEX idx_creado_en ON pacientes (creado_en);
 
--- Índice GIN para datos_extra (para filtros por nacionalidad, ocupación, idiomas, etc.)
-CREATE INDEX idx_pacientes_datos_extra_gin ON pacientes USING GIN (datos_extra);
+-- Índice GIN para búsquedas aproximadas en nombre completo
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-ALTER TABLE pacientes ADD COLUMN nombre_completo TEXT;
+CREATE INDEX idx_nombre_completo_trgm ON pacientes USING GIN (nombre_completo gin_trgm_ops);
 
+-- Función y trigger para mantener nombre_completo actualizado
 CREATE OR REPLACE FUNCTION actualizar_nombre_completo()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.nombre_completo := 
+  NEW.nombre_completo := TRIM(
     COALESCE(NEW.nombre->>'primer', '') || ' ' ||
     COALESCE(NEW.nombre->>'segundo', '') || ' ' ||
     COALESCE(NEW.nombre->>'otro', '') || ' ' ||
     COALESCE(NEW.nombre->>'apellido_primero', '') || ' ' ||
     COALESCE(NEW.nombre->>'apellido_segundo', '') || ' ' ||
-    COALESCE(NEW.nombre->>'casada', '');
+    COALESCE(NEW.nombre->>'casada', '')
+  );
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trigger_nombre_completo
+CREATE TRIGGER trg_set_nombre_completo
 BEFORE INSERT OR UPDATE ON pacientes
 FOR EACH ROW
 EXECUTE FUNCTION actualizar_nombre_completo();
 
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
-CREATE INDEX idx_nombre_completo_gin ON pacientes USING gin (nombre_completo gin_trgm_ops);
-
+-- Actualización masiva inicial
 UPDATE pacientes
 SET
-    nombre_completo = COALESCE(nombre ->> 'primer', '') || ' ' || COALESCE(nombre ->> 'segundo', '') || ' ' || COALESCE(nombre ->> 'otro', '') || ' ' || COALESCE(
-        nombre ->> 'apellido_primero',
-        ''
-    ) || ' ' || COALESCE(
-        nombre ->> 'apellido_segundo',
-        ''
-    ) || ' ' || COALESCE(nombre ->> 'casada', '');
+    nombre_completo = TRIM(
+        COALESCE(nombre ->> 'primer', '') || ' ' || COALESCE(nombre ->> 'segundo', '') || ' ' || COALESCE(nombre ->> 'otro', '') || ' ' || COALESCE(
+            nombre ->> 'apellido_primero',
+            ''
+        ) || ' ' || COALESCE(
+            nombre ->> 'apellido_segundo',
+            ''
+        ) || ' ' || COALESCE(nombre ->> 'casada', '')
+    );

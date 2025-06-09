@@ -21,17 +21,15 @@ class PacienteModel(Base):
     nombre_completo = Column(Text)
     
     def generar_nombre_completo(self):
-        n = self.nombre
-        return " ".join(
-            filter(None, [
-                n.get("primer"),
-                n.get("segundo"),
-                n.get("otro"),
-                n.get("apellido_primero"),
-                n.get("apellido_segundo"),
-                n.get("casada")
-            ])
-        )
+        n = self.nombre or {}
+        return " ".join([v for v in [
+            n.get("primer"),
+            n.get("segundo"),
+            n.get("otro"),
+            n.get("apellido_primero"),
+            n.get("apellido_segundo"),
+            n.get("casada")
+        ] if v])
 
     # relación con ConsultaModel
     consultas = relationship("ConsultaModel", back_populates="paciente", cascade="all, delete-orphan")

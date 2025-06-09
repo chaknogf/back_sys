@@ -12,6 +12,7 @@ class Nombre(BaseModel):
 
 class Contacto(BaseModel):
     direccion: Optional[str] = None
+    localidad: Optional[str] = None
     departamento: Optional[str] = None
     municipio: Optional[str] = None
     telefono: Optional[str] = None

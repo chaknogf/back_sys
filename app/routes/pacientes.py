@@ -1,9 +1,10 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import desc, cast
+from sqlalchemy import String, desc, cast
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import text
 from typing import Optional, List
@@ -44,48 +45,38 @@ async def get_pacientes(
     try:
         query = db.query(PacienteModel).order_by(desc(PacienteModel.id))
 
-        # Filtro directo por ID
         if id:
             query = query.filter(PacienteModel.id == id)
 
-       # Filtros en listas de objetos
         if identificador:
             query = query.filter(
-                cast(PacienteModel.identificadores, JSONB).contains([{"valor": identificador}])
+                (PacienteModel.cui.cast(String).ilike(f"%{identificador}%")) |
+                (PacienteModel.expediente.ilike(f"%{identificador}%")) |
+                (PacienteModel.pasaporte.ilike(f"%{identificador}%")) |
+                (PacienteModel.otro_id.ilike(f"%{identificador}%"))
             )
-            
+
         if nombre_completo:
-            query = query.filter(
-                PacienteModel.nombre_completo.ilike(f"%{nombre_completo}%")
-            )
+            query = query.filter(PacienteModel.nombre_completo.ilike(f"%{nombre_completo}%"))
 
         if primer_nombre:
-            query = query.filter(
-                PacienteModel.nombre["primer"].astext.ilike(f"%{primer_nombre}%")
-            )
+            query = query.filter(PacienteModel.nombre["primer"].astext.ilike(f"%{primer_nombre}%"))
 
         if segundo_nombre:
-            query = query.filter(
-                PacienteModel.nombre["segundo"].astext.ilike(f"%{segundo_nombre}%")
-            )
+            query = query.filter(PacienteModel.nombre["segundo"].astext.ilike(f"%{segundo_nombre}%"))
 
         if primer_apellido:
-            query = query.filter(
-                PacienteModel.nombre["apellido_primero"].astext.ilike(f"%{primer_apellido}%")
-            )
+            query = query.filter(PacienteModel.nombre["apellido_primero"].astext.ilike(f"%{primer_apellido}%"))
 
         if segundo_apellido:
-            query = query.filter(
-                PacienteModel.nombre["apellido_segundo"].astext.ilike(f"%{segundo_apellido}%")
-            )
-        
+            query = query.filter(PacienteModel.nombre["apellido_segundo"].astext.ilike(f"%{segundo_apellido}%"))
 
         if referencia:
             query = query.filter(
                 text("""
                     EXISTS (
-                        SELECT 1 FROM jsonb_array_elements("pacientes"."referencias") AS ref
-                        WHERE ref->>'nombre' ILIKE :referencia
+                        SELECT 1 FROM jsonb_each_text("pacientes"."referencias") AS ref
+                        WHERE ref.value::jsonb->>'nombre' ILIKE :referencia
                     )
                 """)
             ).params(referencia=f"%{referencia}%")
@@ -95,16 +86,26 @@ async def get_pacientes(
 
         if sexo:
             query = query.filter(PacienteModel.sexo == sexo)
-        if fecha_nacimiento:
-            query = query.filter(PacienteModel.fecha_nacimiento == fecha_nacimiento)
-        if fecha_defuncion:
-            query = query.filter(PacienteModel.fecha_defuncion == fecha_defuncion)
 
-        result = query.offset(skip).limit(limit).all()
-        return JSONResponse(status_code=200, content=jsonable_encoder(result))
+        if fecha_nacimiento:
+            try:
+                fecha_nac = datetime.strptime(fecha_nacimiento, "%Y-%m-%d").date()
+                query = query.filter(PacienteModel.fecha_nacimiento == fecha_nac)
+            except ValueError:
+                raise HTTPException(status_code=422, detail="Formato de fecha_nacimiento inválido (use YYYY-MM-DD)")
+
+        if fecha_defuncion and hasattr(PacienteModel, "fecha_defuncion"):
+            try:
+                fecha_def = datetime.strptime(fecha_defuncion, "%Y-%m-%d").date()
+                query = query.filter(PacienteModel.fecha_defuncion == fecha_def)
+            except ValueError:
+                raise HTTPException(status_code=422, detail="Formato de fecha_defuncion inválido (use YYYY-MM-DD)")
+
+        pacientes = query.offset(skip).limit(limit).all()
+        return JSONResponse(status_code=200, content=jsonable_encoder(pacientes))
 
     except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error al consultar pacientes: {str(e)}")
     
 
 

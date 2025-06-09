@@ -101,7 +101,7 @@ async def get_pacientes(
             query = query.filter(PacienteModel.fecha_defuncion == fecha_defuncion)
 
         result = query.offset(skip).limit(limit).all()
-        return result
+        return JSONResponse(status_code=200, content=jsonable_encoder(result))
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -9,7 +9,7 @@ class PacienteModel(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     unidad = Column(Integer)
-    identificadores = Column(JSONB, nullable=False)
+    identificadores = Column(JSONB)
     nombre = Column(JSONB)
     sexo = Column(String(2))
     fecha_nacimiento = Column(Date)

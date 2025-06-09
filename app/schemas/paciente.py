@@ -1,12 +1,10 @@
-from typing import List, Optional, Union, Dict
+from typing import List, Optional, Dict
 from pydantic import BaseModel, ConfigDict, Field
-from datetime import date, datetime
+from datetime import date
 
 class Identificador(BaseModel):
-    cui: Optional[int]
-    expediente: Optional[str]
-    pasaporte: Optional[str]
-    otro: Optional[str]
+    tipo: str
+    valor: str
 
 class Nombre(BaseModel):
     primer: str
@@ -17,11 +15,8 @@ class Nombre(BaseModel):
     casada: Optional[str]
 
 class Contacto(BaseModel):
-    direccion: Optional[str]
-    municipio: Optional[str]
-    telefono: Optional[str]
-    telefono2: Optional[str]
-    telefono3: Optional[str]
+    clave: str
+    valor: str
 
 class Referencia(BaseModel):
     nombre: str
@@ -38,31 +33,30 @@ class Metadata(BaseModel):
 
 class PacienteBase(BaseModel):
     unidad: Optional[int]
-    identificadores: Optional[Identificador]
+    identificadores: Optional[List[Identificador]] = None
     nombre: Nombre
     sexo: Optional[str]
     fecha_nacimiento: Optional[date]
-    contacto: Optional[Contacto]
-    referencias: Optional[Dict[str,Referencia]] = Field(default=None)
-    datos_extra: Optional[Dict[str,DatosExtra]] = Field(default=None)
+    contacto: Optional[List[Contacto]] = None
+    referencias: Optional[List[Referencia]] = None
+    datos_extra: Optional[List[DatosExtra]] = None
     estado: Optional[str] = "V"
-    metadatos: Optional[Dict[str, Metadata]] = Field(default=None)
-    
-    
+    metadatos: Optional[List[Metadata]] = None
+    nombre_completo: Optional[str] = None
+
 class PacienteUpdate(BaseModel):
     id: Optional[int] = None
     unidad: Optional[int]
-    identificadores: Optional[Identificador]
-    nombre: Nombre
-    sexo: Optional[str]
-    fecha_nacimiento: Optional[date]
-    contacto: Optional[Contacto]
-    referencias: Optional[Dict[str,Referencia]] = Field(default=None)
-    datos_extra: Optional[Dict[str,DatosExtra]] = Field(default=None)
+    identificadores: Optional[List[Identificador]] = None
+    nombre: Optional[Nombre] = None
+    sexo: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    contacto: Optional[List[Contacto]] = None
+    referencias: Optional[List[Referencia]] = None
+    datos_extra: Optional[List[DatosExtra]] = None
     estado: Optional[str] = "V"
-    metadatos: Optional[Dict[str, Metadata]] = Field(default=None)
-    # nombre_completo: Optional[str] = Field(default=None)
-
+    metadatos: Optional[List[Metadata]] = None
+    
 
 class PacienteCreate(PacienteBase):
     pass

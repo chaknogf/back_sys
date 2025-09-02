@@ -7,7 +7,7 @@ from urllib.parse import quote_plus
 import os
 
 # Cargar variables de entorno
-load_dotenv()
+load_dotenv(dotenv_path=".env", override=True)
 
 # Obtener variables del entorno
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")

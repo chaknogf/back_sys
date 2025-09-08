@@ -60,16 +60,16 @@ async def get_pacientes(
             query = query.filter(PacienteModel.nombre_completo.ilike(f"%{nombre_completo}%"))
 
         if primer_nombre:
-            query = query.filter(PacienteModel.nombre["primer"].astext.ilike(f"%{primer_nombre}%"))
+            query = query.filter(PacienteModel.nombre["primer_nombre"].astext.ilike(f"%{primer_nombre}%"))
 
         if segundo_nombre:
-            query = query.filter(PacienteModel.nombre["segundo"].astext.ilike(f"%{segundo_nombre}%"))
+            query = query.filter(PacienteModel.nombre["segundo_nombre"].astext.ilike(f"%{segundo_nombre}%"))
 
         if primer_apellido:
-            query = query.filter(PacienteModel.nombre["apellido_primero"].astext.ilike(f"%{primer_apellido}%"))
+            query = query.filter(PacienteModel.nombre["primer_apellido"].astext.ilike(f"%{primer_apellido}%"))
 
         if segundo_apellido:
-            query = query.filter(PacienteModel.nombre["apellido_segundo"].astext.ilike(f"%{segundo_apellido}%"))
+            query = query.filter(PacienteModel.nombre["segundo_apellido"].astext.ilike(f"%{segundo_apellido}%"))
 
         if referencia:
             query = query.filter(

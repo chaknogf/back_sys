@@ -3,12 +3,12 @@ from pydantic import BaseModel, ConfigDict, Field, root_validator
 from datetime import date
 
 class Nombre(BaseModel):
-    primer: str
-    segundo: Optional[str] = None
-    otro: Optional[str] = None
-    apellido_primero: str
-    apellido_segundo: Optional[str] = None
-    casada: Optional[str] = None
+    primer_nombre: str
+    segundo_nombre: Optional[str] = None
+    otro_nombre: Optional[str] = None
+    primer_apellido: str
+    segundo_apellido: Optional[str] = None
+    apellido_casada: Optional[str] = None
 
 class Contacto(BaseModel):
     direccion: Optional[str] = None
@@ -56,12 +56,12 @@ class PacienteUpdate(PacienteBase):
     def generar_nombre_completo(cls, values):
         nombre = values.get("nombre", {})
         partes = [
-            str(nombre.get("primer", "")).strip(),
-            str(nombre.get("segundo", "")).strip(),
-            str(nombre.get("otro", "")).strip(),
-            str(nombre.get("apellido_primero", "")).strip(),
-            str(nombre.get("apellido_segundo", "")).strip(),
-            str(nombre.get("casada", "")).strip()
+            str(nombre.get("primer_nombre", "")).strip(),
+            str(nombre.get("segundo_nombre", "")).strip(),
+            str(nombre.get("otro_nombre", "")).strip(),
+            str(nombre.get("primer_apellido", "")).strip(),
+            str(nombre.get("segundo_apellido", "")).strip(),
+            str(nombre.get("apellido_casada", "")).strip()
         ]
         values["nombre_completo"] = " ".join(p for p in partes if p)
         return values

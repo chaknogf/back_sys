@@ -33,7 +33,7 @@ async def get_consultas(
     tipo_consulta: Optional[int] = Query(None),
     documento: Optional[str] = Query(None),
     fecha_consulta: Optional[str] = Query(None),
-    clico: Optional[str] = Query(None),
+    ciclo: Optional[str] = Query(None),
     primer_nombre: Optional[str] = Query(None),
     segundo_nombre: Optional[str] = Query(None),
     primer_apellido: Optional[str] = Query(None),
@@ -41,65 +41,53 @@ async def get_consultas(
     expediente: Optional[str] = Query(None),
     cui: Optional[int] = Query(None),
     fecha_nacimiento: Optional[str] = Query(None),
-    
-    
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=0),
-    # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
         query = db.query(VistaConsultasModel).order_by(desc(VistaConsultasModel.id_consulta))
 
-        if id:
-            query = query.filter(ConsultaModel.id == paciente_id)
+        if paciente_id:
+            query = query.filter(VistaConsultasModel.id_paciente == paciente_id)
         if consulta_id:
-            query = query.filter(ConsultaModel.id_consulta == consulta_id)
+            query = query.filter(VistaConsultasModel.id_consulta == consulta_id)
         if especialidad:
-            query = query.filter(ConsultaModel.especialidad == especialidad)
+            query = query.filter(VistaConsultasModel.especialidad == especialidad)
         if servicio:
-            query = query.filter(ConsultaModel.servicio == servicio)
+            query = query.filter(VistaConsultasModel.servicio == servicio)
         if tipo_consulta:
-            query = query.filter(ConsultaModel.tipo_consulta == tipo_consulta)
+            query = query.filter(VistaConsultasModel.tipo_consulta == tipo_consulta)
         if documento:
-            query = query.filter(ConsultaModel.documento == documento)
+            query = query.filter(VistaConsultasModel.documento == documento)
         if fecha_consulta:
-            query = query.filter(ConsultaModel.fecha_consulta == fecha_consulta)
-        if clico:
+            query = query.filter(VistaConsultasModel.fecha_consulta == fecha_consulta)
+        if ciclo:
             query = query.filter(
-                cast(ConsultaModel.clico, JSONB).contains([{"clave": clico}])
+                cast(VistaConsultasModel.ciclo, JSONB).contains({"clave": ciclo})
             )
         if primer_nombre:
-            query = query.filter(
-                cast(ConsultaModel.nombre, JSONB).contains( primer_nombre)
-            )
+            query = query.filter(VistaConsultasModel.primer_nombre.ilike(f"%{primer_nombre}%"))
         if segundo_nombre:
-            query = query.filter(
-                cast(ConsultaModel.nombre, JSONB).contains( segundo_nombre)
-            )
+            query = query.filter(VistaConsultasModel.segundo_nombre.ilike(f"%{segundo_nombre}%"))
         if primer_apellido:
-            query = query.filter(
-                cast(ConsultaModel.nombre, JSONB).contains( primer_apellido)
-            )
+            query = query.filter(VistaConsultasModel.primer_apellido.ilike(f"%{primer_apellido}%"))
         if segundo_apellido:
-            query = query.filter(
-                cast(ConsultaModel.nombre, JSONB).contains( segundo_apellido)
-            )
+            query = query.filter(VistaConsultasModel.segundo_apellido.ilike(f"%{segundo_apellido}%"))
         if expediente:
-            query = query.filter(ConsultaModel.expediente == expediente)
+            query = query.filter(VistaConsultasModel.expediente == expediente)
         if cui:
-            query = query.filter(ConsultaModel.cui == cui)
+            query = query.filter(VistaConsultasModel.cui == cui)
         if fecha_nacimiento:
-            query = query.filter(ConsultaModel.fecha_nacimiento == fecha_nacimiento)
-        
-    
+            query = query.filter(VistaConsultasModel.fecha_nacimiento == fecha_nacimiento)
+
         result = query.offset(skip).limit(limit).all()
         return result
+
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
-    
 
 @router.get("/consulta/", response_model=ConsultaUpdate, tags=["consultas"])
 async def get_consulta(

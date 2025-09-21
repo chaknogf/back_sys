@@ -7,7 +7,8 @@ from sqlalchemy import desc, cast
 from sqlalchemy.dialects.postgresql import JSONB
 from typing import Optional, List
 from app.database.db import SessionLocal
-from app.models.consultas import ConsultaModel
+from app.models.consultas import ConsultaModel, VistaConsultasModel
+from app.schemas.vista_consulta import VistaConsultas
 from app.schemas.consultas import ConsultaBase, ConsultaCreate, ConsultaOut, ConsultaUpdate
 from fastapi.security import OAuth2PasswordBearer
 
@@ -20,10 +21,12 @@ def get_db():
         yield db
     finally:
         db.close()
+        
+        
 
-@router.get("/consultas/", response_model=List[ConsultaUpdate], tags=["consultas"])
+@router.get("/consultas/", response_model=List[VistaConsultas], tags=["consultas"])
 async def get_consultas(
-    id: Optional[int] = Query(None),
+    paciente_id: Optional[int] = Query(None),
     consulta_id: Optional[int] = Query(None),
     especialidad: Optional[int] = Query(None),
     servicio: Optional[int] = Query(None),
@@ -31,12 +34,14 @@ async def get_consultas(
     documento: Optional[str] = Query(None),
     fecha_consulta: Optional[str] = Query(None),
     clico: Optional[str] = Query(None),
-    signo: Optional[str] = Query(None),
-    antecedente: Optional[str] = Query(None),
-    orden: Optional[str] = Query(None),
-    estudio: Optional[str] = Query(None),
-    detalle_clinico: Optional[str] = Query(None),
-    sistema: Optional[str] = Query(None),
+    primer_nombre: Optional[str] = Query(None),
+    segundo_nombre: Optional[str] = Query(None),
+    primer_apellido: Optional[str] = Query(None),
+    segundo_apellido: Optional[str] = Query(None),
+    expediente: Optional[str] = Query(None),
+    cui: Optional[int] = Query(None),
+    fecha_nacimiento: Optional[str] = Query(None),
+    
     
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=0),
@@ -44,12 +49,12 @@ async def get_consultas(
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
-        query = db.query(ConsultaModel).order_by(desc(ConsultaModel.id))
+        query = db.query(VistaConsultasModel).order_by(desc(VistaConsultasModel.id_consulta))
 
         if id:
-            query = query.filter(ConsultaModel.id == id)
+            query = query.filter(ConsultaModel.id == paciente_id)
         if consulta_id:
-            query = query.filter(ConsultaModel.consulta_id == consulta_id)
+            query = query.filter(ConsultaModel.id_consulta == consulta_id)
         if especialidad:
             query = query.filter(ConsultaModel.especialidad == especialidad)
         if servicio:
@@ -64,37 +69,68 @@ async def get_consultas(
             query = query.filter(
                 cast(ConsultaModel.clico, JSONB).contains([{"clave": clico}])
             )
-        if signo:
+        if primer_nombre:
             query = query.filter(
-                cast(ConsultaModel.signos, JSONB).contains([{"clave": signo}])
+                cast(ConsultaModel.nombre, JSONB).contains( primer_nombre)
             )
-        if antecedente:
+        if segundo_nombre:
             query = query.filter(
-                cast(ConsultaModel.antecedentes, JSONB).contains([{"clave": antecedente}])
+                cast(ConsultaModel.nombre, JSONB).contains( segundo_nombre)
             )
-        if orden:
+        if primer_apellido:
             query = query.filter(
-                cast(ConsultaModel.ordenes, JSONB).contains([{"clave": orden}])
+                cast(ConsultaModel.nombre, JSONB).contains( primer_apellido)
             )
-        if estudio:
+        if segundo_apellido:
             query = query.filter(
-                cast(ConsultaModel.estudios, JSONB).contains([{"clave": estudio}])
+                cast(ConsultaModel.nombre, JSONB).contains( segundo_apellido)
             )
-        if detalle_clinico:
-            query = query.filter(
-                cast(ConsultaModel.detalle_clinico, JSONB).contains([{"clave": detalle_clinico}])
-            )
-        if sistema:
-            query = query.filter(
-                cast(ConsultaModel.sistema, JSONB).contains([{"clave": sistema}])
-            )
+        if expediente:
+            query = query.filter(ConsultaModel.expediente == expediente)
+        if cui:
+            query = query.filter(ConsultaModel.cui == cui)
+        if fecha_nacimiento:
+            query = query.filter(ConsultaModel.fecha_nacimiento == fecha_nacimiento)
+        
     
         result = query.offset(skip).limit(limit).all()
         return result
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
     
 
+@router.get("/consulta/", response_model=ConsultaUpdate, tags=["consultas"])
+async def get_consulta(
+    id_consulta: Optional[int] = Query(None),
+    expediente: Optional[str] = Query(None),
+    documento: Optional[str] = Query(None),
+    token: str = Depends(oauth2_scheme),
+    db: SQLAlchemySession = Depends(get_db)
+):
+    try:
+        query = db.query(ConsultaModel).order_by(desc(ConsultaModel.id))
+        if id_consulta:
+            query = query.filter(ConsultaModel.id == id_consulta)
+
+        if expediente:
+            query = query.filter(ConsultaModel.expediente_id == expediente)
+        if documento:
+            query = query.filter(ConsultaModel.documento == documento)
+
+        db_consulta = query.first()
+
+        if not db_consulta:
+            raise HTTPException(status_code=404, detail="Consulta no encontrada")
+
+        return db_consulta
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error en base de datos: {str(e)}")
+    finally:
+        db.close()
 
 @router.post("/consulta/crear/", status_code=201, tags=["consultas"])
 async def create_consulta(

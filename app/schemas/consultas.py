@@ -101,14 +101,13 @@ class Apgar(BaseModel):
     puntuacion_total: int
     interpretacion: str
     
-class Examen_fisico(BaseModel):
-    silverman: Dict[str, Silverman]
-    downe: Dict[str, Downe]
-    cuerpo: Dict[str, Cuerpo]
-    glasgow: Dict[str, Glasgow]
-    bishop: Dict[str, Bishop]
-    apgar: Dict[str, Apgar]
-    
+class ExamenFisico(BaseModel):
+    silverman: Silverman
+    downe: Downe
+    cuerpo: Cuerpo
+    glasgow: Glasgow
+    bishop: Bishop
+    apgar: Apgar
     
 class Sistema(BaseModel):
     usuario: str
@@ -145,7 +144,7 @@ class ConsultaBase(BaseModel):
     hora_consulta: Optional[time]
     ciclo: Optional[Dict[str, Datos]] = Field(default=None)
     indicadores: Optional[Dict[str, Datos]] = Field(default=None)
-    detalle_clinico: Optional[Dict[str, Datos]] = Field(default=None)
+    detalle_clinicos: Optional[Dict[str, Datos]] = Field(default=None)
     sistema: Optional[Dict[str,Sistema]] = Field(default=None)
     signos_vitales: Optional[Dict[str, Signos_vitales]] = Field(default=None)
     antecedentes: Optional[Dict[str, Antecedentes]] = Field(default=None)
@@ -154,7 +153,7 @@ class ConsultaBase(BaseModel):
     comentario: Optional[Dict[str, Nota]] = Field(default=None)
     impresion_clinica: Optional[Dict[str, Nota]] = Field(default=None)
     tratamiento: Optional[Dict[str, Nota]] = Field(default=None)
-    examen_fisico: Optional[Dict[str, Examen_fisico]] = Field(default=None)
+    examen_fisico: Optional[Dict[str, ExamenFisico]] = None
     nota_enfermeria: Optional[Dict[str, Enfermeria]] = Field(default=None)
     contraindicado: Optional[str] = None
     presa_quirurgica: Optional[Dict[str, Presa_quirurgica]] = Field(default=None)
@@ -174,7 +173,7 @@ class ConsultaUpdate(BaseModel):
     hora_consulta: Optional[time]
     ciclo: Optional[Dict[str, Datos]] = Field(default=None)
     indicadores: Optional[Dict[str, Datos]] = Field(default=None)
-    detalle_clinico: Optional[Dict[str, Datos]] = Field(default=None)
+    detalle_clinicos: Optional[Dict[str, Datos]] = Field(default=None)
     sistema: Optional[Dict[str,Sistema]] = Field(default=None)
     signos_vitales: Optional[Dict[str, Signos_vitales]] = Field(default=None)
     antecedentes: Optional[Dict[str, Antecedentes]] = Field(default=None)
@@ -183,7 +182,7 @@ class ConsultaUpdate(BaseModel):
     comentario: Optional[Dict[str, Nota]] = Field(default=None)
     impresion_clinica: Optional[Dict[str, Nota]] = Field(default=None)
     tratamiento: Optional[Dict[str, Nota]] = Field(default=None)
-    examen_fisico: Optional[Dict[str, Examen_fisico]] = Field(default=None)
+    examen_fisico: Optional[Dict[str, ExamenFisico]] = None
     nota_enfermeria: Optional[Dict[str, Enfermeria]] = Field(default=None)
     contraindicado: Optional[str] = None
     presa_quirurgica: Optional[Dict[str, Presa_quirurgica]] = Field(default=None)

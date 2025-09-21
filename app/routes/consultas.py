@@ -45,7 +45,7 @@ async def get_consultas(
     
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=0),
-    token: str = Depends(oauth2_scheme),
+    # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
@@ -106,7 +106,7 @@ async def get_consulta(
     id_consulta: Optional[int] = Query(None),
     expediente: Optional[str] = Query(None),
     documento: Optional[str] = Query(None),
-    token: str = Depends(oauth2_scheme),
+    # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
@@ -135,7 +135,7 @@ async def get_consulta(
 @router.post("/consulta/crear/", status_code=201, tags=["consultas"])
 async def create_consulta(
     consulta: ConsultaCreate,
-    token: str = Depends(oauth2_scheme),
+    # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
@@ -151,7 +151,7 @@ async def create_consulta(
 async def update_consulta(
     consulta_id: int,
     consulta: ConsultaUpdate,
-    token: str = Depends(oauth2_scheme),
+    # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
@@ -172,7 +172,7 @@ async def update_consulta(
 @router.delete("/consulta/eliminar/{consulta_id}", tags=["consultas"])
 async def delete_consulta(
     consulta_id: int,
-    token: str = Depends(oauth2_scheme),
+    # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:

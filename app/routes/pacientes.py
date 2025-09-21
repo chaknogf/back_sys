@@ -39,7 +39,7 @@ async def get_pacientes(
     referencia: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=0),
-    token: str = Depends(oauth2_scheme),
+    # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
@@ -112,7 +112,7 @@ async def get_pacientes(
 @router.post("/paciente/crear/", status_code=201, tags=["pacientes"])
 async def create_paciente(
     paciente: PacienteCreate,
-    token: str = Depends(oauth2_scheme),
+    # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
@@ -149,7 +149,7 @@ async def update_paciente(
 @router.delete("/paciente/eliminar/{paciente_id}", tags=["pacientes"])
 async def delete_paciente(
     paciente_id: int,
-    token: str = Depends(oauth2_scheme),
+    # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:

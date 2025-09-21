@@ -133,6 +133,18 @@ class Presa_quirurgica(BaseModel):
     detalle: str
     especialidad: str
 
+class Indicador(BaseModel):
+    estudiante_publico: bool
+    empleado_publico: bool
+    accidente_laboral: bool
+    discapacidad: bool
+    accidente_transito: bool
+    arma_fuego: bool
+    arma_blanca: bool
+    ambulancia: bool
+    embarazo: bool
+    
+
 class ConsultaBase(BaseModel):
     expediente: Optional[str]
     paciente_id: int
@@ -143,7 +155,7 @@ class ConsultaBase(BaseModel):
     fecha_consulta: Optional[date]
     hora_consulta: Optional[time]
     ciclo: Optional[Dict[str, Datos]] = Field(default=None)
-    indicadores: Optional[Dict[str, Datos]] = Field(default=None)
+    indicadores: Indicador = Field(default_factory=Indicador)
     detalle_clinicos: Optional[Dict[str, Datos]] = Field(default=None)
     sistema: Optional[Dict[str,Sistema]] = Field(default=None)
     signos_vitales: Optional[Dict[str, Signos_vitales]] = Field(default=None)

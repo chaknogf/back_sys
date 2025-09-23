@@ -145,8 +145,8 @@ class Indicador(BaseModel):
     embarazo: bool
     
 class Ciclo(BaseModel):
-    estado: str
-    registro: str
+    estado: Optional[str] = None
+    registro: Optional[str] = None
     
 class ConsultaBase(BaseModel):
     expediente: Optional[str]
@@ -190,7 +190,7 @@ class ConsultaUpdate(BaseModel):
     indicadores: Optional[Dict[str, Datos]] = Field(default=None)
     detalle_clinicos: Optional[Dict[str, Datos]] = Field(default=None)
     sistema: Optional[Dict[str,Sistema]] = Field(default=None)
-    signos_vitales: Optional[Dict[str, Signos_vitales]] = Field(default=None)
+    signos_vitales: Optional[Dict[str, Signos_vitales]] = Field(default=None) 
     antecedentes: Optional[Dict[str, Antecedentes]] = Field(default=None)
     ordenes: Optional[Dict[str, Datos]] = Field(default=None)
     estudios: Optional[Dict[str, Datos]] = Field(default=None)

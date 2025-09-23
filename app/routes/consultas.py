@@ -64,7 +64,7 @@ async def get_consultas(
             query = query.filter(VistaConsultasModel.fecha_consulta == fecha_consulta)
         if ciclo:
             query = query.filter(
-                cast(VistaConsultasModel.ciclo, JSONB).contains({"clave": ciclo})
+                cast(VistaConsultasModel.ciclo, JSONB).contains({"estado": ciclo})
             )
         if primer_nombre:
             query = query.filter(VistaConsultasModel.primer_nombre.ilike(f"%{primer_nombre}%"))
@@ -103,7 +103,7 @@ async def get_consulta(
             query = query.filter(ConsultaModel.id == id_consulta)
 
         if expediente:
-            query = query.filter(ConsultaModel.expediente_id == expediente)
+            query = query.filter(ConsultaModel.expediente == expediente)
         if documento:
             query = query.filter(ConsultaModel.documento == documento)
 

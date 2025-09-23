@@ -32,9 +32,7 @@ class ConsultaModel(Base):
     nota_enfermeria = Column(JSONB, nullable=True)
     presa_quirurgica = Column(JSONB, nullable=True)
     egreso = Column(JSONB, nullable=True)
-
     contraindicado = Column(Text)
-
     creado_en = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"), nullable=False)
     actualizado_en = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"), nullable=False)
 

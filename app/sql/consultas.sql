@@ -9,63 +9,28 @@ CREATE TABLE consultas (
     documento VARCHAR(255) NOT NULL,
     fecha_consulta DATE NOT NULL,
     hora_consulta TIME NOT NULL,
-    ciclo JSONB,
     indicadores JSONB,
-    detalle_clinicos JSONB,
-    sistema JSONB,
-    signos_vitales JSONB,
-    antecedentes JSONB,
-    ordenes JSONB,
-    estudios JSONB,
-    comentario JSONB,
-    impresion_clinica JSONB,
-    tratamiento JSONB,
-    examen_fisico JSONB,
-    nota_enfermeria JSONB,
-    contraindicado TEXT,
-    presa_quirurgica JSONB,
-    egreso JSONB,
+    ciclo JSONB, -- aquí va el timeline
     creado_en TIMESTAMP DEFAULT NOW(),
     actualizado_en TIMESTAMP DEFAULT NOW()
 );
 
--- Índices compuestos para filtros frecuentes
-CREATE INDEX idx_consultas_paciente_fecha ON consultas (paciente_id, fecha_consulta);
+-- Índices simples
+CREATE INDEX idx_consultas_paciente_id ON consultas (paciente_id);
 
-CREATE INDEX idx_consultas_paciente_tipo ON consultas (paciente_id, tipo_consulta);
+CREATE INDEX idx_consultas_expediente ON consultas (expediente);
 
--- Índices GIN para JSONB
-CREATE INDEX idx_consultas_ciclo_gin ON consultas USING GIN (ciclo);
+CREATE INDEX idx_consultas_fecha_consulta ON consultas (fecha_consulta);
 
+-- Índices compuestos
+CREATE INDEX idx_consultas_tipo_fecha ON consultas (tipo_consulta, fecha_consulta);
+
+CREATE INDEX idx_consultas_especialidad_servicio ON consultas (especialidad, servicio);
+
+-- Índices GIN para JSONB (permiten búsquedas dentro del ciclo y los indicadores)
 CREATE INDEX idx_consultas_indicadores_gin ON consultas USING GIN (indicadores);
 
-CREATE INDEX idx_consultas_detalle_clinicos_gin ON consultas USING GIN (detalle_clinicos);
-
-CREATE INDEX idx_consultas_signos_vitales_gin ON consultas USING GIN (signos_vitales);
-
-CREATE INDEX idx_consultas_antecedentes_gin ON consultas USING GIN (antecedentes);
-
-CREATE INDEX idx_consultas_ordenes_gin ON consultas USING GIN (ordenes);
-
-CREATE INDEX idx_consultas_estudios_gin ON consultas USING GIN (estudios);
-
--- GIN opcionales para campos clínicos recientes
-CREATE INDEX idx_consultas_comentario_gin ON consultas USING GIN (comentario);
-
-CREATE INDEX idx_consultas_impresion_clinica_gin ON consultas USING GIN (impresion_clinica);
-
-CREATE INDEX idx_consultas_tratamiento_gin ON consultas USING GIN (tratamiento);
-
-CREATE INDEX idx_consultas_examen_fisico_gin ON consultas USING GIN (examen_fisico);
-
-CREATE INDEX idx_consultas_nota_enfermeria_gin ON consultas USING GIN (nota_enfermeria);
-
-CREATE INDEX idx_consultas_egreso_gin ON consultas USING GIN (egreso);
-
-CREATE INDEX idx_consultas_presa_quirurgica_gin ON consultas USING GIN (presa_quirurgica);
-
--- Índice correcto para texto simple
-CREATE INDEX idx_consultas_contraindicado_text ON consultas (contraindicado);
+CREATE INDEX idx_consultas_ciclo_gin ON consultas USING GIN (ciclo);
 
 CREATE OR REPLACE VIEW vista_consultas AS
 SELECT

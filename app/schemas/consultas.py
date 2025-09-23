@@ -17,6 +17,7 @@ class Indicador(BaseModel):
 class Ciclo(BaseModel):
     estado: Optional[str] = None
     registro: Optional[str] = None
+    usuario: Optional[str] = None
     detalle_clinicos: Optional[Dict] = None
     sistema: Optional[Dict] = None
     signos_vitales: Optional[Dict] = None

@@ -144,7 +144,10 @@ class Indicador(BaseModel):
     ambulancia: bool
     embarazo: bool
     
-
+class Ciclo(BaseModel):
+    estado: str
+    registro: str
+    
 class ConsultaBase(BaseModel):
     expediente: Optional[str]
     paciente_id: int
@@ -154,7 +157,7 @@ class ConsultaBase(BaseModel):
     documento: Optional[str]
     fecha_consulta: Optional[date]
     hora_consulta: Optional[time]
-    ciclo: Optional[Dict[str, Datos]] = Field(default=None)
+    ciclo: Optional[Dict[str, Ciclo]] = Field(default=None)
     indicadores: Indicador = Field(default_factory=Indicador)
     detalle_clinicos: Optional[Dict[str, Datos]] = Field(default=None)
     sistema: Optional[Dict[str,Sistema]] = Field(default=None)
@@ -183,7 +186,7 @@ class ConsultaUpdate(BaseModel):
     documento: Optional[str]
     fecha_consulta: Optional[date]
     hora_consulta: Optional[time]
-    ciclo: Optional[Dict[str, Datos]] = Field(default=None)
+    ciclo: Optional[Dict[str, Ciclo]] = Field(default=None)
     indicadores: Optional[Dict[str, Datos]] = Field(default=None)
     detalle_clinicos: Optional[Dict[str, Datos]] = Field(default=None)
     sistema: Optional[Dict[str,Sistema]] = Field(default=None)

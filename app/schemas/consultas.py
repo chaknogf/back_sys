@@ -45,7 +45,7 @@ class ConsultaBase(BaseModel):
     fecha_consulta: Optional[date]
     hora_consulta: Optional[time]
     indicadores: Optional[ Indicador] = Field(default_factory=dict)
-    ciclo: Optional[Dict[str, Ciclo]] = Field(default_factory=dict)
+    ciclo: Optional[Dict] = Field(default_factory=dict)
     
     
 class ConsultaUpdate(BaseModel):
@@ -59,7 +59,7 @@ class ConsultaUpdate(BaseModel):
     fecha_consulta: Optional[date]
     hora_consulta: Optional[time]
     indicadores: Optional[ Indicador] = Field(default_factory=dict)
-    ciclo: Optional[Dict[str, Ciclo]] = Field(default_factory=dict)
+    ciclo: Optional[Dict] = Field(default_factory=dict)
 
 class ConsultaCreate(ConsultaBase):
     pass

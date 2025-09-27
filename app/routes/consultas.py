@@ -135,7 +135,7 @@ async def get_consulta(
 #         db.rollback()
 #         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/crear/", status_code=201, tags=["consultas"])
+@router.post("/consulta/crear/", response_model=ConsultaUpdate,status_code=201, tags=["consultas"])
 def create_consulta(
     consulta: ConsultaCreate,
     db: SQLAlchemySession = Depends(get_db)

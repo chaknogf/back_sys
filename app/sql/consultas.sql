@@ -11,6 +11,7 @@ CREATE TABLE consultas (
     hora_consulta TIME NOT NULL,
     indicadores JSONB,
     ciclo JSONB, -- aquí va el timeline
+    orden INT DEFAULT NULL,
     creado_en TIMESTAMP DEFAULT NOW(),
     actualizado_en TIMESTAMP DEFAULT NOW()
 );
@@ -56,7 +57,8 @@ SELECT
     c.documento,
     c.fecha_consulta,
     c.hora_consulta,
-    c.ciclo
+    c.ciclo,
+    c.orden
 FROM pacientes p
     JOIN consultas c ON p.id = c.paciente_id;
 

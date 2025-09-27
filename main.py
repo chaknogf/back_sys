@@ -9,6 +9,7 @@ from app.routes.eventos import router as eventos
 from app.routes.expediente import router as expediente
 from app.routes.municipios import router as municipios
 from app.routes.paises_iso import router as paises
+from app.routes.total import router as total
 
 from app.routes.renap import router as renap
 
@@ -44,6 +45,7 @@ app.include_router(eventos)
 app.include_router(municipios)
 app.include_router(paises)
 app.include_router(renap)
+app.include_router(total)
 
 
 

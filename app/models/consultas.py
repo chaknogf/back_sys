@@ -19,6 +19,7 @@ class ConsultaModel(Base):
     hora_consulta = Column(Time, nullable=False)
     indicadores = Column(JSONB, nullable=True)
     ciclo = Column(JSONB, nullable=True)
+    orden = Column(Integer, nullable=True)
     creado_en = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"), nullable=False)
     actualizado_en = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"), nullable=False)
 
@@ -58,3 +59,4 @@ class VistaConsultasModel(Base):
     fecha_consulta = Column(Date)
     hora_consulta = Column(Time)
     ciclo = Column(JSONB, nullable=True)
+    orden = Column(Integer, nullable=True)

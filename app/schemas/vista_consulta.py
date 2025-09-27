@@ -25,5 +25,6 @@ class VistaConsultas(BaseModel):
     fecha_consulta: Optional[date]
     hora_consulta: Optional[time]
     ciclo: Optional[Dict[str, Any]]
+    orden: Optional[int] = None 
 
     model_config = ConfigDict(from_attributes=True)

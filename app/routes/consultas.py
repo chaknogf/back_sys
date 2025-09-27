@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import desc, cast
+from sqlalchemy import desc, cast, func
 from sqlalchemy.dialects.postgresql import JSONB
 from typing import Optional, List
 from app.database.db import SessionLocal
@@ -120,21 +120,59 @@ async def get_consulta(
     finally:
         db.close()
 
-@router.post("/consulta/crear/", status_code=201, tags=["consultas"])
-async def create_consulta(
+# @router.post("/consulta/crear/", status_code=201, tags=["consultas"])
+# async def create_consulta(
+#     consulta: ConsultaCreate,
+#     # token: str = Depends(oauth2_scheme),
+#     db: SQLAlchemySession = Depends(get_db)
+# ):
+#     try:
+#         new_consulta = ConsultaModel(**consulta.model_dump())
+#         db.add(new_consulta)
+#         db.commit()
+#         return JSONResponse(status_code=201, content={"message": "Consulta creada exitosamente", "id": new_consulta.id})
+#     except SQLAlchemyError as e:
+#         db.rollback()
+#         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/crear/", status_code=201, tags=["consultas"])
+def create_consulta(
     consulta: ConsultaCreate,
-    # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
-        new_consulta = ConsultaModel(**consulta.model_dump())
-        db.add(new_consulta)
-        db.commit()
-        return JSONResponse(status_code=201, content={"message": "Consulta creada exitosamente", "id": new_consulta.id})
+        with db.begin():
+            # Buscar el último orden en ese grupo
+            max_orden = db.query(func.max(ConsultaModel.orden)).filter(
+                ConsultaModel.tipo_consulta == consulta.tipo_consulta,
+                ConsultaModel.especialidad == consulta.especialidad,
+                ConsultaModel.fecha_consulta == consulta.fecha_consulta
+            ).scalar()
+
+            # Si no existe aún ningún registro en ese grupo, empezamos en 1
+            nuevo_orden = (max_orden or 0) + 1
+
+            # Crear el objeto con el orden calculado
+            consulta_dict = consulta.model_dump()
+            consulta_dict["orden"] = nuevo_orden
+
+            new_consulta = ConsultaModel(**consulta_dict)
+            db.add(new_consulta)
+            db.flush()  # forzar insert en la transacción
+
+        db.refresh(new_consulta)
+
+        return JSONResponse(
+            status_code=201,
+            content={
+                "message": "Consulta creada exitosamente",
+                "id": new_consulta.id,
+                "orden": new_consulta.orden
+            }
+        )
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-
 @router.put("/consulta/actualizar/{consulta_id}", tags=["consultas"])
 async def update_consulta(
     consulta_id: int,

@@ -59,3 +59,10 @@ SELECT
     c.ciclo
 FROM pacientes p
     JOIN consultas c ON p.id = c.paciente_id;
+
+CREATE OR REPLACE VIEW vista_totales AS
+SELECT 'pacientes' AS entidad, COUNT(*) AS total
+FROM pacientes
+UNION ALL
+SELECT 'consultas' AS entidad, COUNT(*) AS total
+FROM consultas;

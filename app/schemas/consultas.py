@@ -39,8 +39,8 @@ class ConsultaBase(BaseModel):
     expediente: Optional[str]
     paciente_id: int
     tipo_consulta: Optional[int]
-    especialidad: Optional[int]
-    servicio: Optional[int]
+    especialidad: Optional[str]
+    servicio: Optional[str]
     documento: Optional[str]
     fecha_consulta: Optional[date]
     hora_consulta: Optional[time]
@@ -53,8 +53,8 @@ class ConsultaUpdate(BaseModel):
     expediente: Optional[str]
     paciente_id: int
     tipo_consulta: Optional[int]
-    especialidad: Optional[int]
-    servicio: Optional[int]
+    especialidad: Optional[str]
+    servicio: Optional[str]
     documento: Optional[str]
     fecha_consulta: Optional[date]
     hora_consulta: Optional[time]

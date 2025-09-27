@@ -28,8 +28,8 @@ def get_db():
 async def get_consultas(
     paciente_id: Optional[int] = Query(None),
     consulta_id: Optional[int] = Query(None),
-    especialidad: Optional[int] = Query(None),
-    servicio: Optional[int] = Query(None),
+    especialidad: Optional[str] = Query(None),
+    servicio: Optional[str] = Query(None),
     tipo_consulta: Optional[int] = Query(None),
     documento: Optional[str] = Query(None),
     fecha_consulta: Optional[str] = Query(None),

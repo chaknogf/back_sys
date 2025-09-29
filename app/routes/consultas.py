@@ -11,6 +11,7 @@ from app.models.consultas import ConsultaModel, VistaConsultasModel
 from app.schemas.vista_consulta import VistaConsultas
 from app.schemas.consultas import ConsultaBase, ConsultaCreate, ConsultaOut, ConsultaUpdate
 from fastapi.security import OAuth2PasswordBearer
+from app.utils.expediente import generar_expediente, generar_emergencia
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -120,22 +121,9 @@ async def get_consulta(
     finally:
         db.close()
 
-# @router.post("/consulta/crear/", status_code=201, tags=["consultas"])
-# async def create_consulta(
-#     consulta: ConsultaCreate,
-#     # token: str = Depends(oauth2_scheme),
-#     db: SQLAlchemySession = Depends(get_db)
-# ):
-#     try:
-#         new_consulta = ConsultaModel(**consulta.model_dump())
-#         db.add(new_consulta)
-#         db.commit()
-#         return JSONResponse(status_code=201, content={"message": "Consulta creada exitosamente", "id": new_consulta.id})
-#     except SQLAlchemyError as e:
-#         db.rollback()
-#         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/consulta/crear/", response_model=ConsultaUpdate,status_code=201, tags=["consultas"])
+
+@router.post("/consulta/crear/", response_model=ConsultaUpdate, status_code=201, tags=["consultas"])
 def create_consulta(
     consulta: ConsultaCreate,
     db: SQLAlchemySession = Depends(get_db)
@@ -152,10 +140,16 @@ def create_consulta(
             # Si no existe aún ningún registro en ese grupo, empezamos en 1
             nuevo_orden = (max_orden or 0) + 1
 
-            # Crear el objeto con el orden calculado
+            # Convertir el objeto pydantic a dict
             consulta_dict = consulta.model_dump()
             consulta_dict["orden"] = nuevo_orden
 
+            # ⚡ Si tipo_consulta == 3, generar correlativo y asignar al documento
+            if consulta.tipo_consulta == 3:
+                correlativo = generar_emergencia(db)
+                consulta_dict["documento"] = correlativo
+
+            # Crear el objeto consulta
             new_consulta = ConsultaModel(**consulta_dict)
             db.add(new_consulta)
             db.flush()  # forzar insert en la transacción
@@ -167,7 +161,8 @@ def create_consulta(
             content={
                 "message": "Consulta creada exitosamente",
                 "id": new_consulta.id,
-                "orden": new_consulta.orden
+                "orden": new_consulta.orden,
+                "documento": new_consulta.documento
             }
         )
     except SQLAlchemyError as e:

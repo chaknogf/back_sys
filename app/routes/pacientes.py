@@ -12,6 +12,7 @@ from app.database.db import SessionLocal
 from app.models.pacientes import PacienteModel
 from app.schemas.paciente import PacienteBase, PacienteCreate, PacienteOut, PacienteUpdate
 from fastapi.security import OAuth2PasswordBearer
+from app.utils.expediente import generar_expediente
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -123,6 +124,35 @@ async def create_paciente(
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/paciente/crearExpediente/", status_code=201, tags=["pacientes"])
+async def create_expediente(
+    paciente: PacienteCreate,
+    # token: str = Depends(oauth2_scheme),
+    db: SQLAlchemySession = Depends(get_db)
+):
+    try:
+        expediente = generar_expediente(db)
+        paciente_dict = paciente.model_dump()
+        paciente_dict["expediente"] = expediente
+        
+        new_paciente = PacienteModel(**paciente_dict)
+        db.add(new_paciente)
+        db.commit()
+        db.refresh(new_paciente)
+        
+        
+        return JSONResponse(
+            status_code=201,
+            content={
+                "message": "Paciente creado exitosamente",
+                "id": new_paciente.id,
+                "expediente": new_paciente.expediente
+            }
+        )
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al crear paciente: {str(e)}")
 
 @router.put("/paciente/actualizar/{paciente_id}", tags=["pacientes"])
 async def update_paciente(

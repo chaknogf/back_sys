@@ -9,7 +9,7 @@ class ConsultaModel(Base):
     __tablename__ = "consultas"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    expediente = Column(String(20), nullable=False)
+    expediente = Column(String(20), nullable=True)
     paciente_id = Column(Integer, ForeignKey("pacientes.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     tipo_consulta = Column(Integer, nullable=False)
     especialidad = Column(String(20), nullable=False)

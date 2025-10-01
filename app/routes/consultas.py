@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from typing import Optional, List
 from app.database.db import SessionLocal
 from app.models.consultas import ConsultaModel, VistaConsultasModel
+from app.models.pacientes import PacienteModel
 from app.schemas.vista_consulta import VistaConsultas
 from app.schemas.consultas import ConsultaBase, ConsultaCreate, ConsultaOut, ConsultaUpdate
 from fastapi.security import OAuth2PasswordBearer
@@ -130,6 +131,17 @@ def create_consulta(
 ):
     try:
         with db.begin():
+            # ✅ Verificar si el paciente tiene expediente
+            paciente = db.query(PacienteModel).filter(PacienteModel.id == consulta.paciente_id).first()
+            if not paciente:
+                raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+            if not paciente.expediente or paciente.expediente.strip() == "":
+                expediente = generar_expediente(db)
+                paciente.expediente = expediente
+                db.add(paciente)
+                db.flush()
+
             # Buscar el último orden en ese grupo
             max_orden = db.query(func.max(ConsultaModel.orden)).filter(
                 ConsultaModel.tipo_consulta == consulta.tipo_consulta,
@@ -152,7 +164,7 @@ def create_consulta(
             # Crear el objeto consulta
             new_consulta = ConsultaModel(**consulta_dict)
             db.add(new_consulta)
-            db.flush()  # forzar insert en la transacción
+            db.flush()
 
         db.refresh(new_consulta)
 
@@ -162,7 +174,8 @@ def create_consulta(
                 "message": "Consulta creada exitosamente",
                 "id": new_consulta.id,
                 "orden": new_consulta.orden,
-                "documento": new_consulta.documento
+                "documento": new_consulta.documento,
+                "expediente_paciente": paciente.expediente  # ✅ devolvemos también el expediente generado
             }
         )
     except SQLAlchemyError as e:

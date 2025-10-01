@@ -38,15 +38,14 @@ class PacienteBase(BaseModel):
     expediente: Optional[str] = None
     pasaporte: Optional[str] = None
     otro_id: Optional[str] = None
-    #identificadores: Optional[Dict[str, Union[str, int]]] = None  # sigue disponible pero opcional
     nombre: Nombre
     sexo: Optional[str]
     fecha_nacimiento: Optional[date]
     contacto: Optional[Contacto] = None
-    referencias: Optional[Dict[str, Referencia]] = None
-    datos_extra: Optional[Dict[str, DatosExtra]] = None
+    referencias: Optional[Dict] = None
+    datos_extra: Optional[Dict] = None
     estado: Optional[str] = "V"
-    metadatos: Optional[Dict[str, Metadata]] = None
+    metadatos: Optional[Dict] = None
 
 class PacienteUpdate(PacienteBase):
     id: Optional[int] = None
@@ -61,7 +60,7 @@ class PacienteUpdate(PacienteBase):
             str(nombre.get("otro_nombre", "")).strip(),
             str(nombre.get("primer_apellido", "")).strip(),
             str(nombre.get("segundo_apellido", "")).strip(),
-            str(nombre.get("apellido_casada", "")).strip()
+            str(nombre.get("apellido_casada", "")).strip() 
         ]
         values["nombre_completo"] = " ".join(p for p in partes if p)
         return values

@@ -20,13 +20,10 @@ CREATE TABLE IF NOT EXISTS pacientes (
     nombre_completo TEXT
 );
 
--- Índices JSONB (uso frecuente de GIN para búsquedas parciales)
-
 CREATE INDEX idx_referencias_gin ON pacientes USING GIN (referencias);
 
 CREATE INDEX idx_datos_extra_gin ON pacientes USING GIN (datos_extra);
 
--- Índices funcionales sobre claves JSON
 CREATE INDEX idx_nombre_primer ON pacientes ((nombre ->> 'primer'));
 
 CREATE INDEX idx_nombre_apellido1 ON pacientes (
@@ -35,19 +32,16 @@ CREATE INDEX idx_nombre_apellido1 ON pacientes (
 
 CREATE INDEX idx_contacto_telefono ON pacientes ((contacto ->> 'telefono'));
 
--- Índices básicos
 CREATE INDEX idx_estado ON pacientes (estado);
 
 CREATE INDEX idx_fecha_nacimiento ON pacientes (fecha_nacimiento);
 
 CREATE INDEX idx_creado_en ON pacientes (creado_en);
 
--- Índice GIN para búsquedas aproximadas en nombre completo
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE INDEX idx_nombre_completo_trgm ON pacientes USING GIN (nombre_completo gin_trgm_ops);
 
--- Función y trigger para mantener nombre_completo actualizado
 CREATE OR REPLACE FUNCTION actualizar_nombre_completo()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -68,7 +62,6 @@ BEFORE INSERT OR UPDATE ON pacientes
 FOR EACH ROW
 EXECUTE FUNCTION actualizar_nombre_completo();
 
--- Actualización masiva inicial
 UPDATE pacientes
 SET
     nombre_completo = TRIM(

@@ -12,7 +12,6 @@ class PacienteModel(Base):
     expediente = Column(String, unique=True, nullable=True)
     pasaporte = Column(String, unique=True, nullable=True)
     otro_id = Column(String, unique=True, nullable=True)
-    # identificadores = Column(JSONB, nullable=True)
     nombre = Column(JSONB, nullable=False)
     sexo = Column(String(2))
     fecha_nacimiento = Column(Date)

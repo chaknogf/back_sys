@@ -4,7 +4,7 @@ from datetime import date, time, datetime
 
 class VistaConsultas(BaseModel):
     id_paciente: int
-    identificadores: Optional[Dict[str, Any]]
+    otro_id: Optional[str]
     expediente: Optional[str]
     cui: Optional[int]
     nombre: Optional[Dict[str, Any]]

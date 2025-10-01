@@ -177,44 +177,7 @@ async def update_paciente(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.patch("/paciente/agregarExpediente/{paciente_id}", tags=["pacientes"])
-async def patch_paciente(
-    paciente_id: int,
-    paciente: PacienteUpdate,
-    # token: str = Depends(oauth2_scheme),  # lo dejas comentado si no lo usas aún
-    db: SQLAlchemySession = Depends(get_db)
-):
-    try:
-        db_paciente = db.query(PacienteModel).filter(PacienteModel.id == paciente_id).first()
-        if not db_paciente:
-            raise HTTPException(status_code=404, detail="Paciente no encontrado")
 
-        # Convertimos el input a dict con solo los campos enviados
-        paciente_dict = paciente.model_dump(exclude_unset=True)
-
-        # Si expediente viene vacío o null → generar uno nuevo
-        expediente = paciente_dict.get("expediente")
-        if expediente is None or expediente == "":
-            expediente = generar_expediente(db)
-        paciente_dict["expediente"] = expediente
-
-        # Actualizamos solo los campos que vienen en el patch
-        for key, value in paciente_dict.items():
-            setattr(db_paciente, key, value)
-
-        db.commit()
-        db.refresh(db_paciente)
-
-        return JSONResponse(
-            status_code=200,
-            content={
-                "message": "Paciente actualizado exitosamente (PATCH)",
-                "paciente": jsonable_encoder(db_paciente)
-            }
-        )
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al actualizar paciente: {str(e)}")
 
 @router.delete("/paciente/eliminar/{paciente_id}", tags=["pacientes"])
 async def delete_paciente(

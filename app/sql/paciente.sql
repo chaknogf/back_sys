@@ -4,10 +4,9 @@ CREATE TABLE IF NOT EXISTS pacientes (
     id SERIAL PRIMARY KEY,
     unidad INT,
     cui BIGINT UNIQUE,
-    expediente VARCHAR UNIQUE,
+    expediente VARCHAR UNIQUE DEFAULT NULL,
     pasaporte VARCHAR UNIQUE,
     otro_id VARCHAR UNIQUE,
-    identificadores JSONB,
     nombre JSONB NOT NULL,
     sexo VARCHAR(2),
     fecha_nacimiento DATE,
@@ -22,7 +21,6 @@ CREATE TABLE IF NOT EXISTS pacientes (
 );
 
 -- Índices JSONB (uso frecuente de GIN para búsquedas parciales)
-CREATE INDEX idx_identificadores_gin ON pacientes USING GIN (identificadores);
 
 CREATE INDEX idx_referencias_gin ON pacientes USING GIN (referencias);
 

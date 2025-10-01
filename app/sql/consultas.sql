@@ -1,7 +1,7 @@
 -- Tabla consultas
 CREATE TABLE consultas (
     id SERIAL PRIMARY KEY,
-    expediente VARCHAR(20) NOT NULL,
+    expediente VARCHAR(20),
     paciente_id INT NOT NULL REFERENCES pacientes (id) ON DELETE CASCADE,
     tipo_consulta INT NOT NULL,
     especialidad VARCHAR(20) NOT NULL,
@@ -16,19 +16,16 @@ CREATE TABLE consultas (
     actualizado_en TIMESTAMP DEFAULT NOW()
 );
 
--- Índices simples
 CREATE INDEX idx_consultas_paciente_id ON consultas (paciente_id);
 
 CREATE INDEX idx_consultas_expediente ON consultas (expediente);
 
 CREATE INDEX idx_consultas_fecha_consulta ON consultas (fecha_consulta);
 
--- Índices compuestos
 CREATE INDEX idx_consultas_tipo_fecha ON consultas (tipo_consulta, fecha_consulta);
 
 CREATE INDEX idx_consultas_especialidad_servicio ON consultas (especialidad, servicio);
 
--- Índices GIN para JSONB (permiten búsquedas dentro del ciclo y los indicadores)
 CREATE INDEX idx_consultas_indicadores_gin ON consultas USING GIN (indicadores);
 
 CREATE INDEX idx_consultas_ciclo_gin ON consultas USING GIN (ciclo);
@@ -36,7 +33,7 @@ CREATE INDEX idx_consultas_ciclo_gin ON consultas USING GIN (ciclo);
 CREATE OR REPLACE VIEW vista_consultas AS
 SELECT
     p.id AS id_paciente,
-    p.identificadores,
+    p.otro_id,
     p.cui,
     p.expediente,
     p.pasaporte,

@@ -125,13 +125,14 @@ async def create_paciente(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.post("/paciente/crearExpediente/", status_code=201, tags=["pacientes"])
+@router.post("/paciente/crearExp/", status_code=201, tags=["pacientes"])
 async def create_expediente(
     paciente: PacienteCreate,
     # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
+        
         expediente = generar_expediente(db)
         paciente_dict = paciente.model_dump()
         paciente_dict["expediente"] = expediente

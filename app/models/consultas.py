@@ -38,7 +38,7 @@ class VistaConsultasModel(Base):
     __table_args__ = {"autoload_with": engine}
 
     id_paciente = Column(Integer, primary_key=True)
-    identificadores = Column(JSONB, nullable=True)
+    otro_id = Column(JSONB, nullable=True)
     expediente = Column(String)
     cui = Column(Integer, nullable=True)
     nombre = Column(JSONB, nullable=True)

@@ -149,10 +149,8 @@ def create_consulta(
                 ConsultaModel.fecha_consulta == consulta.fecha_consulta
             ).scalar()
 
-            # Si no existe aún ningún registro en ese grupo, empezamos en 1
             nuevo_orden = (max_orden or 0) + 1
 
-            # Convertir el objeto pydantic a dict
             consulta_dict = consulta.model_dump()
             consulta_dict["orden"] = nuevo_orden
 
@@ -161,7 +159,6 @@ def create_consulta(
                 correlativo = generar_emergencia(db)
                 consulta_dict["documento"] = correlativo
 
-            # Crear el objeto consulta
             new_consulta = ConsultaModel(**consulta_dict)
             db.add(new_consulta)
             db.flush()
@@ -175,23 +172,34 @@ def create_consulta(
                 "id": new_consulta.id,
                 "orden": new_consulta.orden,
                 "documento": new_consulta.documento,
-                "expediente_paciente": paciente.expediente  # ✅ devolvemos también el expediente generado
+                "expediente_paciente": paciente.expediente
             }
         )
+
     except SQLAlchemyError as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Error al crear consulta",
+                "type": str(type(e).__name__),
+                "msg": str(e),
+                "args": e.args,
+                "orig": str(getattr(e, "orig", None)),
+                "diag": str(getattr(e, "diag", None)),
+                "params": str(getattr(e, "params", None))
+            }
+        )
 
-@router.post("/consulta/crear/emergencia", response_model=ConsultaCreate, status_code=201, tags=["consultas"])
+
+@router.post("/consulta/crear/emergencia", response_model=ConsultaOut, status_code=201, tags=["consultas"])
 async def create_emergencia_consulta(
     consulta: ConsultaCreate,
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
-        # Generar el correlativo de emergencia
         correlativo = generar_emergencia(db)  # ya hace commit
 
-        # Calcular el nuevo orden
         max_orden = db.query(func.max(ConsultaModel.orden)).filter(
             ConsultaModel.tipo_consulta == consulta.tipo_consulta,
             ConsultaModel.especialidad == consulta.especialidad,
@@ -199,22 +207,31 @@ async def create_emergencia_consulta(
         ).scalar()
         nuevo_orden = (max_orden or 0) + 1
 
-        # Crear la consulta
         consulta_dict = consulta.model_dump()
         consulta_dict["orden"] = nuevo_orden
         consulta_dict["documento"] = correlativo
 
         new_consulta = ConsultaModel(**consulta_dict)
         db.add(new_consulta)
-        db.commit()       # hacer commit aquí
+        db.commit()
         db.refresh(new_consulta)
- # Convertir a Pydantic usando from_attributes
+
         return ConsultaOut.model_validate(new_consulta)
 
     except SQLAlchemyError as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al crear consulta de emergencia: {str(e)}")
-    
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Error al crear consulta de emergencia",
+                "type": str(type(e).__name__),
+                "msg": str(e),
+                "args": e.args,
+                "orig": str(getattr(e, "orig", None)),
+                "diag": str(getattr(e, "diag", None)),
+                "params": str(getattr(e, "params", None))
+            }
+        )
 
 @router.put("/consulta/actualizar/{consulta_id}", tags=["consultas"])
 async def update_consulta(

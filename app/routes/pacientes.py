@@ -1,5 +1,6 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi.responses import JSONResponse
@@ -110,49 +111,96 @@ async def get_pacientes(
     
 
 
+
+
 @router.post("/paciente/crear/", status_code=201, tags=["pacientes"])
 async def create_paciente(
     paciente: PacienteCreate,
-    # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
         new_paciente = PacienteModel(**paciente.model_dump())
         db.add(new_paciente)
         db.commit()
-        return JSONResponse(status_code=201, content={"message": "Paciente creado exitosamente", "id": new_paciente.id})
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    
-@router.post("/paciente/crearExpediente/", status_code=201, tags=["pacientes"])
-async def create_expediente(
-    paciente: PacienteCreate,
-    # token: str = Depends(oauth2_scheme),
-    db: SQLAlchemySession = Depends(get_db)
-):
-    try:
-        expediente = generar_expediente(db)
-        paciente_dict = paciente.model_dump()
-        paciente_dict["expediente"] = expediente
-        
-        new_paciente = PacienteModel(**paciente_dict)
-        db.add(new_paciente)
-        db.commit()
         db.refresh(new_paciente)
-        
-        
         return JSONResponse(
             status_code=201,
             content={
                 "message": "Paciente creado exitosamente",
-                "id": new_paciente.id,
-                "expediente": new_paciente.expediente
+                "id": new_paciente.id
+            }
+        )
+    except IntegrityError as e:
+        db.rollback()
+        # Errores de integridad como clave duplicada, FK, etc.
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "Error de integridad",
+                "message": str(e.orig),
+                "params": getattr(e, "params", None),
+                "constraint": getattr(e, "constraint", None),
+                "diag": str(getattr(e, "diag", None)),
             }
         )
     except SQLAlchemyError as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al crear paciente: {str(e)}")
+        # Otros errores SQLAlchemy
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Error en base de datos",
+                "message": str(e),
+                "args": e.args,
+                "orig": str(getattr(e, "orig", None)),
+                "type": str(type(e)),
+                "diag": str(getattr(e, "diag", None)),
+            }
+        )
+@router.post("/paciente/crear/", status_code=201, tags=["pacientes"])
+async def create_paciente(
+    paciente: PacienteCreate,
+    db: SQLAlchemySession = Depends(get_db)
+):
+    try:
+        new_paciente = PacienteModel(**paciente.model_dump())
+        db.add(new_paciente)
+        db.commit()
+        db.refresh(new_paciente)
+        return JSONResponse(
+            status_code=201,
+            content={
+                "message": "Paciente creado exitosamente",
+                "id": new_paciente.id
+            }
+        )
+    except IntegrityError as e:
+        db.rollback()
+        # Errores de integridad como clave duplicada, FK, etc.
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "Error de integridad",
+                "message": str(e.orig),
+                "params": getattr(e, "params", None),
+                "constraint": getattr(e, "constraint", None),
+                "diag": str(getattr(e, "diag", None)),
+            }
+        )
+    except SQLAlchemyError as e:
+        db.rollback()
+        # Otros errores SQLAlchemy
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Error en base de datos",
+                "message": str(e),
+                "args": e.args,
+                "orig": str(getattr(e, "orig", None)),
+                "type": str(type(e)),
+                "diag": str(getattr(e, "diag", None)),
+            }
+        )
 
 @router.put("/paciente/actualizar/{paciente_id}", tags=["pacientes"])
 async def update_paciente(

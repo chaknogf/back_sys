@@ -124,47 +124,48 @@ async def get_consulta(
 
 
 
-@router.post("/consulta/crear/", response_model=ConsultaUpdate, status_code=201, tags=["consultas"])
+@router.post("/consulta/crear/", status_code=201, tags=["consultas"])  # ✅ Sin response_model
 def create_consulta(
     consulta: ConsultaCreate,
     db: SQLAlchemySession = Depends(get_db)
 ):
     try:
-        with db.begin():
-            # ✅ Verificar si el paciente tiene expediente
-            paciente = db.query(PacienteModel).filter(PacienteModel.id == consulta.paciente_id).first()
-            if not paciente:
-                raise HTTPException(status_code=404, detail="Paciente no encontrado")
-
-            if not paciente.expediente or paciente.expediente.strip() == "":
-                expediente = generar_expediente(db)
-                paciente.expediente = expediente
-                db.add(paciente)
-                db.flush()
-
-            # Buscar el último orden en ese grupo
-            max_orden = db.query(func.max(ConsultaModel.orden)).filter(
-                ConsultaModel.tipo_consulta == consulta.tipo_consulta,
-                ConsultaModel.especialidad == consulta.especialidad,
-                ConsultaModel.fecha_consulta == consulta.fecha_consulta
-            ).scalar()
-
-            nuevo_orden = (max_orden or 0) + 1
-
-            consulta_dict = consulta.model_dump()
-            consulta_dict["orden"] = nuevo_orden
-
-            # ⚡ Si tipo_consulta == 3, generar correlativo y asignar al documento
-            if consulta.tipo_consulta == 3:
-                correlativo = generar_emergencia(db)
-                consulta_dict["documento"] = correlativo
-
-            new_consulta = ConsultaModel(**consulta_dict)
-            db.add(new_consulta)
+        # ✅ Verificar si el paciente existe
+        paciente = db.query(PacienteModel).filter(PacienteModel.id == consulta.paciente_id).first()
+        if not paciente:
+            raise HTTPException(status_code=404, detail="Paciente no encontrado")
+        
+        # ✅ Generar expediente si no existe
+        if not paciente.expediente or paciente.expediente.strip() == "":
+            expediente = generar_expediente(db)
+            paciente.expediente = expediente
+            db.add(paciente)
             db.flush()
-
+        
+        # ✅ Calcular el orden (por tipo, especialidad y fecha)
+        max_orden = db.query(func.max(ConsultaModel.orden)).filter(
+            ConsultaModel.tipo_consulta == consulta.tipo_consulta,
+            ConsultaModel.especialidad == consulta.especialidad,
+            ConsultaModel.fecha_consulta == consulta.fecha_consulta
+        ).scalar()
+        nuevo_orden = (max_orden or 0) + 1
+        
+        # ✅ Convertir el modelo y asignar valores calculados
+        consulta_dict = consulta.model_dump()
+        consulta_dict["orden"] = nuevo_orden
+        consulta_dict["expediente"] = paciente.expediente  # ✅ FIX: Agregar expediente si es necesario
+        
+        # ⚡ Si tipo_consulta == 3, generar correlativo
+        if consulta.tipo_consulta == 3:
+            correlativo = generar_emergencia(db)
+            consulta_dict["documento"] = correlativo
+        
+        # ✅ Crear nueva consulta
+        new_consulta = ConsultaModel(**consulta_dict)
+        db.add(new_consulta)
+        db.commit()
         db.refresh(new_consulta)
-
+        
         return JSONResponse(
             status_code=201,
             content={
@@ -175,14 +176,14 @@ def create_consulta(
                 "expediente_paciente": paciente.expediente
             }
         )
-
+        
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "Error al crear consulta",
-                "type": str(type(e).__name__),
+                "type": type(e).__name__,
                 "msg": str(e),
                 "args": e.args,
                 "orig": str(getattr(e, "orig", None)),
@@ -192,46 +193,6 @@ def create_consulta(
         )
 
 
-@router.post("/consulta/crear/emergencia", response_model=ConsultaOut, status_code=201, tags=["consultas"])
-async def create_emergencia_consulta(
-    consulta: ConsultaCreate,
-    db: SQLAlchemySession = Depends(get_db)
-):
-    try:
-        correlativo = generar_emergencia(db)  # ya hace commit
-
-        max_orden = db.query(func.max(ConsultaModel.orden)).filter(
-            ConsultaModel.tipo_consulta == consulta.tipo_consulta,
-            ConsultaModel.especialidad == consulta.especialidad,
-            ConsultaModel.fecha_consulta == consulta.fecha_consulta
-        ).scalar()
-        nuevo_orden = (max_orden or 0) + 1
-
-        consulta_dict = consulta.model_dump()
-        consulta_dict["orden"] = nuevo_orden
-        consulta_dict["documento"] = correlativo
-
-        new_consulta = ConsultaModel(**consulta_dict)
-        db.add(new_consulta)
-        db.commit()
-        db.refresh(new_consulta)
-
-        return ConsultaOut.model_validate(new_consulta)
-
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "Error al crear consulta de emergencia",
-                "type": str(type(e).__name__),
-                "msg": str(e),
-                "args": e.args,
-                "orig": str(getattr(e, "orig", None)),
-                "diag": str(getattr(e, "diag", None)),
-                "params": str(getattr(e, "params", None))
-            }
-        )
 
 @router.put("/consulta/actualizar/{consulta_id}", tags=["consultas"])
 async def update_consulta(

@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS pacientes (
     nombre_completo TEXT
 );
 
+CREATE EXTENSION IF NOT EXISTS unaccent;
+
 CREATE INDEX idx_referencias_gin ON pacientes USING GIN (referencias);
 
 CREATE INDEX idx_datos_extra_gin ON pacientes USING GIN (datos_extra);
@@ -45,31 +47,50 @@ CREATE INDEX idx_nombre_completo_trgm ON pacientes USING GIN (nombre_completo gi
 CREATE OR REPLACE FUNCTION actualizar_nombre_completo()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.nombre_completo := TRIM(
-    COALESCE(NEW.nombre->>'primer', '') || ' ' ||
-    COALESCE(NEW.nombre->>'segundo', '') || ' ' ||
-    COALESCE(NEW.nombre->>'otro', '') || ' ' ||
-    COALESCE(NEW.nombre->>'apellido_primero', '') || ' ' ||
-    COALESCE(NEW.nombre->>'apellido_segundo', '') || ' ' ||
-    COALESCE(NEW.nombre->>'casada', '')
+  NEW.nombre_completo := regexp_replace(
+    TRIM(
+      COALESCE(NEW.nombre->>'primer_nombre', '') || ' ' ||
+      COALESCE(NEW.nombre->>'segundo_nombre', '') || ' ' ||
+      COALESCE(NEW.nombre->>'otro_nombre', '') || ' ' ||
+      COALESCE(NEW.nombre->>'primer_apellido', '') || ' ' ||
+      COALESCE(NEW.nombre->>'segundo_apellido', '') || ' ' ||
+      COALESCE(NEW.nombre->>'apellido_casada', '')
+    ),
+    '\s+', ' ', 'g'  -- reemplaza múltiples espacios por uno
   );
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
+-- Trigger para mantener nombre_completo actualizado
 CREATE TRIGGER trg_set_nombre_completo
 BEFORE INSERT OR UPDATE ON pacientes
 FOR EACH ROW
 EXECUTE FUNCTION actualizar_nombre_completo();
 
+-- Actualización de registros existentes
 UPDATE pacientes
 SET
-    nombre_completo = TRIM(
-        COALESCE(nombre ->> 'primer', '') || ' ' || COALESCE(nombre ->> 'segundo', '') || ' ' || COALESCE(nombre ->> 'otro', '') || ' ' || COALESCE(
-            nombre ->> 'apellido_primero',
-            ''
-        ) || ' ' || COALESCE(
-            nombre ->> 'apellido_segundo',
-            ''
-        ) || ' ' || COALESCE(nombre ->> 'casada', '')
+    nombre_completo = regexp_replace(
+        TRIM(
+            COALESCE(
+                nombre ->> 'primer_nombre',
+                ''
+            ) || ' ' || COALESCE(
+                nombre ->> 'segundo_nombre',
+                ''
+            ) || ' ' || COALESCE(nombre ->> 'otro_nombre', '') || ' ' || COALESCE(
+                nombre ->> 'primer_apellido',
+                ''
+            ) || ' ' || COALESCE(
+                nombre ->> 'segundo_apellido',
+                ''
+            ) || ' ' || COALESCE(
+                nombre ->> 'apellido_casada',
+                ''
+            )
+        ),
+        '\s+',
+        ' ',
+        'g'
     );

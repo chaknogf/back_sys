@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import String, desc, cast
+from sqlalchemy import String, desc, cast, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import text
 from typing import Optional, List
@@ -24,7 +24,8 @@ def get_db():
         yield db
     finally:
         db.close()
-
+        
+        
 @router.get("/pacientes/", response_model=List[PacienteUpdate], tags=["pacientes"])
 async def get_pacientes(
     id: Optional[int] = Query(None),
@@ -40,13 +41,17 @@ async def get_pacientes(
     sexo: Optional[str] = Query(None),
     referencia: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(10, ge=0),
-    # token: str = Depends(oauth2_scheme),
+    limit: int = Query(10, ge=1),
     db: SQLAlchemySession = Depends(get_db)
 ):
+    """
+    🔍 Endpoint para obtener pacientes filtrados dinámicamente.
+    Admite múltiples parámetros opcionales para búsqueda flexible.
+    """
     try:
         query = db.query(PacienteModel).order_by(desc(PacienteModel.id))
 
+        # --- Filtros básicos ---
         if id:
             query = query.filter(PacienteModel.id == id)
 
@@ -58,37 +63,41 @@ async def get_pacientes(
                 (PacienteModel.otro_id.ilike(f"%{identificador}%"))
             )
 
-        if nombre_completo:
-            query = query.filter(PacienteModel.nombre_completo.ilike(f"%{nombre_completo}%"))
+        # --- Filtros por nombre ---
+        nombre_filtros = {
+            "primer_nombre": primer_nombre,
+            "segundo_nombre": segundo_nombre,
+            "primer_apellido": primer_apellido,
+            "segundo_apellido": segundo_apellido
+        }
 
-        if primer_nombre:
-            query = query.filter(PacienteModel.nombre["primer_nombre"].astext.ilike(f"%{primer_nombre}%"))
+        for campo, valor in nombre_filtros.items():
+            if valor:
+                query = query.filter(
+                    func.unaccent(PacienteModel.nombre[campo].astext).ilike(
+                        func.unaccent(f"%{valor}%")
+                    )
+                )
 
-        if segundo_nombre:
-            query = query.filter(PacienteModel.nombre["segundo_nombre"].astext.ilike(f"%{segundo_nombre}%"))
-
-        if primer_apellido:
-            query = query.filter(PacienteModel.nombre["primer_apellido"].astext.ilike(f"%{primer_apellido}%"))
-
-        if segundo_apellido:
-            query = query.filter(PacienteModel.nombre["segundo_apellido"].astext.ilike(f"%{segundo_apellido}%"))
-
+        # --- Filtro por referencia (JSONB) ---
         if referencia:
             query = query.filter(
                 text("""
                     EXISTS (
-                        SELECT 1 FROM jsonb_each_text("pacientes"."referencias") AS ref
+                        SELECT 1 FROM jsonb_each_text(pacientes.referencias) AS ref
                         WHERE ref.value::jsonb->>'nombre' ILIKE :referencia
                     )
                 """)
             ).params(referencia=f"%{referencia}%")
 
+        # --- Otros filtros ---
         if estado:
             query = query.filter(PacienteModel.estado == estado)
 
         if sexo:
             query = query.filter(PacienteModel.sexo == sexo)
 
+        # --- Filtros por fechas ---
         if fecha_nacimiento:
             try:
                 fecha_nac = datetime.strptime(fecha_nacimiento, "%Y-%m-%d").date()
@@ -103,126 +112,179 @@ async def get_pacientes(
             except ValueError:
                 raise HTTPException(status_code=422, detail="Formato de fecha_defuncion inválido (use YYYY-MM-DD)")
 
+        # --- Ejecución final con paginación ---
         pacientes = query.offset(skip).limit(limit).all()
+
         return JSONResponse(status_code=200, content=jsonable_encoder(pacientes))
 
     except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=f"Error al consultar pacientes: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Error al consultar pacientes",
+                "type": type(e).__name__,
+                "msg": str(e),
+                "args": e.args,
+                "orig": str(getattr(e, "orig", None)),
+                "diag": str(getattr(e, "diag", None)),
+                "params": str(getattr(e, "params", None))
+            }
+        )  
+
+
+@router.post("/paciente/crear/", response_model=PacienteOut, status_code=201, tags=["pacientes"])
+async def create_paciente(
+    paciente: PacienteCreate,
+    generar_expediente: bool = Query(
+        default=False, 
+        description="Si es True, genera expediente automáticamente. Si es False, usa el expediente del payload o deja vacío."
+    ),
+    db: SQLAlchemySession = Depends(get_db)
+):
+    """
+    Crea un nuevo paciente.
     
-
-
-
-
-@router.post("/paciente/crear/", status_code=201, tags=["pacientes"])
-async def create_paciente(
-    paciente: PacienteCreate,
-    db: SQLAlchemySession = Depends(get_db)
-):
+    Parámetros:
+    - **generar_expediente**: 
+        - `true`: Genera expediente automáticamente (ignora el expediente en el payload)
+        - `false`: Usa el expediente proporcionado o lo deja vacío
+    
+    Ejemplos de uso:
+    - `POST /paciente/crear/?generar_expediente=true` → Genera expediente
+    - `POST /paciente/crear/?generar_expediente=false` → No genera (default)
+    - `POST /paciente/crear/` → No genera (default)
+    """
     try:
-        new_paciente = PacienteModel(**paciente.model_dump())
+        paciente_data = paciente.model_dump()
+        
+        # ✅ Lógica condicional: Generar expediente o usar el del payload
+        if generar_expediente:
+            # Genera expediente automáticamente (sobrescribe el del payload si existe)
+            expediente_generado = generar_expediente(db)
+            paciente_data["expediente"] = expediente_generado
+        # Si generar_expediente=False, usa el expediente del payload (o None)
+        
+        # ✅ Crear paciente
+        new_paciente = PacienteModel(**paciente_data)
         db.add(new_paciente)
         db.commit()
         db.refresh(new_paciente)
-        return JSONResponse(
-            status_code=201,
-            content={
-                "message": "Paciente creado exitosamente",
-                "id": new_paciente.id
-            }
-        )
+        
+        # ✅ Retornar el modelo completo
+        return new_paciente
+        
     except IntegrityError as e:
         db.rollback()
-        # Errores de integridad como clave duplicada, FK, etc.
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "Error de integridad",
-                "message": str(e.orig),
-                "params": getattr(e, "params", None),
-                "constraint": getattr(e, "constraint", None),
-                "diag": str(getattr(e, "diag", None)),
-            }
-        )
+        error_msg = str(e.orig).lower() if hasattr(e, 'orig') else str(e).lower()
+        
+        if 'unique' in error_msg or 'duplicate' in error_msg:
+            detail = "Ya existe un paciente con ese CUI o expediente"
+        elif 'foreign key' in error_msg:
+            detail = "Referencia inválida a otra tabla"
+        elif 'not null' in error_msg:
+            detail = "Faltan campos requeridos"
+        else:
+            detail = "Error de integridad de datos"
+        
+        raise HTTPException(status_code=400, detail=detail)
+        
     except SQLAlchemyError as e:
         db.rollback()
-        # Otros errores SQLAlchemy
         raise HTTPException(
             status_code=500,
-            detail={
-                "error": "Error en base de datos",
-                "message": str(e),
-                "args": e.args,
-                "orig": str(getattr(e, "orig", None)),
-                "type": str(type(e)),
-                "diag": str(getattr(e, "diag", None)),
-            }
+            detail="Error al crear paciente"
         )
-@router.post("/paciente/crear/", status_code=201, tags=["pacientes"])
-async def create_paciente(
-    paciente: PacienteCreate,
-    db: SQLAlchemySession = Depends(get_db)
-):
-    try:
-        new_paciente = PacienteModel(**paciente.model_dump())
-        db.add(new_paciente)
-        db.commit()
-        db.refresh(new_paciente)
-        return JSONResponse(
-            status_code=201,
-            content={
-                "message": "Paciente creado exitosamente",
-                "id": new_paciente.id
-            }
-        )
-    except IntegrityError as e:
-        db.rollback()
-        # Errores de integridad como clave duplicada, FK, etc.
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "Error de integridad",
-                "message": str(e.orig),
-                "params": getattr(e, "params", None),
-                "constraint": getattr(e, "constraint", None),
-                "diag": str(getattr(e, "diag", None)),
-            }
-        )
-    except SQLAlchemyError as e:
-        db.rollback()
-        # Otros errores SQLAlchemy
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "Error en base de datos",
-                "message": str(e),
-                "args": e.args,
-                "orig": str(getattr(e, "orig", None)),
-                "type": str(type(e)),
-                "diag": str(getattr(e, "diag", None)),
-            }
-        )
-
-@router.put("/paciente/actualizar/{paciente_id}", tags=["pacientes"])
+        
+@router.put("/paciente/actualizar/{paciente_id}", response_model=PacienteOut, tags=["pacientes"])
 async def update_paciente(
     paciente_id: int,
     paciente: PacienteUpdate,
+    accion_expediente: Optional[str] = Query(
+        default="mantener",
+        regex="^(mantener|generar|sobrescribir)$",
+        description="Acción sobre el expediente: 'mantener' (no tocar), 'generar' (solo si no tiene), 'sobrescribir' (forzar nuevo)"
+    ),
     token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)
 ):
+    """
+    Actualiza un paciente existente con opciones de manejo de expediente.
+    
+    Parámetros de expediente (accion_expediente):
+    - **mantener** (default): No modifica el expediente actual
+    - **generar**: Genera expediente solo si el paciente no tiene uno
+    - **sobrescribir**: Genera un nuevo expediente (sobrescribe el existente)
+    
+    Ejemplos:
+    - `PUT /paciente/actualizar/123?accion_expediente=mantener` → No toca expediente
+    - `PUT /paciente/actualizar/123?accion_expediente=generar` → Genera si no tiene
+    - `PUT /paciente/actualizar/123?accion_expediente=sobrescribir` → Genera nuevo (sobrescribe)
+    """
     try:
-        db_paciente = db.query(PacienteModel).filter(PacienteModel.id == paciente_id).first()
+        db_paciente = db.query(PacienteModel).filter(
+            PacienteModel.id == paciente_id
+        ).first()
+        
         if not db_paciente:
-            raise HTTPException(status_code=404, detail="Paciente no encontrado")
+            raise HTTPException(
+                status_code=404,
+                detail="Paciente no encontrado"
+            )
 
+        # ✅ Obtener datos a actualizar (sin el expediente por ahora)
         update_data = paciente.model_dump(exclude_unset=True)
+        
+        # ✅ Manejar el expediente según la acción solicitada
+        if accion_expediente == "generar":
+            # Genera expediente SOLO si no tiene
+            if not db_paciente.expediente or db_paciente.expediente.strip() == "":
+                expediente_generado = generar_expediente(db)
+                update_data["expediente"] = expediente_generado
+            # Si ya tiene expediente, lo mantiene (no hace nada)
+            elif "expediente" in update_data:
+                # Remover el expediente del update_data para no sobrescribir
+                del update_data["expediente"]
+                
+        elif accion_expediente == "sobrescribir":
+            # Genera un nuevo expediente SIEMPRE (sobrescribe)
+            expediente_generado = generar_expediente(db)
+            update_data["expediente"] = expediente_generado
+            
+        elif accion_expediente == "mantener":
+            # No toca el expediente actual
+            # Si viene expediente en el payload, lo usa (permite update manual)
+            pass  # Comportamiento por defecto
+        
+        # ✅ Aplicar todas las actualizaciones
         for key, value in update_data.items():
             setattr(db_paciente, key, value)
 
         db.commit()
-        return JSONResponse(status_code=200, content={"message": "Paciente actualizado exitosamente"})
+        db.refresh(db_paciente)
+        
+        # ✅ Retornar el paciente actualizado completo
+        return db_paciente
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError as e:
+        db.rollback()
+        error_msg = str(e.orig).lower() if hasattr(e, 'orig') else str(e).lower()
+        
+        if 'unique' in error_msg or 'duplicate' in error_msg:
+            detail = "Ya existe un paciente con ese CUI o expediente"
+        else:
+            detail = "Error de integridad de datos"
+        
+        raise HTTPException(status_code=400, detail=detail)
+        
     except SQLAlchemyError as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Error al actualizar paciente"
+        )
 
 @router.delete("/paciente/eliminar/{paciente_id}", tags=["pacientes"])
 async def delete_paciente(

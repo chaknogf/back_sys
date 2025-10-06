@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Text
+from sqlalchemy import Column, Integer, String, Date, Text, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, validates
 from app.database.db import Base
@@ -22,7 +22,10 @@ class PacienteModel(Base):
     metadatos = Column(JSONB)
 
     nombre_completo = Column(Text)
-
+    __table_args__ = (
+        Index("uq_cui_not_null", "cui", unique=True, postgresql_where=text("cui IS NOT NULL AND cui <> ''")),
+        Index("uq_expediente_not_null", "expediente", unique=True, postgresql_where=text("expediente IS NOT NULL AND expediente <> ''")),
+    )
     # Relaciones
     consultas = relationship("ConsultaModel", back_populates="paciente", cascade="all, delete-orphan")
 

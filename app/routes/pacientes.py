@@ -143,7 +143,7 @@ async def create_paciente(
 ):
     """
     Crea un nuevo paciente.
-
+    
     Parámetros:
     - **generar_expediente**: 
         - `true`: Genera expediente automáticamente (ignora el expediente en el payload)
@@ -152,39 +152,30 @@ async def create_paciente(
     try:
         paciente_data = paciente.model_dump()
 
-        # Normalizar campos vacíos
-        paciente_data["cui"] = paciente_data.get("cui") or None
-        paciente_data["expediente"] = paciente_data.get("expediente") or None
+        # ✅ Convertir strings vacíos a None para campos únicos opcionales
+        for key in ["cui", "expediente", "pasaporte", "otro_id"]:
+            if paciente_data.get(key) in ["", None]:
+                paciente_data[key] = None
 
-        # Generar expediente automáticamente si se solicita
+        # ✅ Lógica condicional: Generar expediente o usar el del payload
         if generar_expediente:
-            paciente_data["expediente"] = generar_numero_expediente(db)
+            # Aquí llamas a tu función para generar expediente
+            expediente_generado = generar_expediente(db)
+            paciente_data["expediente"] = expediente_generado
 
-        # Validar duplicados solo si hay valor
-        if paciente_data.get("cui"):
-            exists_cui = db.query(PacienteModel).filter(PacienteModel.cui == paciente_data["cui"]).first()
-            if exists_cui:
-                raise HTTPException(status_code=400, detail="Ya existe un paciente con ese CUI")
-
-        if paciente_data.get("expediente"):
-            exists_expediente = db.query(PacienteModel).filter(PacienteModel.expediente == paciente_data["expediente"]).first()
-            if exists_expediente:
-                raise HTTPException(status_code=400, detail="Ya existe un paciente con ese expediente")
-
-        # Crear paciente
+        # ✅ Crear paciente
         new_paciente = PacienteModel(**paciente_data)
         db.add(new_paciente)
         db.commit()
         db.refresh(new_paciente)
-
         return new_paciente
 
     except IntegrityError as e:
         db.rollback()
         error_msg = str(e.orig).lower() if hasattr(e, 'orig') else str(e).lower()
-        # if 'unique' in error_msg or 'duplicate' in error_msg:
-        #     detail = "Ya existe un paciente con ese CUI o expediente"
-        if 'foreign key' in error_msg:
+        if 'unique' in error_msg or 'duplicate' in error_msg:
+            detail = "Ya existe un paciente con ese CUI o expediente"
+        elif 'foreign key' in error_msg:
             detail = "Referencia inválida a otra tabla"
         elif 'not null' in error_msg:
             detail = "Faltan campos requeridos"
@@ -192,10 +183,12 @@ async def create_paciente(
             detail = "Error de integridad de datos"
         raise HTTPException(status_code=400, detail=detail)
 
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Error al crear paciente")
-        
+        raise HTTPException(
+            status_code=500,
+            detail="Error al crear paciente"
+        )
 @router.put("/paciente/actualizar/{paciente_id}", response_model=PacienteOut, tags=["pacientes"])
 async def update_paciente(
     paciente_id: int,

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import desc, cast, func
+from sqlalchemy import String, desc, cast, func
 from sqlalchemy.dialects.postgresql import JSONB
 from typing import Optional, List
 from app.database.db import SessionLocal
@@ -33,15 +33,13 @@ async def get_consultas(
     especialidad: Optional[str] = Query(None),
     servicio: Optional[str] = Query(None),
     tipo_consulta: Optional[int] = Query(None),
-    documento: Optional[str] = Query(None),
+    identificador: Optional[str] = Query(None),
     fecha_consulta: Optional[str] = Query(None),
     ciclo: Optional[str] = Query(None),
     primer_nombre: Optional[str] = Query(None),
     segundo_nombre: Optional[str] = Query(None),
     primer_apellido: Optional[str] = Query(None),
     segundo_apellido: Optional[str] = Query(None),
-    expediente: Optional[str] = Query(None),
-    cui: Optional[int] = Query(None),
     fecha_nacimiento: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=0),
@@ -50,6 +48,7 @@ async def get_consultas(
     try:
         query = db.query(VistaConsultasModel).order_by(desc(VistaConsultasModel.id_consulta))
 
+        # === Filtros básicos ===
         if paciente_id:
             query = query.filter(VistaConsultasModel.id_paciente == paciente_id)
         if consulta_id:
@@ -60,37 +59,58 @@ async def get_consultas(
             query = query.filter(VistaConsultasModel.servicio == servicio)
         if tipo_consulta:
             query = query.filter(VistaConsultasModel.tipo_consulta == tipo_consulta)
-        if documento:
-            query = query.filter(VistaConsultasModel.documento == documento)
+       
+            
+        if identificador:
+            query = query.filter(
+                (PacienteModel.cui.cast(String).ilike(f"%{identificador}%")) |
+                (PacienteModel.expediente.ilike(f"%{identificador}%")) |
+                (PacienteModel.pasaporte.ilike(f"%{identificador}%")) |
+                (PacienteModel.otro_id.ilike(f"%{identificador}%"))
+            )
+        # === Filtro de fecha consulta (si se envía como string) ===
         if fecha_consulta:
-            query = query.filter(VistaConsultasModel.fecha_consulta == fecha_consulta)
+            query = query.filter(
+                cast(VistaConsultasModel.fecha_consulta, func.DATE) == fecha_consulta
+            )
+
+        # === Filtro ciclo dentro de JSONB ===
         if ciclo:
             query = query.filter(
                 cast(VistaConsultasModel.ciclo, JSONB).contains({"estado": ciclo})
             )
-        if primer_nombre:
-            query = query.filter(VistaConsultasModel.primer_nombre.ilike(f"%{primer_nombre}%"))
-        if segundo_nombre:
-            query = query.filter(VistaConsultasModel.segundo_nombre.ilike(f"%{segundo_nombre}%"))
-        if primer_apellido:
-            query = query.filter(VistaConsultasModel.primer_apellido.ilike(f"%{primer_apellido}%"))
-        if segundo_apellido:
-            query = query.filter(VistaConsultasModel.segundo_apellido.ilike(f"%{segundo_apellido}%"))
-        if expediente:
-            query = query.filter(VistaConsultasModel.expediente == expediente)
-        if cui:
-            query = query.filter(VistaConsultasModel.cui == cui)
-        if fecha_nacimiento:
-            query = query.filter(VistaConsultasModel.fecha_nacimiento == fecha_nacimiento)
 
+        # === Filtros de nombre dinámicos ===
+        nombre_filtros = {
+            "primer_nombre": primer_nombre,
+            "segundo_nombre": segundo_nombre,
+            "primer_apellido": primer_apellido,
+            "segundo_apellido": segundo_apellido,
+        }
+
+        for campo, valor in nombre_filtros.items():
+            if valor:
+                query = query.filter(
+                    func.unaccent(PacienteModel.nombre[campo].astext).ilike(
+                        func.unaccent(f"%{valor}%")
+                    )
+                )
+
+        # === Filtro de fecha nacimiento ===
+        if fecha_nacimiento:
+            query = query.filter(
+                cast(VistaConsultasModel.fecha_nacimiento, func.DATE) == fecha_nacimiento
+            )
+
+        # === Paginación ===
         result = query.offset(skip).limit(limit).all()
         return result
 
     except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error en la base de datos: {str(e)}")
+
     finally:
         db.close()
-
 @router.get("/consulta/", response_model=ConsultaUpdate, tags=["consultas"])
 async def get_consulta(
     id_consulta: Optional[int] = Query(None),

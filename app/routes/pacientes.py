@@ -135,7 +135,7 @@ async def get_pacientes(
 @router.post("/paciente/crear/", response_model=PacienteOut, status_code=201, tags=["pacientes"])
 async def create_paciente(
     paciente: PacienteCreate,
-    generar_expediente: bool = Query(
+    gen_expediente: bool = Query(
         default=False, 
         description="Si es True, genera expediente automáticamente. Si es False, usa el expediente del payload o deja vacío."
     ),
@@ -145,7 +145,7 @@ async def create_paciente(
     Crea un nuevo paciente.
     
     Parámetros:
-    - **generar_expediente**: 
+    - **gen_expediente**: 
         - `true`: Genera expediente automáticamente (ignora el expediente en el payload)
         - `false`: Usa el expediente proporcionado o lo deja vacío
     """
@@ -158,7 +158,7 @@ async def create_paciente(
                 paciente_data[key] = None
 
         # ✅ Lógica condicional: Generar expediente o usar el del payload
-        if generar_expediente:
+        if gen_expediente:
             expediente_generado = generar_expediente(db)
             if not expediente_generado or expediente_generado.strip() == "":
                 expediente_generado = None  # evita chocar con índice único

@@ -71,6 +71,9 @@ async def get_pacientes(
             "segundo_apellido": segundo_apellido
         }
 
+        if nombre_completo:
+            query = query.filter(PacienteModel.nombre_completo.ilike(f"%{nombre_completo}%"))
+
         for campo, valor in nombre_filtros.items():
             if valor:
                 query = query.filter(

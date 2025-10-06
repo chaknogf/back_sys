@@ -182,9 +182,9 @@ async def create_paciente(
     except IntegrityError as e:
         db.rollback()
         error_msg = str(e.orig).lower() if hasattr(e, 'orig') else str(e).lower()
-        if 'unique' in error_msg or 'duplicate' in error_msg:
-            detail = "Ya existe un paciente con ese CUI o expediente"
-        elif 'foreign key' in error_msg:
+        # if 'unique' in error_msg or 'duplicate' in error_msg:
+        #     detail = "Ya existe un paciente con ese CUI o expediente"
+        if 'foreign key' in error_msg:
             detail = "Referencia inválida a otra tabla"
         elif 'not null' in error_msg:
             detail = "Faltan campos requeridos"

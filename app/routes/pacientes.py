@@ -159,8 +159,9 @@ async def create_paciente(
 
         # ✅ Lógica condicional: Generar expediente o usar el del payload
         if generar_expediente:
-            # Aquí llamas a tu función para generar expediente
             expediente_generado = generar_expediente(db)
+            if not expediente_generado or expediente_generado.strip() == "":
+                expediente_generado = None  # evita chocar con índice único
             paciente_data["expediente"] = expediente_generado
 
         # ✅ Crear paciente

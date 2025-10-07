@@ -64,10 +64,11 @@ async def get_consultas(
         if identificador:
             query = query.filter(
                 (VistaConsultasModel.cui == identificador) | (VistaConsultasModel.cui.cast(String).ilike(f"%{identificador}%")) |
-                (VistaConsultasModel.expediente ==  identificador) |
+                (VistaConsultasModel.expediente.cast(String) ==  identificador) |
                 (VistaConsultasModel.pasaporte.ilike(f"%{identificador}%")) |
                 (VistaConsultasModel.otro_id.ilike(f"%{identificador}%")) |
-                (VistaConsultasModel.documento == identificador) 
+                (VistaConsultasModel.documento == identificador) | 
+                (VistaConsultasModel.documento.cast(String) == identificador)
             )
         # === Filtro de fecha consulta (si se envía como string) ===
         if fecha_consulta:

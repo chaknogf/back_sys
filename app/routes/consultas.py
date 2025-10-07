@@ -70,9 +70,7 @@ async def get_consultas(
             )
         # === Filtro de fecha consulta (si se envía como string) ===
         if fecha_consulta:
-            query = query.filter(
-                cast(VistaConsultasModel.fecha_consulta, func.DATE) == fecha_consulta
-            )
+            query = query.filter(VistaConsultasModel.fecha_consulta == fecha_consulta)
 
         # === Filtro ciclo dentro de JSONB ===
         if ciclo:
@@ -90,17 +88,20 @@ async def get_consultas(
 
         for campo, valor in nombre_filtros.items():
             if valor:
+                # columna JSON textual del view
+                col = VistaConsultasModel.nombre[campo].astext
+
+                # Opción A: si tienes la extensión unaccent instalada en Postgres:
                 query = query.filter(
-                    func.unaccent(PacienteModel.nombre[campo].astext).ilike(
-                        func.unaccent(f"%{valor}%")
-                    )
+                    func.unaccent(col).ilike(func.unaccent(f"%{valor}%"))
                 )
+
+                # Opción B (más compatible): usar ilike simple sin unaccent
+                # query = query.filter(col.ilike(f"%{valor}%"))
 
         # === Filtro de fecha nacimiento ===
         if fecha_nacimiento:
-            query = query.filter(
-                cast(VistaConsultasModel.fecha_nacimiento, func.DATE) == fecha_nacimiento
-            )
+            query = query.filter(VistaConsultasModel.fecha_nacimiento== fecha_nacimiento)
 
         # === Paginación ===
         result = query.offset(skip).limit(limit).all()

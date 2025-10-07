@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import String, desc, cast, func
+from sqlalchemy import String, desc, cast, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from typing import Optional, List
 from app.database.db import SessionLocal
@@ -81,7 +81,7 @@ async def get_consultas(
         # === Filtro ciclo dentro de JSONB ===
         if ciclo:
             query = query.filter(
-                cast(VistaConsultasModel.ciclo, JSONB).contains({"estado": ciclo})
+                text(f"(ciclo -> -1 ->> 'estado') ILIKE '%{ciclo}%'")
             )
 
         # === Filtros de nombre dinámicos ===

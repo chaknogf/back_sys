@@ -81,7 +81,11 @@ async def get_consultas(
         # === Filtro ciclo dentro de JSONB ===
         if ciclo:
             query = query.filter(
-                text(f"(ciclo -> -1 ->> 'estado') ILIKE '%{ciclo}%'")
+                text(f"""
+                (ciclo -> (
+                    SELECT key FROM jsonb_each(ciclo) ORDER BY key DESC LIMIT 1
+                ) ->> 'estado') = '{ciclo}'
+                """)
             )
 
         # === Filtros de nombre dinámicos ===

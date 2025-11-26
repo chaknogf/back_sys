@@ -2,7 +2,7 @@ DROP TABLE IF EXISTS pacientes CASCADE;
 
 CREATE TABLE IF NOT EXISTS pacientes (
     id SERIAL PRIMARY KEY,
-    unidad INT,
+    unidad INT,  --unida_ejecutora
     cui BIGINT UNIQUE,
     expediente VARCHAR UNIQUE DEFAULT NULL,
     pasaporte VARCHAR UNIQUE,

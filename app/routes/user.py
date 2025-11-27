@@ -82,7 +82,7 @@ async def get_users(
 @router.post("/user/crear", tags=["users"])
 async def create_user(
     user: UserCreate, 
-    token: str = Depends(oauth2_scheme),
+    # token: str = Depends(oauth2_scheme),
     db: SQLAlchemySession = Depends(get_db)):
     try:
         # Asegúrate de que la contraseña esté cifrada

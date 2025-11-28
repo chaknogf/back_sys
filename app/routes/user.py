@@ -1,141 +1,138 @@
-from sqlalchemy.exc import SQLAlchemyError
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
-from sqlalchemy import func, desc
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional
-from datetime import date, datetime, time
-from app.database.db import SessionLocal
+# app/routes/users.py
+"""
+CRUD completo de usuarios - Solo admins
+"""
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from sqlalchemy.orm import Session
+from typing import List
+
+from app.database.db import get_db
 from app.models.user import UserModel
-from sqlalchemy.orm import Session as SQLAlchemySession
-from passlib.context import CryptContext
-from fastapi.security import OAuth2PasswordBearer
-from app.schemas.schemas import UserCreate, UserBase, UserResponse
+from app.schemas.user import UserCreate, UserResponse, UserUpdate, UserBase
+from app.database.security import get_current_user, hash_password
+from app.config.mail_config import conf
+from fastapi_mail import FastMail, MessageSchema, MessageType
+
+router = APIRouter(prefix="/users", tags=["Usuarios"])
 
 
-
-
-
-
-class Userschema(BaseModel):
-   
-    nombre: str | None = None
-    username: str | None = None
-    email: EmailStr | None = None
-    role: str | None = None
-    password: str | None = None
-    estado: str | None = None
-    
-
-
-    class Config:
-        from_attributes = True
-
-
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-router = APIRouter() 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-        
-        
-@router.get("/user/", response_model=List[UserResponse], tags=["users"])
-async def get_users(
-    id: Optional[int] = Query(None, description="ID del usuario"),
-    nombre: Optional[str] = Query(None, description="Nombre del usuario"),
-    username: Optional[str] = Query(None, description="Username del usuario"),
-    email: Optional[str] = Query(None, description="Email del usuario"),
-    role: Optional[str] = Query(None, description="Role del usuario"),
-    current_user: dict = Depends(oauth2_scheme),  # Esto ya valida el token
-    skip: int = Query(0, ge=0),
-    limit: int = Query(10, ge=0),
-    db: SQLAlchemySession = Depends(get_db)
+# === LISTAR USUARIOS ===
+@router.get("/", response_model=List[UserResponse])
+def listar_usuarios(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
 ):
-    try:
-       query = db.query(UserModel).order_by(desc(UserModel.id))
+    # Opcional: solo admins
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
 
-       if id:
-           query = query.filter(UserModel.id == id)
-       if nombre:
-           query = query.filter(UserModel.nombre.ilike(f"%{nombre}%"))
-       if username:
-           query = query.filter(UserModel.username.ilike(f"%{username}%"))
-       if email:
-           query = query.filter(UserModel.email.ilike(f"%{email}%"))
-       if role:
-           query = query.filter(UserModel.role == role)
+    usuarios = db.query(UserModel).offset(skip).limit(limit).all()
+    return usuarios
+
+
+# === CREAR USUARIO + CORREO BIENVENIDA ===
+@router.post("/", response_model=UserResponse, status_code=201)
+async def crear_usuario(
+    user_data: UserCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo admins pueden crear usuarios")
+
+    # Verificar duplicados
+    if db.query(UserModel).filter(UserModel.username == user_data.username).first():
+        raise HTTPException(status_code=400, detail="Username ya existe")
+    if db.query(UserModel).filter(UserModel.email == user_data.email).first():
+        raise HTTPException(status_code=400, detail="Email ya registrado")
+
+    # GUARDAR LA CONTRASEÑA EN TEXTO PLANO TEMPORALMENTE
+    contraseña_plana = user_data.password
+    hashed = hash_password(user_data.password)
+
+    nuevo_usuario = UserModel(
+        **user_data.model_dump(exclude={"password"}), 
+        password=hashed
+    )
+    
+    db.add(nuevo_usuario)
+    db.commit()
+    db.refresh(nuevo_usuario)
+
+    # ENVIAR CORREO CON LA CONTRASEÑA REAL
+    background_tasks.add_task(enviar_bienvenida, nuevo_usuario, contraseña_plana)
+
+    return nuevo_usuario
+
+
+# === ACTUALIZAR USUARIO ===
+@router.patch("/{user_id}", response_model=UserResponse)
+def actualizar_usuario(
+    user_id: int,
+    update_data: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    if current_user.role != "admin" and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    usuario = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    for key, value in update_data.model_dump(exclude_unset=True).items():
+        if key == "password" and value:
+            setattr(usuario, key, hash_password(value))
+        else:
+            setattr(usuario, key, value)
+
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+
+# === ELIMINAR USUARIO ===
+@router.delete("/{user_id}", status_code=204)
+def eliminar_usuario(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo admins pueden eliminar")
+
+    usuario = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    db.delete(usuario)
+    db.commit()
+    return None
+
+
+# === FUNCIÓN DE CORREO (RECIBE LA CONTRASEÑA PLANA) ===
+async def enviar_bienvenida(usuario: UserModel, contraseña_plana: str):
+    fm = FastMail(conf)
+    message = MessageSchema(
+        subject="¡Bienvenido a MedicalApp Tecpán!",
+        recipients=[usuario.email],
+        body=f"""
+        <h2>¡Hola {usuario.nombre}!</h2>
+        <p>Tu cuenta ha sido creada exitosamente en el Sistema Hospitalario Nacional.</p>
+        <hr>
+        <p><strong>Usuario:</strong> <code>{usuario.username}</code></p>
+        <p><strong>Contraseña:</strong> <code>{contraseña_plana}</code></p>
        
-       result = query.offset(skip).limit(limit).all()
-       return JSONResponse(status_code=200, content=jsonable_encoder(result))
-
-    except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-        
-        
-# Ruta para crear un nuevo usuario
-@router.post("/user/crear", tags=["users"])
-async def create_user(
-    user: UserCreate, 
-    # token: str = Depends(oauth2_scheme),
-    db: SQLAlchemySession = Depends(get_db)):
-    try:
-        # Asegúrate de que la contraseña esté cifrada
-        if user.password:
-            hashed_password = pwd_context.hash(user.password)
-            user.password = hashed_password
-
-        # Crear el nuevo usuario con los datos proporcionados
-        new_user = UserModel(**user.model_dump())
-        
-        # Añadir y confirmar el nuevo usuario en la base de datos
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-        
-        # Retornar el nuevo usuario en formato JSON
-        return JSONResponse(status_code=200, content={"message": "User created successfully"})
-    
-    except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
-@router.put("/user/actualizar/{user_id}", tags=["users"])
-async def update_user(
-    user_id: int, 
-    user: UserBase, 
-    token: str = Depends(oauth2_scheme),
-    db: SQLAlchemySession = Depends(get_db)):
-    try:
-        db_user = db.query(UserModel).filter(UserModel.id == user_id).first()
-        if db_user is None:
-            raise HTTPException(status_code=404, detail="User not found")
-        for key, value in user.model_dump().items():
-            setattr(db_user, key, value)
-        db.commit()
-        db.refresh(db_user)
-        return JSONResponse(status_code=200, content=jsonable_encoder(db_user))
-    except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
-    
-@router.delete("/user/eliminar/{user_id}", tags=["users"])
-async def delete_user(
-    user_id: int, 
-    current_user: dict = Depends(oauth2_scheme),
-    db: SQLAlchemySession = Depends(get_db)):
-    try:
-        db_user = db.query(UserModel).filter(UserModel.id == user_id).first()
-        if db_user is None:
-            raise HTTPException(status_code=404, detail="User not found")
-        db.delete(db_user)
-        db.commit()
-        return JSONResponse(status_code=200, content={"message": "User deleted successfully"})
-    except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
-    
+        <br>
+        <p><a href="https://hgtecpan.duckdns.org" style="background:#0066cc; color:white; padding:12px 24px; text-decoration:none; border-radius:8px;">
+            Ingresar al Sistema
+        </a></p>
+        <br>
+        <p>¡Gracias por ser parte del equipo que salva vidas!</p>
+        """,
+        subtype=MessageType.html
+    )
+    await fm.send_message(message)

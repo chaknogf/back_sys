@@ -1,99 +1,55 @@
-from sqlalchemy.exc import SQLAlchemyError
-from fastapi import APIRouter, Depends, Form, HTTPException, status
-from fastapi.responses import JSONResponse
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session as SQLAlchemySession
-from datetime import timedelta
-from jose import JWTError, jwt
-from app.database.db import SessionLocal
+# app/auth/login.py
+"""
+Router de autenticación.
+Todo limpio, sin duplicados, usando los módulos centrales.
+"""
+
+from fastapi import APIRouter, Depends, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+
+from app.database.db import get_db
+from app.database.security import verify_password, create_access_token, get_current_user
 from app.models.user import UserModel
-from app.database.config import SECRET_KEY, ALGORITHM
-from app.database.security import verify_password, create_access_token
 
-# Dependencia para obtener la sesión de la base de datos
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# Ruta y prefijo para autenticación
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# Sin scopes, solo autenticación básica
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-@router.post("/login")
+@router.post("/login", summary="Login con usuario y contraseña")
 def login(
-    username: str = Form(...),
-    password: str = Form(...),
-    db: SQLAlchemySession = Depends(get_db)
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
 ):
     """
-    Autenticación de usuarios, genera un token de acceso si las credenciales son correctas.
+    Endpoint estándar de FastAPI para login.
+    Cliente envía: username y password en form-data.
+    Devuelve: access_token + token_type
     """
-    try:
-        user = db.query(UserModel).filter(UserModel.username == username).first()
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Usuario no encontrado"
-            )
-        
-        if not verify_password(password, user.password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Contraseña incorrecta"
-            )
+    user = db.query(UserModel).filter(UserModel.username == form_data.username).first()
 
-        access_token = create_access_token(
-            data={"sub": user.username},
-            expires_delta=timedelta(minutes=60)
-        )
-
-        return {"access_token": access_token, "token_type": "bearer"}
-
-    except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail="Error en la base de datos: " + str(e))
-
-
-@router.get("/me")
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: SQLAlchemySession = Depends(get_db)
-):
-    """
-    Devuelve la información del usuario autenticado usando el token.
-    """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-
-        if username is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token inválido"
-            )
-
-        user = db.query(UserModel).filter(UserModel.username == username).first()
-        if user is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Usuario no encontrado"
-            )
-
-        return {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "role": user.role,
-            "unidad": user.unidad
-        }
-
-    except JWTError:
+    if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido o expirado"
+            detail="Usuario o contraseña incorrectos",
+            headers={"WWW-Authenticate": "Bearer"},
         )
+
+    access_token = create_access_token(data={"sub": user.username})
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.get("/me", summary="Obtener datos del usuario autenticado")
+def me(current_user: UserModel = Depends(get_current_user)):
+    """
+    Usa la dependencia mágica get_current_user() → 0 líneas de JWT manual!
+    """
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "nombre": current_user.nombre,
+        "role": current_user.role,
+        # "servicio_id": current_user.servicio_id,
+        "estado": current_user.estado
+    }

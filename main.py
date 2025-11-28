@@ -1,3 +1,4 @@
+#m
 from fastapi import FastAPI
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,13 +19,36 @@ from app.auth.login import router as login
 
 
 
+# ====================== APLICACIÓN FASTAPI ======================
 app = FastAPI(
-    title="backend-fah",
+    title="Hospital General Tipo I de Tecpán - Sistema FAH",
     version="3.0.0",
-    description="Documentación de la API FAH",
-    root_path="/fah",
-    docs_url="/docs",
+    description="""
+    **Sistema de Gestión Hospitalaria**
     
+    Características:
+    - Integración RENAP Guatemala
+    - Expediente Único Electrónico
+    - Dashboard en tiempo real
+    - Autenticación JWT + Argon2
+    - 100% desarrollado en Guatemala
+    - Desarrollado por Ronald Chacón  www.ronchak.dev
+    """,
+    contact={
+        "name": "Departamento de Informática - Hospital General Tipo I de Tecpán Guatemala",
+        "email": "sistemas@hospitaltecpan.gob.gt",
+    },
+    license_info={
+        "name": "Ronald Chacón",
+        "url": "https://www.ronchak.dev",
+       "para": "Hospital General Tipo I de Tecpán Guatemala"
+        
+    },
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    root_path="/fah",  # ← IMPORTANTE para DuckDNS + proxy
+   
 )
 
 app.add_middleware(

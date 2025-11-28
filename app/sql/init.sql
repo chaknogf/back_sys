@@ -13,6 +13,11 @@ CREATE TABLE users (
     actualizado_en timestamp without time zone DEFAULT now()
 );
 
+ALTER TABLE users ALTER COLUMN id SET DEFAULT nextval('users_id_seq');
+ALTER TABLE users ADD CONSTRAINT pk_users PRIMARY KEY (id);
+CREATE SEQUENCE IF NOT EXISTS users_id_seq OWNED BY users.id;
+ALTER SEQUENCE users_id_seq OWNED BY users.id;
+
 CREATE TABLE pacientes (
     id SERIAL PRIMARY KEY,
     -- 🔐 Identificadores múltiples
@@ -134,3 +139,5 @@ CREATE INDEX idx_eventos_consulta_datos_gin ON eventos_consulta USING GIN (datos
 
 -- Índice GIN para búsquedas dentro del JSONB 'responsable'
 CREATE INDEX idx_eventos_consulta_responsable_gin ON eventos_consulta USING GIN (responsable);
+
+

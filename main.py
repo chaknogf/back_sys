@@ -27,7 +27,7 @@ app = FastAPI(
     **Sistema de Gestión Hospitalaria**
     
     Características:
-    - Integración RENAP Guatemala
+    - Integración RENAP Guatemala --nightly--
     - Expediente Único Electrónico
     - Dashboard en tiempo real
     - Autenticación JWT + Argon2

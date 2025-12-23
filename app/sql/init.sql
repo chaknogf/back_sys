@@ -20,24 +20,37 @@ ALTER SEQUENCE users_id_seq OWNED BY users.id;
 
 CREATE TABLE pacientes (
     id SERIAL PRIMARY KEY,
-    -- 🔐 Identificadores múltiples
-    identificadores JSONB NOT NULL, -- Ej: [{ "tipo": "DPI", "valor": "1234567890101" }, { "tipo": "expediente", "valor": "20250001" }]
+
+    -- 🔐 Identificadores principales
+    expediente VARCHAR(20) UNIQUE,
+    cui BIGINT,
+    pasaporte VARCHAR(50),
+
     -- 🧍‍♂️ Identificación personal
-    nombre JSONB, -- { "primer": "...", "segundo": "...", "otros": ["..."], "apellido": "..." }
-    sexo VARCHAR(2),
+    nombre JSONB NOT NULL,
+    sexo CHAR(1) CHECK (sexo IN ('M','F')),
     fecha_nacimiento DATE,
+
     -- ☎️ Contacto
-    contacto JSONB, -- { "telefono": "...", "email": "...", "direccion": "..." }
-    -- 👪 Referencias
-    referencias JSONB, -- [{ "nombre": "...", "parentesco": "...", "telefono": "..." }]
-    -- 🌍 Otros datos del paciente
-    datos_extra JSONB, -- { "nacionalidad": "...", "ocupacion": "...", "idiomas": [...], covid }
-    -- ⚙️ Metadatos del sistema
-    estado VARCHAR(2) DEFAULT 'A', -- 'A'=Activo, 'I'=Inactivo, 'F'=Fallecido
-    metadatos JSONB, -- { "creado_por": "...", "actualizado_por": "..." }
+    contacto JSONB,
+
+    -- 👪 Referencias familiares
+    referencias JSONB,
+
+    -- 🌍 Otros datos históricos y clínicos
+    datos_extra JSONB,
+
+    -- ⚙️ Estado del paciente
+    estado CHAR(1) DEFAULT 'V' CHECK (estado IN ('V','F')),
+
+    -- 🧾 Metadatos del sistema
+    metadatos JSONB,
+
+    -- ⏱️ Tiempos del sistema
     creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 -- 🔎 Índice para búsqueda eficiente dentro del campo 'identificadores'
 -- Índice para buscar por identificadores (ej. DPI, expediente)
 CREATE INDEX idx_pacientes_identificadores_gin ON pacientes USING GIN (identificadores);

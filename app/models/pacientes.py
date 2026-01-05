@@ -9,11 +9,11 @@ class PacienteModel(Base):
     __tablename__ = "pacientes"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    unidad = Column(Integer, nullable=True)
+    # unidad = Column(Integer, nullable=True)
     cui = Column(Integer, unique=True, nullable=True, index=True)
     expediente = Column(String(20), unique=True, nullable=True, index=True)
     pasaporte = Column(String(20), unique=True, nullable=True)
-    otro_id = Column(String(50), unique=True, nullable=True)
+    # otro_id = Column(String(50), unique=True, nullable=True)
     nombre = Column(JSONB, nullable=False)
     sexo = Column(String(2), nullable=True)
     fecha_nacimiento = Column(Date, nullable=True)

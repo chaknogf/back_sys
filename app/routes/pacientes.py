@@ -1,11 +1,10 @@
 # app/routes/pacientes.py
 """
-Router de pacientes - Búsqueda avanzada, creación inteligente y CRUD completo
-Sistema hospitalario nacional - Guatemala 2025
+Router de pacientes - CORREGIDO
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func, text
+from sqlalchemy import func, desc, cast, String, text, or_
 from sqlalchemy.exc import IntegrityError
 from typing import Optional, List
 from datetime import date
@@ -24,90 +23,156 @@ router = APIRouter(prefix="/pacientes", tags=["Pacientes"])
 
 
 # =============================================================================
-# BÚSQUEDA AVANZADA ULTRARRÁPIDA (con unaccent + JSONB)
+# BÚSQUEDA AVANZADA - CORREGIDA
 # =============================================================================
 @router.get("/", response_model=PacienteListResponse)
 def buscar_pacientes(
-    q: Optional[str] = Query(None, description="Búsqueda libre: CUI, expediente, nombre, etc."),
+    q: Optional[str] = Query(None, description="Búsqueda libre"),
     cui: Optional[str] = Query(None),
     expediente: Optional[str] = Query(None),
     nombre: Optional[str] = Query(None),
     sexo: Optional[str] = Query(None),
-    estado: Optional[str] = Query("A"),
-    fecha_nac: Optional[date] = Query(None, description="YYYY-MM-DD"),
+    estado: Optional[str] = Query(None),  # CAMBIO: era "A" por defecto, ahora None
+    fecha_nac: Optional[str] = Query(None, description="YYYY-MM-DD"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """
+    Búsqueda de pacientes con filtros opcionales
+    Si no se envían filtros, devuelve todos los pacientes (paginados)
+    """
+    
+    # Empezar con query base
     query = db.query(PacienteModel).order_by(desc(PacienteModel.id))
 
+    # Solo aplicar filtros si se proporcionan
     if q:
-        q = q.strip()
+        q_clean = q.strip().upper()
         query = query.filter(
-            (PacienteModel.cui.cast(str).ilike(f"%{q}%")) |
-            (PacienteModel.expediente.ilike(f"%{q}%")) |
-            (PacienteModel.nombre_completo.ilike(f"%{q}%"))
+            or_(
+                # Búsqueda en CUI
+                cast(PacienteModel.cui, String).ilike(f"%{q_clean}%"),
+                # Búsqueda en expediente
+                PacienteModel.expediente.ilike(f"%{q_clean}%"),
+                # Búsqueda en nombre_completo (columna calculada)
+                PacienteModel.nombre_completo.ilike(f"%{q_clean}%"),
+                # O búsqueda en JSONB de nombre
+                func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_nombre').ilike(f"%{q_clean}%"),
+                func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_nombre').ilike(f"%{q_clean}%"),
+                func.jsonb_extract_path_text(PacienteModel.nombre, 'otro_nombre').ilike(f"%{q_clean}%"),
+                func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_apellido').ilike(f"%{q_clean}%"),
+                func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_apellido').ilike(f"%{q_clean}%"),
+                func.jsonb_extract_path_text(PacienteModel.nombre, 'apellido_casada').ilike(f"%{q_clean}%")
+            )
         )
 
-    if cui and cui.isdigit():
-        query = query.filter(PacienteModel.cui == int(cui))
+    if cui:
+        if cui.isdigit():
+            query = query.filter(PacienteModel.cui == int(cui))
+        else:
+            # Si no es numérico, buscar como string
+            query = query.filter(cast(PacienteModel.cui, String).ilike(f"%{cui}%"))
+
     if expediente:
         query = query.filter(PacienteModel.expediente.ilike(f"%{expediente}%"))
+
     if nombre:
+        nombre_clean = nombre.strip().upper()
         query = query.filter(
-            func.unaccent(PacienteModel.nombre_completo).ilike(func.unaccent(f"%{nombre}%"))
+            or_(
+                PacienteModel.nombre_completo.ilike(f"%{nombre_clean}%"),
+                func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_nombre').ilike(f"%{nombre_clean}%"),
+                func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_nombre').ilike(f"%{nombre_clean}%"),
+                func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_apellido').ilike(f"%{nombre_clean}%"),
+                func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_apellido').ilike(f"%{nombre_clean}%")
+            )
         )
+
     if sexo:
         query = query.filter(PacienteModel.sexo == sexo.upper())
+
     if estado:
         query = query.filter(PacienteModel.estado == estado.upper())
-    if fecha_nac:
-        query = query.filter(PacienteModel.fecha_nacimiento == fecha_nac)
 
+    if fecha_nac:
+        try:
+            query = query.filter(PacienteModel.fecha_nacimiento == fecha_nac)
+        except:
+            pass  # Ignorar si el formato es inválido
+
+    # Contar total ANTES de paginar
     total = query.count()
+    
+    # Aplicar paginación
     pacientes = query.offset(skip).limit(limit).all()
 
-    return PacienteListResponse(total=total, pacientes=pacientes)
+    return PacienteListResponse(
+        total=total,
+        pacientes=pacientes
+    )
 
 
 # =============================================================================
-# AUTOCOMPLETE - IDEAL PARA BÚSQUEDA RÁPIDA EN RECEPCCIÓN
+# AUTOCOMPLETE - CORREGIDO
 # =============================================================================
 @router.get("/buscar", response_model=List[PacienteSimple])
 def autocomplete(
-    q: str = Query(..., min_length=3),
+    q: str = Query(..., min_length=1),  # CAMBIO: min_length=1 en lugar de 3
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """
+    Búsqueda rápida para autocomplete
+    Busca en CUI, expediente y nombre completo
+    """
+    q_clean = q.strip().upper()
+    
+    # Construir query
     resultados = db.query(PacienteModel).filter(
-        (PacienteModel.cui.cast(str).ilike(f"%{q}%")) |
-        (PacienteModel.expediente.ilike(f"%{q}%")) |
-        (PacienteModel.nombre_completo.ilike(f"%{q}%"))
+        or_(
+            cast(PacienteModel.cui, String).ilike(f"%{q_clean}%"),
+            PacienteModel.expediente.ilike(f"%{q_clean}%"),
+            PacienteModel.nombre_completo.ilike(f"%{q_clean}%")
+        )
     ).limit(15).all()
 
-    return [PacienteSimple.from_orm(p) for p in resultados]
+    return [
+        PacienteSimple(
+            id=p.id,
+            cui=p.cui,
+            expediente=p.expediente,
+            nombre_completo=p.nombre_completo or "",
+            fecha_nacimiento=p.fecha_nacimiento
+        )
+        for p in resultados
+    ]
 
 
 # =============================================================================
-# CREAR PACIENTE (INTELIGENTE)
+# CREAR PACIENTE
 # =============================================================================
 @router.post("/", response_model=PacienteOut, status_code=201)
 def crear_paciente(
     paciente_in: PacienteCreate,
-    generar_expediente: bool = Query(True, description="Generar expediente automáticamente"),
+    auto_expediente: bool = Query(True, description="Generar expediente automáticamente"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """
+    Crear nuevo paciente
+    Si auto_expediente=True y no se proporciona expediente, se genera automáticamente
+    """
     data = paciente_in.model_dump()
 
-    # Limpiar campos vacíos
-    for field in ["cui", "expediente", "pasaporte", "otro_id"]:
+    # Limpiar campos vacíos (convertir "" a None)
+    for field in ["cui", "expediente", "pasaporte"]:
         if data.get(field) in ["", " ", None]:
             data[field] = None
 
-    # Generar expediente si se solicita
-    if generar_expediente:
+    # Generar expediente si se solicita y no existe
+    if auto_expediente and not data.get("expediente"):
         data["expediente"] = generar_expediente(db)
 
     try:
@@ -118,10 +183,24 @@ def crear_paciente(
         return nuevo
     except IntegrityError as e:
         db.rollback()
-        msg = str(e.orig).lower()
-        if "unique" in msg or "duplicate" in msg:
-            raise HTTPException(status_code=400, detail="CUI o expediente ya existe")
-        raise HTTPException(status_code=400, detail="Datos inválidos o duplicados")
+        error_msg = str(e.orig).lower()
+        
+        # Mensajes de error más específicos
+        if "cui" in error_msg:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Ya existe un paciente con el CUI: {data.get('cui')}"
+            )
+        elif "expediente" in error_msg:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Ya existe un paciente con el expediente: {data.get('expediente')}"
+            )
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail="Datos duplicados o inválidos"
+            )
 
 
 # =============================================================================
@@ -133,9 +212,13 @@ def obtener_paciente(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Obtener un paciente específico por ID"""
     paciente = db.get(PacienteModel, paciente_id)
     if not paciente:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Paciente con ID {paciente_id} no encontrado"
+        )
     return paciente
 
 
@@ -149,41 +232,103 @@ def actualizar_paciente(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Actualizar datos de un paciente existente"""
     paciente = db.get(PacienteModel, paciente_id)
     if not paciente:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Paciente con ID {paciente_id} no encontrado"
+        )
 
+    # Obtener solo los campos que fueron enviados
     datos = update.model_dump(exclude_unset=True)
+    
+    # Actualizar campos
     for key, value in datos.items():
         setattr(paciente, key, value)
 
-    db.commit()
-    db.refresh(paciente)
-    return paciente
+    try:
+        db.commit()
+        db.refresh(paciente)
+        return paciente
+    except IntegrityError as e:
+        db.rollback()
+        error_msg = str(e.orig).lower()
+        
+        if "cui" in error_msg:
+            raise HTTPException(status_code=400, detail="CUI ya existe")
+        elif "expediente" in error_msg:
+            raise HTTPException(status_code=400, detail="Expediente ya existe")
+        else:
+            raise HTTPException(status_code=400, detail="Error al actualizar")
 
 
 # =============================================================================
-# ELIMINAR PACIENTE (lógico o físico)
+# ELIMINAR PACIENTE
 # =============================================================================
 @router.delete("/{paciente_id}", status_code=204)
 def eliminar_paciente(
     paciente_id: int,
+    fisico: bool = Query(False, description="True=eliminación física, False=lógica"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Solo administradores")
+    """
+    Eliminar un paciente
+    - fisico=False: Eliminación lógica (cambia estado a 'I')
+    - fisico=True: Eliminación física (borra el registro)
+    """
+    
+    # Solo admin puede eliminar físicamente
+    if fisico and current_user.role != "admin":
+        raise HTTPException(
+            status_code=403, 
+            detail="Solo administradores pueden eliminar físicamente"
+        )
 
     paciente = db.get(PacienteModel, paciente_id)
     if not paciente:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Paciente con ID {paciente_id} no encontrado"
+        )
 
-    # Opción 1: Eliminación lógica
-    paciente.estado = "I"
+    if fisico:
+        # Eliminación física
+        db.delete(paciente)
+    else:
+        # Eliminación lógica
+        paciente.estado = "I"
+
     db.commit()
-
-    # Opción 2: Eliminación física (descomentar si es necesario)
-    # db.delete(paciente)
-    # db.commit()
-
     return None
+
+
+# =============================================================================
+# ENDPOINT DE DEBUG (QUITAR EN PRODUCCIÓN)
+# =============================================================================
+@router.get("/debug/count")
+def debug_count(db: Session = Depends(get_db)):
+    """Endpoint temporal para verificar cuántos pacientes hay"""
+    total = db.query(PacienteModel).count()
+    activos = db.query(PacienteModel).filter(PacienteModel.estado == "A").count()
+    inactivos = db.query(PacienteModel).filter(PacienteModel.estado == "I").count()
+    
+    # Obtener algunos ejemplos
+    ejemplos = db.query(PacienteModel).limit(3).all()
+    
+    return {
+        "total": total,
+        "activos": activos,
+        "inactivos": inactivos,
+        "ejemplos": [
+            {
+                "id": p.id,
+                "expediente": p.expediente,
+                "cui": p.cui,
+                "nombre_completo": p.nombre_completo,
+                "estado": p.estado
+            }
+            for p in ejemplos
+        ]
+    }

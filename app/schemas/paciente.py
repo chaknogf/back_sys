@@ -34,13 +34,20 @@ class Nombre(BaseModel):
 
 
 class Contacto(BaseModel):
-    direccion: Optional[str] = Field(None, max_length=200)
-    localidad: Optional[str] = None
-    departamento: Optional[str] = None
+    domicilio: Optional[str] = Field(None, max_length=200)
+    vecindad: Optional[str] = None
     municipio: Optional[str] = None
-    telefono: Optional[str] = Field(None, pattern=r"^\d{8,15}$")
-    telefono2: Optional[str] = None
-    telefono3: Optional[str] = None
+    telefonos: Optional[str] = Field(None, pattern=r"^\d{8,30}$")
+    
+    @field_validator("telefonos", mode="before")
+    @classmethod
+    def format_telefonos(cls, v: str) -> str:
+        if not v:
+            return v
+        # Remove any existing dashes
+        v = v.replace("-", "")
+        # Add dash every 8 digits
+        return "-".join(v[i:i+8] for i in range(0, len(v), 8))
 
 
 class Referencia(BaseModel):
@@ -53,14 +60,14 @@ class Referencia(BaseModel):
 # Schema base del paciente
 # ===================================================================
 class PacienteBase(BaseModel):
-    unidad: Optional[int] = Field(None, ge=1, description="ID de la unidad de salud")
+    # unidad: Optional[int] = Field(None, ge=1, description="ID de la unidad de salud")
     cui: Optional[int] = Field(None, ge=100000000, le=999999999, description="CUI del paciente")
     expediente: Optional[str] = Field(None, max_length=20)
     pasaporte: Optional[str] = Field(None, max_length=20)
-    otro_id: Optional[str] = Field(None, max_length=30)
+    # otro_id: Optional[str] = Field(None, max_length=30)
 
     nombre: Nombre
-    sexo: Optional[str] = Field(None, pattern=r"^(M|F|O)$", description="M=Masculino, F=Femenino, O=Otro")
+    sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
 
     contacto: Optional[Contacto] = None
@@ -89,11 +96,11 @@ class PacienteCreate(PacienteBase):
 # Para actualizar (parcial)
 # ===================================================================
 class PacienteUpdate(BaseModel):
-    unidad: Optional[int] = None
+    # unidad: Optional[int] = None
     cui: Optional[int] = None
     expediente: Optional[str] = None
     pasaporte: Optional[str] = None
-    otro_id: Optional[str] = None
+    # otro_id: Optional[str] = None
     nombre: Optional[Nombre] = None
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None

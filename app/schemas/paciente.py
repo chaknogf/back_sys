@@ -38,17 +38,21 @@ class Contacto(BaseModel):
     vecindad: Optional[str] = None
     municipio: Optional[str] = None
     telefonos: Optional[str] = Field(None, pattern=r"^\d{8,30}$")
-    
+
     @field_validator("telefonos", mode="before")
     @classmethod
     def format_telefonos(cls, v: str) -> str:
         if not v:
             return v
-        # Remove any existing dashes
         v = v.replace("-", "")
-        # Add dash every 8 digits
-        return "-".join(v[i:i+8] for i in range(0, len(v), 8))
+        return "-".join(v[i:i + 8] for i in range(0, len(v), 8))
 
+    @field_validator("municipio", mode="before")
+    @classmethod
+    def municipio_a_string(cls, v):
+        if v is None:
+            return None
+        return str(v)
 
 class Referencia(BaseModel):
     nombre: str = Field(..., max_length=100)
@@ -61,7 +65,7 @@ class Referencia(BaseModel):
 # ===================================================================
 class PacienteBase(BaseModel):
     # unidad: Optional[int] = Field(None, ge=1, description="ID de la unidad de salud")
-    cui: Optional[int] = Field(None, ge=100000000, le=999999999, description="CUI del paciente")
+    cui: Optional[int] = None
     expediente: Optional[str] = Field(None, max_length=20)
     pasaporte: Optional[str] = Field(None, max_length=20)
     # otro_id: Optional[str] = Field(None, max_length=30)
@@ -75,6 +79,13 @@ class PacienteBase(BaseModel):
     datos_extra: Optional[Dict[str, Any]] = None
     estado: Optional[str] = Field("A", pattern=r"^(A|I|V)$", description="A=Activo, I=Inactivo, V=Fallecido")
     metadatos: Optional[Dict[str, Any]] = None
+    
+    @field_validator("cui", mode="before")
+    @classmethod
+    def normalizar_cui(cls, v):
+        if v is None:
+            return None
+        return str(v)
 
     model_config = ConfigDict(
         from_attributes=True,

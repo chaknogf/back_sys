@@ -1,7 +1,7 @@
-# app/schemas/pacientes.py
 """
 Schemas para pacientes - Sistema Hospitalario Nacional
 Totalmente compatible con Pydantic v2, FastAPI, OpenAPI y frontend.
+Validaciones flexibles para datos legacy/inconsistentes.
 """
 
 from typing import Optional, Dict, Any, List
@@ -13,12 +13,21 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 # Modelos anidados (reutilizables y limpios)
 # ===================================================================
 class Nombre(BaseModel):
-    primer_nombre: str = Field(..., min_length=2, max_length=50)
+    primer_nombre: str = Field(..., min_length=1, max_length=50)
     segundo_nombre: Optional[str] = Field(None, max_length=50)
     otro_nombre: Optional[str] = Field(None, max_length=50)
-    primer_apellido: str = Field(..., min_length=2, max_length=50)
+    primer_apellido: str = Field(..., min_length=1, max_length=50)  # Cambiado de 2 a 1
     segundo_apellido: Optional[str] = Field(None, max_length=50)
     apellido_casada: Optional[str] = Field(None, max_length=50)
+
+    @field_validator("primer_nombre", "primer_apellido", mode="before")
+    @classmethod
+    def limpiar_nombres(cls, v):
+        """Limpia espacios en blanco y valida que no esté vacío"""
+        if v is None:
+            return v
+        v = str(v).strip()
+        return v if v else None
 
     @property
     def completo(self) -> str:
@@ -37,15 +46,30 @@ class Contacto(BaseModel):
     domicilio: Optional[str] = Field(None, max_length=200)
     vecindad: Optional[str] = None
     municipio: Optional[str] = None
-    telefonos: Optional[str] = Field(None, pattern=r"^\d{8,30}$")
+    telefonos: Optional[str] = Field(None, max_length=100)  # Removido el pattern restrictivo
 
     @field_validator("telefonos", mode="before")
     @classmethod
-    def format_telefonos(cls, v: str) -> str:
+    def format_telefonos(cls, v):
+        """Valida y formatea teléfonos de manera flexible"""
         if not v:
-            return v
-        v = v.replace("-", "")
-        return "-".join(v[i:i + 8] for i in range(0, len(v), 8))
+            return None
+        
+        v = str(v).strip()
+        
+        # Si está vacío o es solo "0", retornar None
+        if not v or v == "0":
+            return None
+        
+        # Remover caracteres no numéricos
+        numeros = "".join(c for c in v if c.isdigit())
+        
+        # Si no hay suficientes dígitos, retornar None
+        if len(numeros) < 8:
+            return None
+        
+        # Formatear en bloques de 8
+        return "-".join(numeros[i:i + 8] for i in range(0, len(numeros), 8))
 
     @field_validator("municipio", mode="before")
     @classmethod
@@ -54,21 +78,30 @@ class Contacto(BaseModel):
             return None
         return str(v)
 
+
 class Referencia(BaseModel):
     nombre: str = Field(..., max_length=100)
     parentesco: Optional[str] = None
-    telefono: Optional[str] = Field(None, pattern=r"^\d{8,15}$")
+    telefono: Optional[str] = Field(None, max_length=20)  # Más flexible
+
+    @field_validator("telefono", mode="before")
+    @classmethod
+    def validar_telefono(cls, v):
+        """Valida teléfono de manera flexible"""
+        if not v:
+            return None
+        v = str(v).strip()
+        # Solo números y guiones
+        return "".join(c for c in v if c.isdigit() or c == "-") or None
 
 
 # ===================================================================
 # Schema base del paciente
 # ===================================================================
 class PacienteBase(BaseModel):
-    # unidad: Optional[int] = Field(None, ge=1, description="ID de la unidad de salud")
     cui: Optional[int] = None
     expediente: Optional[str] = Field(None, max_length=20)
     pasaporte: Optional[str] = Field(None, max_length=20)
-    # otro_id: Optional[str] = Field(None, max_length=30)
 
     nombre: Nombre
     sexo: Optional[str] = None
@@ -83,9 +116,18 @@ class PacienteBase(BaseModel):
     @field_validator("cui", mode="before")
     @classmethod
     def normalizar_cui(cls, v):
-        if v is None:
+        if v is None or v == "":
             return None
-        return str(v)
+        return int(v) if str(v).isdigit() else None
+
+    @field_validator("expediente", "pasaporte", mode="before")
+    @classmethod
+    def limpiar_strings(cls, v):
+        """Limpia strings opcionales"""
+        if not v:
+            return None
+        v = str(v).strip()
+        return v if v else None
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -107,11 +149,9 @@ class PacienteCreate(PacienteBase):
 # Para actualizar (parcial)
 # ===================================================================
 class PacienteUpdate(BaseModel):
-    # unidad: Optional[int] = None
     cui: Optional[int] = None
     expediente: Optional[str] = None
     pasaporte: Optional[str] = None
-    # otro_id: Optional[str] = None
     nombre: Optional[Nombre] = None
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
@@ -131,13 +171,26 @@ class PacienteOut(PacienteBase):
     creado_en: Optional[date] = None
     actualizado_en: Optional[date] = None
 
-    @field_validator("nombre_completo", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def generar_nombre_completo(cls, v: Any, values: Any) -> str:
-        nombre = values.data.get("nombre")
-        if not nombre:
-            return ""
-        return nombre.completo
+    def generar_nombre_completo(cls, data):
+        """Genera nombre completo desde el objeto nombre"""
+        if isinstance(data, dict):
+            nombre_obj = data.get("nombre")
+            if nombre_obj:
+                # Si es un dict, crear el objeto Nombre
+                if isinstance(nombre_obj, dict):
+                    try:
+                        nombre_instance = Nombre(**nombre_obj)
+                        data["nombre_completo"] = nombre_instance.completo
+                    except:
+                        data["nombre_completo"] = ""
+                # Si ya es un objeto Nombre
+                elif hasattr(nombre_obj, "completo"):
+                    data["nombre_completo"] = nombre_obj.completo
+                else:
+                    data["nombre_completo"] = ""
+        return data
 
     model_config = ConfigDict(from_attributes=True)
 

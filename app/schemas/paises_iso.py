@@ -14,12 +14,7 @@ class PaisOut(BaseModel):
     """
     id: int = Field(..., description="ID interno en la base de datos")
     nombre: str = Field(..., max_length=100, description="Nombre oficial del país")
-    codigo_iso2: Optional[str] = Field(
-        None,
-        max_length=2,
-        pattern=r"^[A-Z]{2}$",
-        description="Código ISO 3166-1 alpha-2 (ej: GT, US, MX)"
-    )
+   
     codigo_iso3: Optional[str] = Field(
         None,
         max_length=3,

@@ -8,5 +8,4 @@ class PaisIsoModel(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     nombre = Column(String(100), nullable=False)
-    codigo_iso2 = Column(String(2), unique=True, nullable=True)
     codigo_iso3 = Column(String(3), unique=True, nullable=True)

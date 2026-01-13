@@ -15,7 +15,7 @@ class PacienteModel(Base):
     pasaporte = Column(String(20), unique=True, nullable=True)
     # otro_id = Column(String(50), unique=True, nullable=True)
     nombre = Column(JSONB, nullable=False)
-    sexo = Column(String(2), nullable=True)
+    sexo = Column(String(1), nullable=True)
     fecha_nacimiento = Column(Date, nullable=True)
     contacto = Column(JSONB, nullable=True)
     referencias = Column(JSONB, nullable=True)

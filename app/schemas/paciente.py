@@ -83,6 +83,9 @@ class Referencia(BaseModel):
     nombre: str = Field(..., max_length=100)
     parentesco: Optional[str] = None
     telefono: Optional[str] = Field(None, max_length=20)  # Más flexible
+    expediente: Optional[str] = None
+    idpersona: Optional[str] = None
+    responsable: Optional[bool] = None
 
     @field_validator("telefono", mode="before")
     @classmethod
@@ -110,7 +113,7 @@ class PacienteBase(BaseModel):
     contacto: Optional[Contacto] = None
     referencias: Optional[List[Referencia]] = None
     datos_extra: Optional[Dict[str, Any]] = None
-    estado: Optional[str] = Field("A", pattern=r"^(A|I|V)$", description="A=Activo, I=Inactivo, V=Fallecido")
+    estado: Optional[str] = Field("V", pattern=r"^(V|F|I)$", description="V=Vivo, F=Fallecido, I=Inactivo")
     metadatos: Optional[Dict[str, Any]] = None
     
     @field_validator("cui", mode="before")

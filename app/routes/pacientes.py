@@ -225,44 +225,101 @@ def obtener_paciente(
 # =============================================================================
 # ACTUALIZAR PACIENTE
 # =============================================================================
+# =============================================================================
+# ACTUALIZAR PACIENTE (OPTIMIZADO)
+# =============================================================================
+
 @router.patch("/{paciente_id}", response_model=PacienteOut)
 def actualizar_paciente(
     paciente_id: int,
-    update: PacienteUpdate,
+    paciente_update: PacienteUpdate,
+    accion_expediente: str = Query(
+        default="mantener",
+        regex="^(mantener|generar|sobrescribir)$",
+        description="'mantener': no modifica expediente | 'generar': genera si no existe | 'sobrescribir': genera nuevo"
+    ),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    """Actualizar datos de un paciente existente"""
+    """
+    Actualizar datos de un paciente existente con control de expediente.
+    
+    **Acciones de expediente:**
+    - `mantener` (default): No modifica el expediente actual
+    - `generar`: Genera expediente solo si el paciente no tiene uno
+    - `sobrescribir`: Genera un nuevo expediente (sobrescribe el existente)
+    
+    **Ejemplos:**
+    ```
+    PATCH /pacientes/123
+    PATCH /pacientes/123?accion_expediente=generar
+    PATCH /pacientes/123?accion_expediente=sobrescribir
+    ```
+    """
+    
+    # Obtener paciente
     paciente = db.get(PacienteModel, paciente_id)
     if not paciente:
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail=f"Paciente con ID {paciente_id} no encontrado"
         )
 
-    # Obtener solo los campos que fueron enviados
-    datos = update.model_dump(exclude_unset=True)
-    
-    # Actualizar campos
-    for key, value in datos.items():
-        setattr(paciente, key, value)
-
     try:
+        # Obtener solo los datos que fueron enviados (exclude_unset=True)
+        datos_update = paciente_update.model_dump(exclude_unset=True)
+
+        # 🔧 MANEJO DE EXPEDIENTE
+        if accion_expediente == "generar":
+            # Generar SOLO si no tiene expediente
+            if not paciente.expediente or paciente.expediente.strip() == "":
+                datos_update["expediente"] = generar_expediente(db)
+            # Si ya tiene, remover del update para mantenerlo
+            elif "expediente" in datos_update:
+                del datos_update["expediente"]
+
+        elif accion_expediente == "sobrescribir":
+            # Generar SIEMPRE un nuevo expediente
+            datos_update["expediente"] = generar_expediente(db)
+
+        # elif accion_expediente == "mantener":
+        #   No hacer nada - comportamiento por defecto
+
+        # 🔄 Aplicar cambios al paciente
+        for key, value in datos_update.items():
+            setattr(paciente, key, value)
+
+        # 💾 Guardar cambios
         db.commit()
         db.refresh(paciente)
+        
         return paciente
+
     except IntegrityError as e:
         db.rollback()
-        error_msg = str(e.orig).lower()
-        
+        error_msg = str(e.orig).lower() if hasattr(e, 'orig') else str(e).lower()
+
         if "cui" in error_msg:
-            raise HTTPException(status_code=400, detail="CUI ya existe")
+            raise HTTPException(
+                status_code=400,
+                detail="Ya existe un paciente con ese CUI"
+            )
         elif "expediente" in error_msg:
-            raise HTTPException(status_code=400, detail="Expediente ya existe")
+            raise HTTPException(
+                status_code=400,
+                detail="Ya existe un paciente con ese expediente"
+            )
         else:
-            raise HTTPException(status_code=400, detail="Error al actualizar")
-
-
+            raise HTTPException(
+                status_code=400,
+                detail="Datos duplicados o inválidos"
+            )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Error al actualizar paciente"
+        )
 # =============================================================================
 # ELIMINAR PACIENTE
 # =============================================================================

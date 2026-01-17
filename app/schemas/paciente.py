@@ -114,7 +114,7 @@ class PacienteBase(BaseModel):
     referencias: Optional[List[Referencia]] = None
     datos_extra: Optional[Dict[str, Any]] = None
     estado: Optional[str] = Field("V", pattern=r"^(V|F|I)$", description="V=Vivo, F=Fallecido, I=Inactivo")
-    metadatos: Optional[Dict[str, Any]] = None
+    metadatos: Optional[List[MetadataEvento]] = None
     
     @field_validator("cui", mode="before")
     @classmethod
@@ -138,6 +138,12 @@ class PacienteBase(BaseModel):
         extra="ignore"
     )
 
+class MetadataEvento(BaseModel):
+    accion: str
+    usuario: Optional[str] = None
+    registro: Optional[str] = None
+    expediente_duplicado: Optional[bool] = None
+    origen_mysql_id: Optional[int] = None
 
 # ===================================================================
 # Para crear paciente
@@ -162,7 +168,7 @@ class PacienteUpdate(BaseModel):
     referencias: Optional[List[Referencia]] = None
     datos_extra: Optional[Dict[str, Any]] = None
     estado: Optional[str] = None
-    metadatos: Optional[Dict[str, Any]] = None
+    metadatos: Optional[List[MetadataEvento]] = None
 
 
 # ===================================================================

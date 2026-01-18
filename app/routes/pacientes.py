@@ -156,7 +156,7 @@ def autocomplete(
 @router.post("/", response_model=PacienteOut, status_code=201)
 def crear_paciente(
     paciente_in: PacienteCreate,
-    auto_expediente: bool = Query(True, description="Generar expediente automáticamente"),
+    auto_expediente: bool = Query(False, description="Generar expediente automáticamente"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):

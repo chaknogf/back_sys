@@ -16,6 +16,7 @@ from app.schemas.vista_consulta import VistaConsultas
 from app.utils.expediente import generar_expediente, generar_emergencia
 from app.database.security import get_current_user
 from app.models.user import UserModel
+from sqlalchemy.orm import joinedload
 
 router = APIRouter(prefix="/consultas", tags=["Consultas Médicas"])
 
@@ -23,63 +24,27 @@ router = APIRouter(prefix="/consultas", tags=["Consultas Médicas"])
 # =============================================================================
 # BÚSQUEDA AVANZADA EN VISTA MATERIALIZADA (ULTRARRÁPIDA)
 # =============================================================================
-@router.get("/", response_model=List[VistaConsultas])
+
+
+@router.get("/", response_model=List[ConsultaOut])
 def buscar_consultas(
-    # Filtros principales
-    paciente_id: Optional[int] = Query(None),
-    consulta_id: Optional[int] = Query(None),
-    expediente: Optional[str] = Query(None),
-    cui: Optional[str] = Query(None),
-    documento: Optional[str] = Query(None),
-    fecha: Optional[date] = Query(None, description="Fecha de consulta (YYYY-MM-DD)"),
-    especialidad: Optional[str] = Query(None),
-    servicio: Optional[str] = Query(None),
-    tipo: Optional[int] = Query(None, alias="tipo_consulta"),
-    
-    # Búsqueda por nombre
-    nombre: Optional[str] = Query(None, description="Búsqueda libre por cualquier parte del nombre"),
-    
-    # Paginación
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
-    
+    paciente_id: Optional[int] = None,
+    cui: Optional[str] = None,
+    fecha: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    query = db.query(VistaConsultasModel).order_by(desc(VistaConsultasModel.fecha_consulta), desc(VistaConsultasModel.id_consulta))
+    query = db.query(ConsultaModel).join(PacienteModel)
 
     if paciente_id:
-        query = query.filter(VistaConsultasModel.id_paciente == paciente_id)
-    if consulta_id:
-        query = query.filter(VistaConsultasModel.id_consulta == consulta_id)
-    if expediente:
-        query = query.filter(VistaConsultasModel.expediente.ilike(f"%{expediente}%"))
-    if cui and cui.isdigit():
-        query = query.filter(VistaConsultasModel.cui == int(cui))
-    if documento:
-        query = query.filter(VistaConsultasModel.documento.ilike(f"%{documento}%"))
+        query = query.filter(ConsultaModel.paciente_id == paciente_id)
+    if cui:
+        query = query.filter(PacienteModel.cui == cui)
     if fecha:
-        query = query.filter(VistaConsultasModel.fecha_consulta == fecha)
-    if especialidad:
-        query = query.filter(VistaConsultasModel.especialidad == especialidad)
-    if servicio:
-        query = query.filter(VistaConsultasModel.servicio == servicio)
-    if tipo:
-        query = query.filter(VistaConsultasModel.tipo_consulta == tipo)
+        query = query.filter(ConsultaModel.fecha_consulta == fecha)
 
-    # Búsqueda inteligente por nombre
-    if nombre:
-        nombre = nombre.strip().upper()
-        query = query.filter(
-            func.unaccent(VistaConsultasModel.primer_nombre).ilike(func.unaccent(f"%{nombre}%"))
-            | func.unaccent(VistaConsultasModel.primer_apellido).ilike(func.unaccent(f"%{nombre}%"))
-            | func.unaccent(VistaConsultasModel.segundo_apellido).ilike(func.unaccent(f"%{nombre}%"))
-        )
-
-    resultados = query.offset(skip).limit(limit).all()
+    resultados = query.all()
     return resultados
-
-
 # =============================================================================
 # OBTENER UNA CONSULTA POR ID
 # =============================================================================

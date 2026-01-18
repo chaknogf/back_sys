@@ -30,10 +30,10 @@ CREATE INDEX idx_consultas_indicadores_gin ON consultas USING GIN (indicadores);
 
 CREATE INDEX idx_consultas_ciclo_gin ON consultas USING GIN (ciclo);
 
-CREATE OR REPLACE VIEW vista_consultas AS
+CREATE OR REPLACE VIEW public.vista_consultas AS
 SELECT
     p.id AS id_paciente,
-    p.otro_id,
+    p.datos_extra ->> 'personaid' AS otro_id,
     p.cui,
     p.expediente,
     p.pasaporte,
@@ -65,3 +65,51 @@ FROM pacientes
 UNION ALL
 SELECT 'consultas' AS entidad, COUNT(*) AS total
 FROM consultas;
+
+CREATE OR REPLACE VIEW vista_totales AS
+-- Total de pacientes
+SELECT 'pacientes' AS entidad, COUNT(*) AS total
+FROM pacientes
+UNION ALL
+
+-- Total de consultas
+SELECT 'consultas' AS entidad, COUNT(*) AS total
+FROM consultas
+UNION ALL
+
+-- Consultas de hoy
+SELECT 'consultas_hoy' AS entidad, COUNT(*) AS total
+FROM consultas
+WHERE
+    fecha_consulta = CURRENT_DATE
+UNION ALL
+
+-- COEX de hoy (tipo_consulta = 1)
+SELECT 'coex_hoy' AS entidad, COUNT(*) AS total
+FROM consultas
+WHERE
+    tipo_consulta = 1
+    AND fecha_consulta = CURRENT_DATE
+UNION ALL
+
+-- Hospitalizaciones de hoy (tipo_consulta = 2)
+SELECT 'hospitalizaciones_hoy' AS entidad, COUNT(*) AS total
+FROM consultas
+WHERE
+    tipo_consulta = 2
+    AND fecha_consulta = CURRENT_DATE
+UNION ALL
+
+-- Emergencias de hoy (tipo_consulta = 3)
+SELECT 'emergencias_hoy' AS entidad, COUNT(*) AS total
+FROM consultas
+WHERE
+    tipo_consulta = 3
+    AND fecha_consulta = CURRENT_DATE
+UNION ALL
+
+-- Pacientes activos
+SELECT 'pacientes_activos' AS entidad, COUNT(*) AS total
+FROM pacientes
+WHERE
+    estado = 'ACTIVO';

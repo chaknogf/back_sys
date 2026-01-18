@@ -1,5 +1,5 @@
 # app/models/consultas.py → solo cambia __table_args__
-from sqlalchemy import Column, Integer, String, Date, Time, ForeignKey, Index, text, desc
+from sqlalchemy import BigInteger, Column, Integer, String, Date, Text, Time, ForeignKey, Index, text, desc
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import relationship
 from app.database.db import Base
@@ -51,7 +51,7 @@ class VistaConsultasModel(Base):
     id_paciente = Column(Integer, primary_key=True)
     otro_id = Column(JSONB, nullable=True)
     expediente = Column(String)
-    cui = Column(Integer, nullable=True)
+    cui = Column(BigInteger, nullable=True)
     nombre = Column(JSONB, nullable=True)
     primer_nombre = Column(String)
     segundo_nombre = Column(String)

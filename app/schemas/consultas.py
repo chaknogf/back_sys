@@ -9,6 +9,8 @@ from datetime import date, time
 from pydantic import BaseModel, ConfigDict, Field
 
 
+
+
 # ===================================================================
 # Indicadores clínicos (banderas sí/no)
 # ===================================================================
@@ -126,6 +128,45 @@ class ConsultaListResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     
+"""
+Schema para la vista `vista_consultas`.
+Compatible con FastAPI + Pydantic v2 + OpenAPI.
+Solo lectura, ideal para reportes y búsquedas rápidas.
+"""
+
+
+
+# ===================================================================
+# Vista de consultas con datos de paciente
+# ===================================================================
+class VistaConsultas(BaseModel):
+    id_paciente: int
+    otro_id: Optional[Any] = None
+    expediente: Optional[str] = None
+    cui: Optional[int] = None
+    nombre: Optional[Dict[str, Any]] = None
+    primer_nombre: Optional[str] = None
+    segundo_nombre: Optional[str] = None
+    otro_nombre: Optional[str] = None
+    primer_apellido: Optional[str] = None
+    segundo_apellido: Optional[str] = None
+    apellido_casada: Optional[str] = None
+    sexo: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    estado: Optional[str] = None
+
+    id_consulta: int
+    tipo_consulta: int
+    especialidad: Optional[str] = None
+    servicio: Optional[str] = None
+    documento: Optional[str] = None
+    fecha_consulta: Optional[date] = None
+    hora_consulta: Optional[time] = None
+    ciclo: Optional[Dict[str, Any]] = None
+    orden: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
     
 # class Datos(BaseModel):
 #     clave: str

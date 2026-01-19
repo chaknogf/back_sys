@@ -5,8 +5,8 @@ Validaciones flexibles para datos legacy/inconsistentes.
 """
 
 from typing import Optional, Dict, Any, List, Literal
-from datetime import date, datetime
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from datetime import date, datetime, time
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, field_serializer
 
 
 # ===================================================================
@@ -102,6 +102,22 @@ class MetadataEvento(BaseModel):
     registro: Optional[datetime] = None
     accion: Optional[Literal["CREADO", "ACTUALIZADO"]] = None
     expediente_duplicado: Optional[bool] = None
+    
+class Neonatales(BaseModel):
+    peso_nacimiento: Optional[str] = None
+    edad_gestacional: Optional[str] = None
+    parto: Optional[str] = None
+    gemelo: Optional[str] = None
+    expediente_madre: Optional[str] = None
+    extrahositalario: Optional[bool] = False
+    hora_nacimiento: Optional[time] = None
+    
+    @field_serializer('hora_nacimiento')
+    def serialize_hora(self, hora: Optional[time], _info):
+        """Convierte time a string formato HH:MM:SS"""
+        if hora is None:
+            return None
+        return hora.strftime('%H:%M:%S')
 
 
 # ===================================================================
@@ -236,3 +252,33 @@ class PacienteSimple(BaseModel):
             nombre_completo=paciente.nombre_completo or "",
             fecha_nacimiento=paciente.fecha_nacimiento
         )
+        
+        
+
+        
+class PacienteCreateDerivado(BaseModel):
+    """
+    Schema para crear un paciente derivado (hijo/a) a partir de la madre.
+    El frontend SOLO envía información propia del recién nacido.
+    Todo lo heredado o estructural lo gestiona el backend.
+    """
+    # =========================
+    # Datos obligatorios
+    # =========================
+    sexo: Literal["M", "F"] = Field(..., description="Sexo del recién nacido")
+    fecha_nacimiento: date = Field(..., description="Fecha de nacimiento")
+    # =========================
+    # Datos clínicos neonatales
+    # =========================
+    datos_extra: Neonatales = Field(
+        ...,
+        description="Datos neonatales del recién nacido"
+    )
+    # =========================
+    # Estado inicial
+    # =========================
+    estado: Optional[Literal["V", "F", "I"]] = "V"
+
+    model_config = {
+        "extra": "forbid"
+    }

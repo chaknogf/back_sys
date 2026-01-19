@@ -4,8 +4,8 @@ Totalmente compatible con Pydantic v2, FastAPI, OpenAPI y frontend.
 Validaciones flexibles para datos legacy/inconsistentes.
 """
 
-from typing import Optional, Dict, Any, List
-from datetime import date
+from typing import Optional, Dict, Any, List, Literal
+from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
@@ -96,6 +96,12 @@ class Referencia(BaseModel):
         v = str(v).strip()
         # Solo números y guiones
         return "".join(c for c in v if c.isdigit() or c == "-") or None
+    
+class MetadataEvento(BaseModel):
+    usuario: Optional[str] = None
+    registro: Optional[datetime] = None
+    accion: Optional[Literal["CREADO", "ACTUALIZADO"]] = None
+    expediente_duplicado: Optional[bool] = None
 
 
 # ===================================================================
@@ -114,7 +120,7 @@ class PacienteBase(BaseModel):
     referencias: Optional[List[Referencia]] = None
     datos_extra: Optional[Dict[str, Any]] = None
     estado: Optional[str] = Field("V", pattern=r"^(V|F|I)$", description="V=Vivo, F=Fallecido, I=Inactivo")
-    metadatos: Optional[List[MetadataEvento]] = None
+    # metadatos: Optional[List[MetadataEvento]] = None
     
     @field_validator("cui", mode="before")
     @classmethod
@@ -138,12 +144,7 @@ class PacienteBase(BaseModel):
         extra="ignore"
     )
 
-class MetadataEvento(BaseModel):
-    accion: str
-    usuario: Optional[str] = None
-    registro: Optional[str] = None
-    expediente_duplicado: Optional[bool] = None
-    origen_mysql_id: Optional[int] = None
+
 
 # ===================================================================
 # Para crear paciente
@@ -168,7 +169,7 @@ class PacienteUpdate(BaseModel):
     referencias: Optional[List[Referencia]] = None
     datos_extra: Optional[Dict[str, Any]] = None
     estado: Optional[str] = None
-    metadatos: Optional[List[MetadataEvento]] = None
+    # metadatos: Optional[List[MetadataEvento]] = None
 
 
 # ===================================================================
@@ -179,7 +180,8 @@ class PacienteOut(PacienteBase):
     nombre_completo: str = Field(..., description="Nombre completo generado automáticamente")
     creado_en: Optional[date] = None
     actualizado_en: Optional[date] = None
-
+    metadatos: Optional[List[MetadataEvento]] = None
+   
     @model_validator(mode="before")
     @classmethod
     def generar_nombre_completo(cls, data):
@@ -210,6 +212,7 @@ class PacienteOut(PacienteBase):
 class PacienteListResponse(BaseModel):
     total: int
     pacientes: List[PacienteOut]
+    
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -8,6 +8,8 @@ from typing import Optional, Dict, Any
 from datetime import date, time
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.paciente import PacienteOut
+
 
 
 
@@ -112,8 +114,7 @@ class ConsultaUpdate(BaseModel):
 # ===================================================================
 class ConsultaOut(ConsultaBase):
     id: int = Field(..., description="ID único de la consulta")
-    creado_en: Optional[date] = None
-    actualizado_en: Optional[date] = None
+    paciente: Optional[PacienteOut]
 
     model_config = ConfigDict(from_attributes=True)
 

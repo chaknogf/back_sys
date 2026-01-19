@@ -4,7 +4,7 @@ Router de consultas médicas - Búsqueda avanzada, creación inteligente y CRUD 
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func, text
+from sqlalchemy import desc, func, text, or_
 from typing import Optional, List
 from datetime import date
 
@@ -21,29 +21,83 @@ from sqlalchemy.orm import joinedload
 router = APIRouter(prefix="/consultas", tags=["Consultas Médicas"])
 
 
-# =============================================================================
-# BÚSQUEDA AVANZADA EN VISTA MATERIALIZADA (ULTRARRÁPIDA)
-# =============================================================================
-
-
 @router.get("/", response_model=List[ConsultaOut])
 def buscar_consultas(
     paciente_id: Optional[int] = None,
-    cui: Optional[str] = None,
+    expediente: Optional[str] = None,
+    cui: Optional[int] = None,
+    primer_nombre: Optional[str] = None,
+    segundo_nombre: Optional[str] = None,
+    primer_apellido: Optional[str] = None,
+    segundo_apellido: Optional[str] = None,
+    tipo_consulta: Optional[int] = None,
+    especialidad: Optional[str] = None,
     fecha: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    query = db.query(ConsultaModel).join(PacienteModel)
+    query = (
+        db.query(ConsultaModel)
+        .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
+    )
 
+    # ======================
+    # Filtros de CONSULTA
+    # ======================
     if paciente_id:
         query = query.filter(ConsultaModel.paciente_id == paciente_id)
-    if cui:
-        query = query.filter(PacienteModel.cui == cui)
+
+    if tipo_consulta:
+        query = query.filter(ConsultaModel.tipo_consulta == tipo_consulta)
+
+    if especialidad:
+        query = query.filter(
+            ConsultaModel.especialidad.ilike(f"%{especialidad}%")
+        )
+
     if fecha:
         query = query.filter(ConsultaModel.fecha_consulta == fecha)
 
-    resultados = query.all()
+    # ======================
+    # Filtros de PACIENTE
+    # ======================
+    if expediente:
+        query = query.filter(
+            or_(
+                ConsultaModel.expediente == expediente,
+                PacienteModel.expediente == expediente
+            )
+        )
+
+    if cui:
+        query = query.filter(PacienteModel.cui == cui)
+
+    if primer_nombre:
+        query = query.filter(
+            PacienteModel.nombre["primer_nombre"].astext.ilike(f"%{primer_nombre}%")
+        )
+
+    if segundo_nombre:
+        query = query.filter(
+            PacienteModel.nombre["segundo_nombre"].astext.ilike(f"%{segundo_nombre}%")
+        )
+
+    if primer_apellido:
+        query = query.filter(
+            PacienteModel.nombre["primer_apellido"].astext.ilike(f"%{primer_apellido}%")
+        )
+
+    if segundo_apellido:
+        query = query.filter(
+            PacienteModel.nombre["segundo_apellido"].astext.ilike(f"%{segundo_apellido}%")
+        )
+
+    resultados = (
+        query
+        .order_by(ConsultaModel.fecha_consulta.desc())
+        .all()
+    )
+
     return resultados
 # =============================================================================
 # OBTENER UNA CONSULTA POR ID
@@ -54,7 +108,7 @@ def obtener_consulta(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    consulta = db.query(ConsultaModel).filter(ConsultaModel.id == consulta_id).first()
+    consulta = db.get(ConsultaModel, consulta_id)
     if not consulta:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
     return consulta
@@ -69,7 +123,6 @@ def crear_consulta(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    # Verificar paciente
     paciente = db.get(PacienteModel, consulta_in.paciente_id)
     if not paciente:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
@@ -78,14 +131,13 @@ def crear_consulta(
     if not paciente.expediente:
         paciente.expediente = generar_expediente(db)
         db.add(paciente)
-        db.flush()
 
-    # Generar número de emergencia si aplica
+    # Documento
     documento = consulta_in.documento
     if consulta_in.tipo_consulta == 3:  # Emergencia
         documento = generar_emergencia(db)
 
-    # Calcular orden
+    # Orden
     ultimo_orden = db.query(func.coalesce(func.max(ConsultaModel.orden), 0)).filter(
         ConsultaModel.fecha_consulta == consulta_in.fecha_consulta,
         ConsultaModel.tipo_consulta == consulta_in.tipo_consulta,
@@ -95,7 +147,7 @@ def crear_consulta(
     nueva_consulta = ConsultaModel(
         **consulta_in.model_dump(exclude={"documento"}),
         expediente=paciente.expediente,
-        documento=documento or consulta_in.documento,
+        documento=documento,
         orden=ultimo_orden + 1
     )
 

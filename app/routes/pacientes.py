@@ -7,12 +7,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, cast, String, text, or_
 from sqlalchemy.exc import IntegrityError
 from typing import Optional, List
-from datetime import date
-
+from datetime import date, datetime, timezone
 from app.database.db import get_db
 from app.models.pacientes import PacienteModel
 from app.schemas.paciente import (
-    PacienteCreate, PacienteOut, PacienteUpdate, PacienteSimple, PacienteListResponse
+    
+    PacienteCreate, PacienteOut, PacienteUpdate, PacienteSimple, PacienteListResponse, MetadataEvento
 ) 
 from app.utils.expediente import generar_expediente
 from app.database.security import get_current_user
@@ -21,6 +21,30 @@ from app.models.user import UserModel
 
 router = APIRouter(prefix="/pacientes", tags=["Pacientes"])
 
+def agregar_evento(paciente, usuario, accion, expediente_duplicado=None):
+    evento = {
+        "usuario": usuario or "sistema",
+        "registro": datetime.now(timezone.utc).isoformat(),
+        "accion": accion,
+        "expediente_duplicado": expediente_duplicado
+    }
+
+    if paciente.metadatos is None:
+        paciente.metadatos = []
+
+    paciente.metadatos.append(evento)
+    
+def normalizar_metadatos(paciente):
+    if not paciente.metadatos:
+        return
+
+    for m in paciente.metadatos:
+        if not m.get("accion"):
+            m["accion"] = "ACTUALIZADO"
+        if not m.get("usuario"):
+            m["usuario"] = "sistema"
+        if m.get("registro") and not isinstance(m["registro"], str):
+            m["registro"] = m["registro"].isoformat()
 
 # =============================================================================
 # BÚSQUEDA AVANZADA - CORREGIDA
@@ -46,7 +70,9 @@ def buscar_pacientes(
     
     # Empezar con query base
     query = db.query(PacienteModel).order_by(desc(PacienteModel.id))
-
+    
+    # Filtro por defecto: excluir inactivos
+    query = query.filter(PacienteModel.estado != "I")
     # Solo aplicar filtros si se proporcionan
     if q:
         q_clean = q.strip().upper()
@@ -108,6 +134,14 @@ def buscar_pacientes(
     # Aplicar paginación
     pacientes = query.offset(skip).limit(limit).all()
 
+    for p in pacientes:
+        if p.metadatos:
+            for m in p.metadatos:
+                if not m.get("accion"):
+                    m["accion"] = "ACTUALIZADO"
+                if not m.get("usuario"):
+                    m["usuario"] = "sistema"
+
     return PacienteListResponse(
         total=total,
         pacientes=pacientes
@@ -137,6 +171,9 @@ def autocomplete(
             PacienteModel.nombre_completo.ilike(f"%{q_clean}%")
         )
     ).limit(15).all()
+    
+    # Filtro por defecto: excluir inactivos
+    query = query.filter(PacienteModel.estado != "I")
 
     return [
         PacienteSimple(
@@ -148,6 +185,34 @@ def autocomplete(
         )
         for p in resultados
     ]
+
+# =============================================================================
+# OBTENER PACIENTE POR ID
+# =============================================================================
+@router.get("/{paciente_id}", response_model=PacienteOut)
+def obtener_paciente(
+    paciente_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    paciente = db.get(PacienteModel, paciente_id)
+    if not paciente:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Paciente con ID {paciente_id} no encontrado"
+        )
+
+    # 🔧 NORMALIZACIÓN DEFENSIVA
+    if paciente.metadatos:
+        for m in paciente.metadatos:
+            if not m.get("accion"):
+                m["accion"] = "ACTUALIZADO"
+            if not m.get("usuario"):
+                m["usuario"] = "sistema"
+            if isinstance(m.get("registro"), str) is False:
+                m["registro"] = str(m["registro"])
+
+    return paciente
 
 
 # =============================================================================
@@ -164,67 +229,54 @@ def crear_paciente(
     Crear nuevo paciente
     Si auto_expediente=True y no se proporciona expediente, se genera automáticamente
     """
+
     data = paciente_in.model_dump()
 
-    # Limpiar campos vacíos (convertir "" a None)
-    for field in ["cui", "expediente", "pasaporte"]:
-        if data.get(field) in ["", " ", None]:
+    # Limpiar campos vacíos
+    for field in ("cui", "expediente", "pasaporte"):
+        if not data.get(field) or str(data.get(field)).strip() == "":
             data[field] = None
 
-    # Generar expediente si se solicita y no existe
+    # Generar expediente si se solicita
     if auto_expediente and not data.get("expediente"):
         data["expediente"] = generar_expediente(db)
 
     try:
         nuevo = PacienteModel(**data)
+
+        # 🔹 evento CREADO (antes del commit, pero ya existe la entidad)
+        agregar_evento(
+            nuevo,
+            usuario=current_user.username,
+            accion="CREADO"
+        )
+
         db.add(nuevo)
         db.commit()
         db.refresh(nuevo)
         return nuevo
+
     except IntegrityError as e:
         db.rollback()
         error_msg = str(e.orig).lower()
-        
-        # Mensajes de error más específicos
+
         if "cui" in error_msg:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=f"Ya existe un paciente con el CUI: {data.get('cui')}"
             )
         elif "expediente" in error_msg:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=f"Ya existe un paciente con el expediente: {data.get('expediente')}"
             )
         else:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail="Datos duplicados o inválidos"
             )
 
 
-# =============================================================================
-# OBTENER PACIENTE POR ID
-# =============================================================================
-@router.get("/{paciente_id}", response_model=PacienteOut)
-def obtener_paciente(
-    paciente_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
-):
-    """Obtener un paciente específico por ID"""
-    paciente = db.get(PacienteModel, paciente_id)
-    if not paciente:
-        raise HTTPException(
-            status_code=404, 
-            detail=f"Paciente con ID {paciente_id} no encontrado"
-        )
-    return paciente
-
-
-# =============================================================================
-# ACTUALIZAR PACIENTE
-# =============================================================================
 # =============================================================================
 # ACTUALIZAR PACIENTE (OPTIMIZADO)
 # =============================================================================
@@ -241,23 +293,6 @@ def actualizar_paciente(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    """
-    Actualizar datos de un paciente existente con control de expediente.
-    
-    **Acciones de expediente:**
-    - `mantener` (default): No modifica el expediente actual
-    - `generar`: Genera expediente solo si el paciente no tiene uno
-    - `sobrescribir`: Genera un nuevo expediente (sobrescribe el existente)
-    
-    **Ejemplos:**
-    ```
-    PATCH /pacientes/123
-    PATCH /pacientes/123?accion_expediente=generar
-    PATCH /pacientes/123?accion_expediente=sobrescribir
-    ```
-    """
-    
-    # Obtener paciente
     paciente = db.get(PacienteModel, paciente_id)
     if not paciente:
         raise HTTPException(
@@ -266,38 +301,48 @@ def actualizar_paciente(
         )
 
     try:
-        # Obtener solo los datos que fueron enviados (exclude_unset=True)
         datos_update = paciente_update.model_dump(exclude_unset=True)
+
+        expediente_anterior = paciente.expediente
+        expediente_generado = False
 
         # 🔧 MANEJO DE EXPEDIENTE
         if accion_expediente == "generar":
-            # Generar SOLO si no tiene expediente
             if not paciente.expediente or paciente.expediente.strip() == "":
                 datos_update["expediente"] = generar_expediente(db)
-            # Si ya tiene, remover del update para mantenerlo
-            elif "expediente" in datos_update:
-                del datos_update["expediente"]
+                expediente_generado = True
+            else:
+                datos_update.pop("expediente", None)
 
         elif accion_expediente == "sobrescribir":
-            # Generar SIEMPRE un nuevo expediente
             datos_update["expediente"] = generar_expediente(db)
+            expediente_generado = True
 
-        # elif accion_expediente == "mantener":
-        #   No hacer nada - comportamiento por defecto
-
-        # 🔄 Aplicar cambios al paciente
+        datos_update.pop("metadatos", None)
+        
+        # 🔄 Aplicar cambios
         for key, value in datos_update.items():
             setattr(paciente, key, value)
 
-        # 💾 Guardar cambios
+        # 🧾 Evento de auditoría
+        agregar_evento(
+            paciente,
+            usuario=current_user.username,
+            accion="ACTUALIZADO",
+            expediente_duplicado=(
+                expediente_generado and expediente_anterior is not None
+            )
+        )
+
         db.commit()
         db.refresh(paciente)
-        
+        # 🧼 LIMPIEZA FINAL ANTES DE RESPONDER
+        normalizar_metadatos(paciente)
         return paciente
 
     except IntegrityError as e:
         db.rollback()
-        error_msg = str(e.orig).lower() if hasattr(e, 'orig') else str(e).lower()
+        error_msg = str(e.orig).lower() if hasattr(e, "orig") else str(e).lower()
 
         if "cui" in error_msg:
             raise HTTPException(
@@ -314,12 +359,6 @@ def actualizar_paciente(
                 status_code=400,
                 detail="Datos duplicados o inválidos"
             )
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail="Error al actualizar paciente"
-        )
 # =============================================================================
 # ELIMINAR PACIENTE
 # =============================================================================

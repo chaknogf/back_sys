@@ -1,6 +1,7 @@
 # app/models/pacientes.py
 from sqlalchemy import Column, Integer, String, Date, Text, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import relationship, validates
 from app.database.db import Base
 
@@ -21,7 +22,7 @@ class PacienteModel(Base):
     referencias = Column(JSONB, nullable=True)
     datos_extra = Column(JSONB, nullable=True)
     estado = Column(String(2), server_default="A", nullable=False)
-    metadatos = Column(JSONB, nullable=True)
+    metadatos = Column(MutableList.as_mutable(JSONB), default=list)
     nombre_completo = Column(Text, nullable=True)
 
     # Índices condicionales (solo únicos si no son nulos)

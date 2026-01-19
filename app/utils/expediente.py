@@ -1,3 +1,5 @@
+# app/utils/expediente.py
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, SmallInteger, DateTime
 from sqlalchemy.orm import Session
@@ -21,7 +23,8 @@ class EmergenciaControl(Base):
 
 
 def generar_expediente(db: Session) -> str:
-    anio_actual = int(datetime.now().strftime("%y"))  # '25' para 2025
+    anio_actual = int(datetime.now().strftime("%y"))  # 25 para 2025
+
     control = db.query(ExpedienteControl).filter_by(anio=anio_actual).first()
 
     if control:
@@ -30,14 +33,13 @@ def generar_expediente(db: Session) -> str:
         control = ExpedienteControl(anio=anio_actual, ultimo_correlativo=1)
         db.add(control)
 
-    db.commit()
-
-    correlativo_str = str(control.ultimo_correlativo).zfill(6)  # 000001
-    expediente_id = f"{anio_actual}-{correlativo_str}"          # 25-000001
-    return expediente_id
+    # ❌ NO commit aquí
+    correlativo = control.ultimo_correlativo  # sin ceros
+    return f"{anio_actual}A-{correlativo}"     # 25A-11
 
 def generar_emergencia(db: Session) -> str:
-    anio_actual = int(datetime.now().strftime("%y"))  # '25' para 2025
+    anio_actual = int(datetime.now().strftime("%y"))  # 25 para 2025
+
     control = db.query(EmergenciaControl).filter_by(anio=anio_actual).first()
 
     if control:
@@ -46,8 +48,6 @@ def generar_emergencia(db: Session) -> str:
         control = EmergenciaControl(anio=anio_actual, ultimo_correlativo=1)
         db.add(control)
 
-    db.commit()
-
-    correlativo_str = str(control.ultimo_correlativo).zfill(6)  # 000001
-    expediente_id = f"{correlativo_str}-E{anio_actual}"          # 000001-E25
-    return expediente_id
+    # ❌ NO commit aquí
+    correlativo = control.ultimo_correlativo
+    return f"{correlativo}-E{anio_actual}"  # 16-E25

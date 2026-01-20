@@ -20,58 +20,16 @@ class ConsultaModel(Base):
     indicadores = Column(JSONB, nullable=True)
     ciclo = Column(JSONB, nullable=True)
     orden = Column(Integer, nullable=True)
-    #creado_en = Column(TIMESTAMP(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False)
-    #actualizado_en = Column(TIMESTAMP(timezone=True), server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"), nullable=False)
-
+    
     paciente = relationship("PacienteModel", back_populates="consultas")
-    eventos = relationship("EventoConsultaModel", back_populates="consulta", cascade="all, delete-orphan", passive_deletes=True)
+    # eventos = relationship("EventoConsultaModel", back_populates="consulta", cascade="all, delete-orphan", passive_deletes=True)
 
     __table_args__ = (
-        # Los índices más importantes para el sistema
-        Index("idx_consulta_paciente_fecha", "paciente_id", "fecha_consulta"),
-        Index("idx_consulta_fecha_desc", desc("fecha_consulta")),        # ← CORREGIDO
-        Index("idx_consulta_tipo", "tipo_consulta"),
-        Index("idx_consulta_servicio", "servicio"),
-        Index("idx_consulta_documento", "documento"),
+        # Índice compuesto para filtros frecuentes y ordenamiento
+        Index("idx_consulta_paciente_tipo_fecha", "paciente_id", "tipo_consulta", "fecha_consulta"),
+        Index("idx_consulta_fecha_desc", text("fecha_consulta DESC")),  # Para orden descendente
+        Index("idx_consulta_tipo_especialidad", "tipo_consulta", "especialidad"),
+        Index("idx_consulta_servicio_documento", "servicio", "documento"),
     )
 
 
-# =============================================================================
-# VISTA MATERIALIZADA (solo lectura) - NO se usa para INSERT/UPDATE/DELETE
-# =============================================================================
-class VistaConsultasModel(Base):
-    """
-    Representa una vista materializada en PostgreSQL (vista_consultas).
-    Solo lectura. Ideal para reportes y búsquedas rápidas.
-    """
-    __tablename__ = "vista_consultas"
-    __table_args__ = {"schema": "public"}  # Ajusta si tu vista está en otro schema
-
-    # Campos de la vista (exactamente como están en PostgreSQL)
-    id_paciente = Column(Integer, primary_key=True)
-    otro_id = Column(JSONB, nullable=True)
-    expediente = Column(String)
-    cui = Column(BigInteger, nullable=True)
-    nombre = Column(JSONB, nullable=True)
-    primer_nombre = Column(String)
-    segundo_nombre = Column(String)
-    otro_nombre = Column(String)
-    primer_apellido = Column(String)
-    segundo_apellido = Column(String)
-    apellido_casada = Column(String)
-    sexo = Column(String)
-    fecha_nacimiento = Column(Date)
-    estado = Column(String)
-
-    id_consulta = Column(Integer)
-    tipo_consulta = Column(Integer)
-    especialidad = Column(String)
-    servicio = Column(String)
-    documento = Column(String)
-    fecha_consulta = Column(Date)
-    hora_consulta = Column(Time)
-    ciclo = Column(JSONB, nullable=True)
-    orden = Column(Integer, nullable=True)
-
-    # Esta clase NO tiene relaciones ni métodos de escritura
-    # Solo se usa para SELECT rápidas

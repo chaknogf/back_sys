@@ -6,7 +6,7 @@ CREATE TABLE consultas (
     tipo_consulta INT NOT NULL,
     especialidad VARCHAR(20) NOT NULL,
     servicio VARCHAR(20) NOT NULL,
-    documento VARCHAR(20) NOT NULL,
+    documento VARCHAR(20),
     fecha_consulta DATE NOT NULL,
     hora_consulta TIME NOT NULL,
     indicadores JSONB,

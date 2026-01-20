@@ -128,7 +128,7 @@ class PacienteBase(BaseModel):
     expediente: Optional[str] = Field(None, max_length=20)
     pasaporte: Optional[str] = Field(None, max_length=20)
 
-    nombre: Nombre
+    nombre: Nombre 
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
 
@@ -191,12 +191,12 @@ class PacienteUpdate(BaseModel):
 # ===================================================================
 # Respuesta completa al frontend
 # ===================================================================
-class PacienteOut(PacienteBase):
+class PacienteOutConsulta(PacienteBase):
     id: int = Field(..., description="ID único en la base de datos")
     nombre_completo: str = Field(..., description="Nombre completo generado automáticamente")
     creado_en: Optional[date] = None
     actualizado_en: Optional[date] = None
-    metadatos: Optional[List[MetadataEvento]] = None
+   
    
     @model_validator(mode="before")
     @classmethod
@@ -218,6 +218,12 @@ class PacienteOut(PacienteBase):
                 else:
                     data["nombre_completo"] = ""
         return data
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PacienteOut(PacienteOutConsulta):
+    metadatos: Optional[List[MetadataEvento]] = None
+   
 
     model_config = ConfigDict(from_attributes=True)
 

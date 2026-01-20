@@ -107,6 +107,38 @@ class CicloClinico(BaseModel):
 
     model_config = ConfigDict(extra="allow", from_attributes=True)
 
+class CicloUpdate(BaseModel):
+    estado: EstadoCiclo = "actualizado"
+    especialidad: Optional[str] = None
+    servicio: Optional[str] = None
+    detalle_clinicos: Optional[Dict[str, Any]] = None
+    signos_vitales: Optional[Dict[str, Any]] = None
+    antecedentes: Optional[Dict[str, Any]] = None
+    ordenes: Optional[Dict[str, Any]] = None
+    estudios: Optional[Dict[str, Any]] = None
+    comentario: Optional[Union[str, Dict[str, Any]]] = None  
+    impresion_clinica: Optional[Dict[str, Any]] = None
+    tratamiento: Optional[Dict[str, Any]] = None
+    examen_fisico: Optional[Dict[str, Any]] = None
+    nota_enfermeria: Optional[Dict[str, Any]] = None
+    contraindicado: Optional[str] = None
+    presa_quirurgica: Optional[Dict[str, Any]] = None
+    egreso: Optional[Dict[str, Any]] = None
+    @field_validator('estado', mode='before')
+    @classmethod
+    def normalizar_estado(cls, v):
+        """Normaliza estados a minúsculas para compatibilidad con datos legacy"""
+        if isinstance(v, str):
+            return v.lower()
+        return v
+    @field_validator('comentario', mode='before')
+    @classmethod
+    def normalizar_comentario(cls, v):
+        """Convierte dict vacío a None"""
+        if isinstance(v, dict) and not v:
+            return None
+        return v
+    model_config = ConfigDict(extra="allow", from_attributes=True)
 
 # ===================================================================
 # Schema base (común)
@@ -158,7 +190,7 @@ class ConsultaUpdate(BaseModel):
     fecha_consulta: Optional[date] = None
     hora_consulta: Optional[time] = None
     indicadores: Optional[Indicador] = None
-    ciclo: Optional[CicloClinico] = None  
+    ciclo: Optional[CicloUpdate] = None  
     orden: Optional[int] = None
 
     model_config = ConfigDict(extra="ignore")

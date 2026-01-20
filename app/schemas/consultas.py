@@ -8,7 +8,7 @@ from typing import List, Literal, Optional, Dict, Any, Union
 from datetime import date, time
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.schemas.paciente import PacienteOut
+from app.schemas.paciente import PacienteOutConsulta
 
 
 # ===================================================================
@@ -198,8 +198,7 @@ class ConsultaUpdate(BaseModel):
 
 class ConsultaOut(ConsultaBase):
     id: int = Field(..., description="ID único de la consulta")
-    paciente: Optional[PacienteOut] = None
-    ciclo: Optional[List[CicloClinico]] = None
+    paciente: Optional[PacienteOutConsulta] = None
 
     @field_validator('ciclo', mode='before')
     @classmethod
@@ -231,20 +230,19 @@ class ConsultaOut(ConsultaBase):
 
 class RegistroConsultaOut(BaseModel):
     id: int
-    expediente: str
+    expediente: Optional[str] = None
     paciente_id: int
     tipo_consulta: int
     especialidad: str
     servicio: str
-    documento: str
+    documento: Optional[str] = None
     fecha_consulta: date
     hora_consulta: time
     indicadores: Indicador
-    ciclo: List[CicloClinico]  
+    ciclo: List[CicloClinico]
     orden: int
 
     model_config = ConfigDict(from_attributes=True)
-
 
 # ===================================================================
 # Para listas con conteo (paginación)

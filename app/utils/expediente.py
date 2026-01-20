@@ -25,29 +25,47 @@ class EmergenciaControl(Base):
 def generar_expediente(db: Session) -> str:
     anio_actual = int(datetime.now().strftime("%y"))  # 25 para 2025
 
-    control = db.query(ExpedienteControl).filter_by(anio=anio_actual).first()
+    control = (
+        db.query(ExpedienteControl)
+        .filter(ExpedienteControl.anio == anio_actual)
+        .with_for_update()
+        .first()
+    )
 
-    if control:
-        control.ultimo_correlativo += 1
-    else:
-        control = ExpedienteControl(anio=anio_actual, ultimo_correlativo=1)
+    if not control:
+        # Año nuevo o tabla vacía → iniciar en 0
+        control = ExpedienteControl(
+            anio=anio_actual,
+            ultimo_correlativo=0
+        )
         db.add(control)
+        db.flush()  # asegura persistencia sin commit
 
-    # ❌ NO commit aquí
-    correlativo = control.ultimo_correlativo  # sin ceros
-    return f"{anio_actual}A-{correlativo}"     # 25A-11
+    # Incremento SIEMPRE después
+    control.ultimo_correlativo += 1
+    correlativo = control.ultimo_correlativo
+
+    return f"{anio_actual}A-{correlativo}"
 
 def generar_emergencia(db: Session) -> str:
     anio_actual = int(datetime.now().strftime("%y"))  # 25 para 2025
 
-    control = db.query(EmergenciaControl).filter_by(anio=anio_actual).first()
+    control = (
+        db.query(EmergenciaControl)
+        .filter(EmergenciaControl.anio == anio_actual)
+        .with_for_update()
+        .first()
+    )
 
-    if control:
-        control.ultimo_correlativo += 1
-    else:
-        control = EmergenciaControl(anio=anio_actual, ultimo_correlativo=1)
+    if not control:
+        control = EmergenciaControl(
+            anio=anio_actual,
+            ultimo_correlativo=0
+        )
         db.add(control)
+        db.flush()
 
-    # ❌ NO commit aquí
+    control.ultimo_correlativo += 1
     correlativo = control.ultimo_correlativo
-    return f"{correlativo}-E{anio_actual}"  # 16-E25
+
+    return f"{correlativo}-E{anio_actual}"

@@ -4,7 +4,7 @@ Router de consultas médicas - Búsqueda avanzada, creación inteligente y CRUD 
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func, text, or_
+from sqlalchemy import String, cast, desc, func, text, or_
 from typing import Optional, List
 from datetime import datetime, date, time
 
@@ -43,22 +43,24 @@ def buscar_consultas(
     # ======================
     # Filtros de CONSULTA
     # ======================
-    if paciente_id:
+    if paciente_id is not None:
         query = query.filter(ConsultaModel.paciente_id == paciente_id)
 
-    if tipo_consulta:
+    if tipo_consulta is not None:
         query = query.filter(ConsultaModel.tipo_consulta == tipo_consulta)
 
     if especialidad:
-        query = query.filter(
-            ConsultaModel.especialidad.ilike(f"%{especialidad}%")
-        )
+        query = query.filter(ConsultaModel.especialidad == especialidad)
 
     if fecha:
-        query = query.filter(ConsultaModel.fecha_consulta == fecha)
+        inicio = datetime.combine(fecha, time.min)
+        fin = datetime.combine(fecha, time.max)
+        query = query.filter(
+            ConsultaModel.fecha_consulta.between(inicio, fin)
+        )
 
     # ======================
-    # Filtros de PACIENTE
+    # Filtros mixtos CONSULTA / PACIENTE
     # ======================
     if expediente:
         query = query.filter(
@@ -68,31 +70,39 @@ def buscar_consultas(
             )
         )
 
-    if cui:
+    # ======================
+    # Filtros de PACIENTE
+    # ======================
+    if cui is not None:
         query = query.filter(PacienteModel.cui == cui)
 
     if primer_nombre:
         query = query.filter(
-            PacienteModel.nombre["primer_nombre"].astext.ilike(f"%{primer_nombre}%")
+            cast(PacienteModel.nombre["primer_nombre"], String)
+            .ilike(f"%{primer_nombre}%")
         )
 
     if segundo_nombre:
         query = query.filter(
-            PacienteModel.nombre["segundo_nombre"].astext.ilike(f"%{segundo_nombre}%")
+            cast(PacienteModel.nombre["segundo_nombre"], String)
+            .ilike(f"%{segundo_nombre}%")
         )
 
     if primer_apellido:
         query = query.filter(
-            PacienteModel.nombre["primer_apellido"].astext.ilike(f"%{primer_apellido}%")
+            cast(PacienteModel.nombre["primer_apellido"], String)
+            .ilike(f"%{primer_apellido}%")
         )
 
     if segundo_apellido:
         query = query.filter(
-            PacienteModel.nombre["segundo_apellido"].astext.ilike(f"%{segundo_apellido}%")
+            cast(PacienteModel.nombre["segundo_apellido"], String)
+            .ilike(f"%{segundo_apellido}%")
         )
 
     resultados = (
         query
+        .distinct()
         .order_by(ConsultaModel.fecha_consulta.desc())
         .all()
     )
@@ -256,10 +266,14 @@ def registrar_consulta(
 ):
     """
     Registro rápido de consulta:
-    - El frontend envía solo paciente_id, tipo_consulta, especialidad, servicio y opcionalmente indicadores.
-    - Backend genera expediente, documento, fecha/hora, ciclo inicial y orden automáticamente.
+    - Tipos 1 y 2:
+        * Usa expediente del paciente si existe
+        * Si no existe, genera uno nuevo y lo asigna al paciente
+    - Tipo 3 (Emergencia):
+        * Genera documento de emergencia
+        * NO modifica expediente del paciente
     """
-    
+
     # ======================
     # 1. Verificar paciente
     # ======================
@@ -268,26 +282,33 @@ def registrar_consulta(
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
 
     # ======================
-    # 2. Obtener o generar expediente
+    # 2. Inicializar campos de consulta
     # ======================
-    expediente = paciente.expediente
-    if not expediente:
-        if datos.tipo_consulta in [1, 2]:
-            expediente = generar_expediente(db)
-        elif datos.tipo_consulta == 3:
-            expediente = generar_emergencia(db)
-        paciente.expediente = expediente
-        db.add(paciente)
+    expediente_consulta: str | None = None
+    documento_consulta: str | None = None
 
     # ======================
-    # 3. Documento según tipo
+    # 3. Tipos 1 y 2 → Consulta normal
     # ======================
-    documento = expediente
-    if datos.tipo_consulta == 3:  # Emergencia
-        documento = generar_emergencia(db)
+    if datos.tipo_consulta in (1, 2):
+        if paciente.expediente:
+            expediente_consulta = paciente.expediente
+        else:
+            expediente_consulta = generar_expediente(db)
+            paciente.expediente = expediente_consulta
+            db.add(paciente)
 
     # ======================
-    # 4. Inicializar indicadores completos
+    # 4. Tipo 3 → Emergencia
+    # ======================
+    elif datos.tipo_consulta == 3:
+        documento_consulta = generar_emergencia(db)
+
+    else:
+        raise HTTPException(status_code=400, detail="Tipo de consulta inválido")
+
+    # ======================
+    # 5. Indicadores (completos)
     # ======================
     indicadores_dict = datos.indicadores.model_dump() if datos.indicadores else {}
     indicadores_completos = {
@@ -301,10 +322,9 @@ def registrar_consulta(
         "ambulancia": indicadores_dict.get("ambulancia", False),
         "embarazo": indicadores_dict.get("embarazo", False),
     }
-    
 
     # ======================
-    # 5. Crear ciclo clínico inicial
+    # 6. Ciclo clínico inicial
     # ======================
     ciclo_inicial = CicloClinico(
         estado="admision",
@@ -313,10 +333,11 @@ def registrar_consulta(
         especialidad=datos.especialidad,
         servicio=datos.servicio
     )
-    ciclo_historial = [ciclo_inicial.model_dump(mode='json')]
+
+    ciclo_historial = [ciclo_inicial.model_dump(mode="json")]
 
     # ======================
-    # 6. Calcular orden en la cola
+    # 7. Calcular orden diario
     # ======================
     hoy = date.today()
     ultimo_orden = (
@@ -330,15 +351,15 @@ def registrar_consulta(
     ) or 0
 
     # ======================
-    # 7. Crear la consulta
+    # 8. Crear consulta
     # ======================
     nueva_consulta = ConsultaModel(
         paciente_id=datos.paciente_id,
-        expediente=expediente,
+        expediente=expediente_consulta,
+        documento=documento_consulta,
         tipo_consulta=datos.tipo_consulta,
         especialidad=datos.especialidad,
         servicio=datos.servicio,
-        documento=documento,
         fecha_consulta=hoy,
         hora_consulta=datetime.now().time(),
         indicadores=indicadores_completos,
@@ -348,6 +369,9 @@ def registrar_consulta(
 
     db.add(nueva_consulta)
 
+    # ======================
+    # 9. Commit transaccional
+    # ======================
     try:
         db.commit()
         db.refresh(nueva_consulta)
@@ -355,11 +379,11 @@ def registrar_consulta(
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail=f"Error al crear la consulta: {str(e)}"
+            detail=f"Error al registrar consulta: {str(e)}"
         )
 
     # ======================
-    # 8. Retornar respuesta estructurada
+    # 10. Respuesta
     # ======================
     return RegistroConsultaOut(
         id=nueva_consulta.id,
@@ -372,6 +396,6 @@ def registrar_consulta(
         fecha_consulta=nueva_consulta.fecha_consulta,
         hora_consulta=nueva_consulta.hora_consulta,
         indicadores=Indicador(**nueva_consulta.indicadores),
-        ciclo=[CicloClinico(**c) for c in nueva_consulta.ciclo],  # siempre lista
+        ciclo=[CicloClinico(**c) for c in nueva_consulta.ciclo],
         orden=nueva_consulta.orden
     )

@@ -4,13 +4,11 @@ Schemas para consultas médicas.
 Totalmente compatibles con FastAPI + Pydantic v2 + OpenAPI.
 """
 
-from typing import Optional, Dict, Any
+from typing import List, Literal, Optional, Dict, Any, Union
 from datetime import date, time
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.paciente import PacienteOut
-
-
 
 
 # ===================================================================
@@ -18,36 +16,71 @@ from app.schemas.paciente import PacienteOut
 # ===================================================================
 class Indicador(BaseModel):
     """Indicadores sociales y clínicos de la consulta"""
-    estudiante_publico: bool = Field(..., description="¿Es estudiante de institución pública?")
-    empleado_publico: bool = Field(..., description="¿Es empleado público?")
-    accidente_laboral: bool = Field(..., description="¿Accidente laboral?")
-    discapacidad: bool = Field(..., description="¿Tiene discapacidad?")
-    accidente_transito: bool = Field(..., description="¿Accidente de tránsito?")
-    arma_fuego: bool = Field(..., description="¿Herida por arma de fuego?")
-    arma_blanca: bool = Field(..., description="¿Herida por arma blanca?")
-    ambulancia: bool = Field(..., description="¿Llegó en ambulancia?")
-    embarazo: bool = Field(..., description="¿Paciente embarazada?")
+    estudiante_publico: Optional[bool] = None
+    empleado_publico: Optional[bool] = None
+    accidente_laboral: Optional[bool] = None
+    discapacidad: Optional[bool] = None
+    accidente_transito: Optional[bool] = None
+    arma_fuego: Optional[bool] = None
+    arma_blanca: Optional[bool] = None
+    ambulancia: Optional[bool] = None
+    embarazo: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ===================================================================
+# Estados del ciclo clínico
+# ===================================================================
+EstadoCiclo = Literal[
+    "iniciado",       # Estado inicial legacy
+    "pendiente",      # Estado inicial
+    "admision",       # Paciente admitido
+    "signos",         # Toma de signos vitales
+    "consulta",       # En consulta con el médico
+    "estudios",       # Realizando estudios/laboratorios
+    "tratamiento",    # Recibiendo tratamiento
+    "observacion",    # En observación
+    "evolucion",      # Seguimiento/evolución
+    "procedimiento",  # Realizando procedimiento
+    "recuperacion",   # En recuperación
+    "egreso",         # Alta médica
+    "referido",       # Referido a otra institución
+    "traslado",       # Trasladado a otro servicio
+    "prestamo",       # Expediente prestado
+    "archivo",        # Archivado
+    "recepcion",      # En recepción
+    "actualizado",    # Registro actualizado
+    "reprogramado",   # Consulta reprogramada
+    "descartado"      # Consulta descartada/cancelada
+]
 
 
 # ===================================================================
 # Ciclo clínico completo (estructura flexible pero tipada)
 # ===================================================================
 class CicloClinico(BaseModel):
-    """Estructura completa del ciclo de atención"""
-    estado: Optional[str] = None
-    registro: Optional[str] = None
-    usuario: Optional[str] = None
+    """
+    Representa UN registro individual del ciclo clínico.
+    Se acumula en una lista, no se sobrescribe.
+    """
+    # Campos obligatorios de auditoría (siempre se registran)
+    estado: EstadoCiclo = Field(
+        ..., 
+        description="Estado actual del ciclo clínico"
+    )
+    registro: str = Field(..., description="Timestamp ISO del registro")
+    usuario: str = Field(..., description="Usuario que realizó la acción")
+    
+    # Campos clínicos opcionales (se llenan según el flujo)
     especialidad: Optional[str] = None
     servicio: Optional[str] = None
     detalle_clinicos: Optional[Dict[str, Any]] = None
-    sistema: Optional[Dict[str, Any]] = None
     signos_vitales: Optional[Dict[str, Any]] = None
     antecedentes: Optional[Dict[str, Any]] = None
     ordenes: Optional[Dict[str, Any]] = None
     estudios: Optional[Dict[str, Any]] = None
-    comentario: Optional[Dict[str, Any]] = None
+    comentario: Optional[Union[str, Dict[str, Any]]] = None  # 👈 Acepta str O dict
     impresion_clinica: Optional[Dict[str, Any]] = None
     tratamiento: Optional[Dict[str, Any]] = None
     examen_fisico: Optional[Dict[str, Any]] = None
@@ -56,6 +89,22 @@ class CicloClinico(BaseModel):
     presa_quirurgica: Optional[Dict[str, Any]] = None
     egreso: Optional[Dict[str, Any]] = None
 
+    @field_validator('estado', mode='before')
+    @classmethod
+    def normalizar_estado(cls, v):
+        """Normaliza estados a minúsculas para compatibilidad con datos legacy"""
+        if isinstance(v, str):
+            return v.lower()
+        return v
+    
+    @field_validator('comentario', mode='before')
+    @classmethod
+    def normalizar_comentario(cls, v):
+        """Convierte dict vacío a None"""
+        if isinstance(v, dict) and not v:
+            return None
+        return v
+
     model_config = ConfigDict(extra="allow", from_attributes=True)
 
 
@@ -63,38 +112,44 @@ class CicloClinico(BaseModel):
 # Schema base (común)
 # ===================================================================
 class ConsultaBase(BaseModel):
-    expediente: Optional[str] = Field(None, max_length=20, description="Expediente del paciente")
-    paciente_id: int = Field(..., gt=0, description="ID del paciente en la tabla pacientes")
-    tipo_consulta: Optional[int] = Field(None, ge=1, description="Código del tipo de consulta")
+    expediente: Optional[str] = Field(None, max_length=20)
+    paciente_id: int = Field(..., gt=0)
+    tipo_consulta: Optional[int] = Field(None, ge=1)
     especialidad: Optional[str] = Field(None, max_length=50)
     servicio: Optional[str] = Field(None, max_length=50)
-    documento: Optional[str] = Field(None, max_length=20, description="DPI, pasaporte, etc.")
+    documento: Optional[str] = Field(None, max_length=20)
     fecha_consulta: Optional[date] = None
     hora_consulta: Optional[time] = None
     indicadores: Optional[Indicador] = None
-    ciclo: Optional[CicloClinico] = None
-    orden: Optional[int] = Field(None, ge=0, description="Orden en la cola de atención")
+    ciclo: Optional[List[CicloClinico]] = None  
+    orden: Optional[int] = Field(None, ge=0)
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# ===================================================================
-# Para crear una consulta
-# ===================================================================
-class ConsultaCreate(ConsultaBase):
-    """Usado al crear una nueva consulta"""
-    # paciente_id, tipo_consulta, fecha_consulta suelen ser obligatorios
-    paciente_id: int = Field(..., gt=0)
-    tipo_consulta: int = Field(..., ge=1)
-    fecha_consulta: date
-    hora_consulta: time
+class ConsultaCreate(BaseModel):
+    """
+    Schema para crear una consulta completa manualmente.
+    Usado en POST /consultas/ (endpoint completo, no el simplificado).
+    """
+    paciente_id: int = Field(..., gt=0, description="ID del paciente")
+    tipo_consulta: int = Field(..., ge=1, description="Tipo de consulta")
+    especialidad: str = Field(..., max_length=50)
+    servicio: str = Field(..., max_length=50)
+    documento: Optional[str] = Field(None, max_length=20, description="Se genera automáticamente si no se proporciona")
+    fecha_consulta: date = Field(..., description="Fecha de la consulta")
+    hora_consulta: time = Field(..., description="Hora de la consulta")
+    indicadores: Optional[Indicador] = None
+    ciclo: Optional[List[CicloClinico]] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
-# ===================================================================
-# Para actualizar (parcial) - PATCH
-# ===================================================================
 class ConsultaUpdate(BaseModel):
-    """Actualización parcial de consulta"""
+    """
+    Para actualizar una consulta.
+    El campo 'ciclo' aquí es UN SOLO objeto que se agregará al historial.
+    """
     expediente: Optional[str] = None
     tipo_consulta: Optional[int] = None
     especialidad: Optional[str] = None
@@ -103,18 +158,58 @@ class ConsultaUpdate(BaseModel):
     fecha_consulta: Optional[date] = None
     hora_consulta: Optional[time] = None
     indicadores: Optional[Indicador] = None
-    ciclo: Optional[CicloClinico] = None
+    ciclo: Optional[CicloClinico] = None  
     orden: Optional[int] = None
 
     model_config = ConfigDict(extra="ignore")
 
 
-# ===================================================================
-# Respuesta completa al frontend
-# ===================================================================
 class ConsultaOut(ConsultaBase):
     id: int = Field(..., description="ID único de la consulta")
-    paciente: Optional[PacienteOut]
+    paciente: Optional[PacienteOut] = None
+    ciclo: Optional[List[CicloClinico]] = None
+
+    @field_validator('ciclo', mode='before')
+    @classmethod
+    def convertir_ciclo_a_lista(cls, v):
+        """
+        Convierte ciclo de dict a lista para compatibilidad
+        con datos legacy.
+        """
+        if v is None:
+            return None
+        
+        # Si es un dict vacío, retornar lista vacía
+        if isinstance(v, dict) and not v:
+            return []
+        
+        # Si es un dict con datos, convertir a lista con un elemento
+        if isinstance(v, dict):
+            return [v]
+        
+        # Si ya es una lista, retornarla tal cual
+        if isinstance(v, list):
+            return v
+        
+        # Caso inesperado
+        return []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RegistroConsultaOut(BaseModel):
+    id: int
+    expediente: str
+    paciente_id: int
+    tipo_consulta: int
+    especialidad: str
+    servicio: str
+    documento: str
+    fecha_consulta: date
+    hora_consulta: time
+    indicadores: Indicador
+    ciclo: List[CicloClinico]  
+    orden: int
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -124,178 +219,23 @@ class ConsultaOut(ConsultaBase):
 # ===================================================================
 class ConsultaListResponse(BaseModel):
     total: int
-    consultas: list[ConsultaOut]
-
-    model_config = ConfigDict(from_attributes=True)
-    
-    
-"""
-Schema para la vista `vista_consultas`.
-Compatible con FastAPI + Pydantic v2 + OpenAPI.
-Solo lectura, ideal para reportes y búsquedas rápidas.
-"""
-
-
-
-# ===================================================================
-# Vista de consultas con datos de paciente
-# ===================================================================
-class VistaConsultas(BaseModel):
-    id_paciente: int
-    otro_id: Optional[Any] = None
-    expediente: Optional[str] = None
-    cui: Optional[int] = None
-    nombre: Optional[Dict[str, Any]] = None
-    primer_nombre: Optional[str] = None
-    segundo_nombre: Optional[str] = None
-    otro_nombre: Optional[str] = None
-    primer_apellido: Optional[str] = None
-    segundo_apellido: Optional[str] = None
-    apellido_casada: Optional[str] = None
-    sexo: Optional[str] = None
-    fecha_nacimiento: Optional[date] = None
-    estado: Optional[str] = None
-
-    id_consulta: int
-    tipo_consulta: int
-    especialidad: Optional[str] = None
-    servicio: Optional[str] = None
-    documento: Optional[str] = None
-    fecha_consulta: Optional[date] = None
-    hora_consulta: Optional[time] = None
-    ciclo: Optional[Dict[str, Any]] = None
-    orden: Optional[int] = None
+    consultas: List[ConsultaOut]
 
     model_config = ConfigDict(from_attributes=True)
 
     
-# class Datos(BaseModel):
-#     clave: str
-#     valor: str
-#     registro: str
+# ===================================================================
+# Schema específico para registro de consultas
+# ===================================================================
+class RegistroConsultaCreate(BaseModel):
+    """
+    Schema para registro rápido de consulta.
+    El frontend solo envía lo mínimo necesario.
+    """
+    paciente_id: int = Field(..., gt=0, description="ID del paciente")
+    tipo_consulta: int = Field(..., ge=1, le=3, description="1=Primera vez, 2=Subsecuente, 3=Emergencia")
+    especialidad: str = Field(..., max_length=50)
+    servicio: str = Field(..., max_length=50)
+    indicadores: Optional[Indicador] = None
 
-# class Signos_vitales(BaseModel):
-#     pa: str
-#     fc: str
-#     fr: str
-#     sat02: str
-#     temp: str
-#     peso: str
-#     talla: str
-#     pt: str
-#     te: str
-#     pe: str
-#     gmt: str
-    
-# class Antecedentes(BaseModel):
-#     familiares: List[Dict[str, Any]]
-#     medicos: List[Dict[str, Any]]
-#     quirurgicos: List[Dict[str, Any]]
-#     alergicos: List[Dict[str, Any]]
-#     traumaticos: List[Dict[str, Any]]
-#     ginecoobstetricos: List[Dict[str, Any]]
-#     habitos: List[Dict[str, Any]]
-
-# class Nota(BaseModel):
-#     usuario: str
-#     nota: str
-#     registro: str
-    
-# class Enfermeria(BaseModel):
-#     usuario: str
-#     turno: str
-#     nota: str
-#     registro: str
-#     signos: Dict[str, Signos_vitales]  
-    
-
-  
-# class Silverman(BaseModel):
-#     retraso_esternal: int
-#     aleteo_nasal: int
-#     quejido_expiratorio: int
-#     movimiento_toracico: int
-#     retraccion_supraclavicular: int
-#     puntuacion_total: int
-    
-    
-# class Downe(BaseModel):
-#     frecuencia_respiratoria: int
-#     aleteo_nasal: int
-#     quejido_respiratorio: int
-#     retraccion_toracoabdominal: int
-#     cinoasis: int
-#     puntuacion_total: int
-
-# class Cuerpo(BaseModel):
-#     cabeza: str
-#     ojos: str
-#     oidos: str
-#     nariz: str
-#     boca: str
-#     cuello: str
-#     torax: str
-#     pulmones: str
-#     corazon: str
-#     abdomen: str
-#     genitales: str
-#     extremidades: str
-#     columna: str
-#     piel: str
-#     neurologico: str
-    
-# class Glasgow(BaseModel):
-#     apertura_ocular: int
-#     respuesta_verbal: int
-#     respuesta_motora: int
-#     puntuacion_total: int
-    
-# class Bishop(BaseModel):
-#     dilatacion: int
-#     borramiento: int
-#     posicion: int
-#     consistencia: int
-#     altura_presentacion: int
-#     puntuacion_total: int
-    
-# class Apgar(BaseModel):
-#     tono_muscular: int
-#     respuesta_refleja: int
-#     llanto: int
-#     respiracion: int
-#     coloracion: int
-#     puntuacion_total: int
-#     interpretacion: str
-    
-# class ExamenFisico(BaseModel):
-#     silverman: Silverman
-#     downe: Downe
-#     cuerpo: Cuerpo
-#     glasgow: Glasgow
-#     bishop: Bishop
-#     apgar: Apgar
-    
-# class Sistema(BaseModel):
-#     usuario: str
-#     accion: str
-#     fecha: str
-    
-# class Dx(BaseModel):
-#     codigo: str
-#     descripcion: str
-#     tipo: str
-    
-# class Egreso(BaseModel):
-#     registro: str
-#     usuario: str
-#     referencia: str
-#     diagnostico: List[Dx]
-#     condicion_egreso: str
-    
-# class Presa_quirurgica(BaseModel):
-#     programada: str
-#     reprogramada: str
-#     realizada: str
-#     detalle: str
-#     especialidad: str
-
+    model_config = ConfigDict(from_attributes=True)

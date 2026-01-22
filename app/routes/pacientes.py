@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, cast, String, text, or_
 from sqlalchemy.exc import IntegrityError
 from typing import Optional, List
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 from app.database.db import get_db
+from app.models.consultas import ConsultaModel
 from app.models.pacientes import PacienteModel
 from app.schemas.paciente import (
     
-    PacienteCreate, PacienteOut, PacienteUpdate, PacienteSimple, PacienteListResponse, MetadataEvento
+    PacienteCreate, PacienteOut, PacienteUpdate, PacienteSimple, PacienteListResponse, MetadataEvento, PacientesConConsultas
 ) 
 from app.utils.expediente import generar_expediente
 from app.database.security import get_current_user
@@ -428,3 +429,73 @@ def debug_count(db: Session = Depends(get_db)):
             for p in ejemplos
         ]
     }
+    
+# =============================================================================
+# LISTAR PACIENTES CON CONSULTAS
+# =============================================================================
+# @router.get("/c", response_model=List[PacientesConConsultas])
+# def listar_pacientes_con_consultas(
+#     paciente_id: Optional[int] = None,
+#     expediente: Optional[str] = None,
+#     cui: Optional[int] = None,
+#     primer_nombre: Optional[str] = None,
+#     primer_apellido: Optional[str] = None,
+#     tipo_consulta: Optional[int] = None,
+#     especialidad: Optional[str] = None,
+#     fecha: Optional[date] = None,
+#     db: Session = Depends(get_db),
+#     current_user: UserModel = Depends(get_current_user)
+# ):
+#     query = db.query(PacienteModel)
+
+#     # ======================
+#     # Filtros de PACIENTE
+#     # ======================
+#     if paciente_id:
+#         query = query.filter(PacienteModel.id == paciente_id)
+
+#     if expediente:
+#         query = query.filter(PacienteModel.expediente == expediente)
+
+#     if cui:
+#         query = query.filter(PacienteModel.cui == cui)
+
+#     if primer_nombre:
+#         query = query.filter(
+#             cast(PacienteModel.nombre["primer_nombre"], String)
+#             .ilike(f"%{primer_nombre}%")
+#         )
+
+#     if primer_apellido:
+#         query = query.filter(
+#             cast(PacienteModel.nombre["primer_apellido"], String)
+#             .ilike(f"%{primer_apellido}%")
+#         )
+
+#     # ======================
+#     # Filtros sobre CONSULTAS
+#     # ======================
+#     if any([tipo_consulta, especialidad, fecha]):
+#         query = query.join(PacienteModel.consultas)
+
+#         if tipo_consulta:
+#             query = query.filter(ConsultaModel.tipo_consulta == tipo_consulta)
+
+#         if especialidad:
+#             query = query.filter(ConsultaModel.especialidad == especialidad)
+
+#         if fecha:
+#             inicio = datetime.combine(fecha, time.min)
+#             fin = datetime.combine(fecha, time.max)
+#             query = query.filter(
+#                 ConsultaModel.fecha_consulta.between(inicio, fin)
+#             )
+
+#     pacientes = (
+#         query
+#         .distinct()
+#         .order_by(PacienteModel.id.desc())
+#         .all()
+#     )
+
+#     return pacientes

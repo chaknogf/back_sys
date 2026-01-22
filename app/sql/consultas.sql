@@ -11,6 +11,7 @@ CREATE TABLE consultas (
     hora_consulta TIME NOT NULL,
     indicadores JSONB,
     ciclo JSONB, -- aquí va el timeline
+    activo BOOLEAN DEFAULT TRUE,
     orden INT DEFAULT NULL,
     creado_en TIMESTAMP DEFAULT NOW(),
     actualizado_en TIMESTAMP DEFAULT NOW()

@@ -155,6 +155,7 @@ class ConsultaBase(BaseModel):
     indicadores: Optional[Indicador] = None
     ciclo: Optional[List[CicloClinico]] = None  
     orden: Optional[int] = Field(None, ge=0)
+    activo: bool = True
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -173,6 +174,7 @@ class ConsultaCreate(BaseModel):
     hora_consulta: time = Field(..., description="Hora de la consulta")
     indicadores: Optional[Indicador] = None
     ciclo: Optional[List[CicloClinico]] = None
+   
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -192,7 +194,7 @@ class ConsultaUpdate(BaseModel):
     indicadores: Optional[Indicador] = None
     ciclo: Optional[CicloUpdate] = None  
     orden: Optional[int] = None
-
+    activo: Optional[bool] = None
     model_config = ConfigDict(extra="ignore")
 
 
@@ -241,6 +243,7 @@ class RegistroConsultaOut(BaseModel):
     indicadores: Indicador
     ciclo: List[CicloClinico]
     orden: int
+    activo: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -279,5 +282,6 @@ class ConsultaBaseOut(BaseModel):
     fecha_consulta: Optional[date] = None
     hora_consulta: Optional[time] = None
     indicadores: Optional[Indicador] = None
+    activo: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)

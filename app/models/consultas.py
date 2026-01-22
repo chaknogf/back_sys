@@ -1,5 +1,5 @@
 # app/models/consultas.py → solo cambia __table_args__
-from sqlalchemy import BigInteger, Column, Integer, String, Date, Text, Time, ForeignKey, Index, text, desc
+from sqlalchemy import BigInteger, Boolean, Column, Integer, String, Date, Text, Time, ForeignKey, Index, text, desc
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import relationship
 from app.database.db import Base
@@ -20,6 +20,7 @@ class ConsultaModel(Base):
     indicadores = Column(JSONB, nullable=True)
     ciclo = Column(JSONB, nullable=True)
     orden = Column(Integer, nullable=True)
+    activo = Column(Boolean, default=True)
     
     paciente = relationship("PacienteModel", back_populates="consultas")
     # eventos = relationship("EventoConsultaModel", back_populates="consulta", cascade="all, delete-orphan", passive_deletes=True)

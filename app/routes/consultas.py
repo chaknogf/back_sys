@@ -108,6 +108,102 @@ def buscar_consultas(
     )
 
     return resultados
+
+# =============================================================================
+# OBTENER UNA CONSULTAS ACTIVAS
+# =============================================================================
+@router.get("/activas", response_model=List[ConsultaOut])
+def buscar_consultas_activas(
+    paciente_id: Optional[int] = None,
+    expediente: Optional[str] = None,
+    cui: Optional[int] = None,
+    primer_nombre: Optional[str] = None,
+    segundo_nombre: Optional[str] = None,
+    primer_apellido: Optional[str] = None,
+    segundo_apellido: Optional[str] = None,
+    tipo_consulta: Optional[int] = None,
+    especialidad: Optional[str] = None,
+    fecha: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    query = (
+        db.query(ConsultaModel)
+        .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
+    )
+
+    query = query.filter(ConsultaModel.activo.is_(True))
+
+   # ======================
+    # Filtros de CONSULTA
+    # ======================
+    if paciente_id is not None:
+        query = query.filter(ConsultaModel.paciente_id == paciente_id)
+
+    if tipo_consulta is not None:
+        query = query.filter(ConsultaModel.tipo_consulta == tipo_consulta)
+
+    if especialidad:
+        query = query.filter(ConsultaModel.especialidad == especialidad)
+
+    if fecha:
+        inicio = datetime.combine(fecha, time.min)
+        fin = datetime.combine(fecha, time.max)
+        query = query.filter(
+            ConsultaModel.fecha_consulta.between(inicio, fin)
+        )
+
+    # ======================
+    # Filtros mixtos CONSULTA / PACIENTE
+    # ======================
+    if expediente:
+        query = query.filter(
+            or_(
+                ConsultaModel.expediente == expediente,
+                PacienteModel.expediente == expediente
+            )
+        )
+
+    # ======================
+    # Filtros de PACIENTE
+    # ======================
+    if cui is not None:
+        query = query.filter(PacienteModel.cui == cui)
+
+    if primer_nombre:
+        query = query.filter(
+            cast(PacienteModel.nombre["primer_nombre"], String)
+            .ilike(f"%{primer_nombre}%")
+        )
+
+    if segundo_nombre:
+        query = query.filter(
+            cast(PacienteModel.nombre["segundo_nombre"], String)
+            .ilike(f"%{segundo_nombre}%")
+        )
+
+    if primer_apellido:
+        query = query.filter(
+            cast(PacienteModel.nombre["primer_apellido"], String)
+            .ilike(f"%{primer_apellido}%")
+        )
+
+    if segundo_apellido:
+        query = query.filter(
+            cast(PacienteModel.nombre["segundo_apellido"], String)
+            .ilike(f"%{segundo_apellido}%")
+        )
+
+    resultados = (
+        query
+        .distinct()
+        .order_by(ConsultaModel.fecha_consulta.desc())
+        .all()
+    )
+
+    return resultados
+
+
 # =============================================================================
 # OBTENER UNA CONSULTA POR ID
 # =============================================================================
@@ -121,7 +217,6 @@ def obtener_consulta(
     if not consulta:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
     return consulta
-
 
 # =============================================================================
 # ACTUALIZAR CONSULTA

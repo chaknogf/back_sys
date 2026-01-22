@@ -269,3 +269,15 @@ class RegistroConsultaCreate(BaseModel):
     indicadores: Optional[Indicador] = None
 
     model_config = ConfigDict(from_attributes=True)
+    
+class ConsultaBaseOut(BaseModel):
+    expediente: Optional[str] = Field(None, max_length=20)
+    tipo_consulta: Optional[int] = Field(None, ge=1)
+    especialidad: Optional[str] = Field(None, max_length=50)
+    servicio: Optional[str] = Field(None, max_length=50)
+    documento: Optional[str] = Field(None, max_length=20)
+    fecha_consulta: Optional[date] = None
+    hora_consulta: Optional[time] = None
+    indicadores: Optional[Indicador] = None
+
+    model_config = ConfigDict(from_attributes=True)

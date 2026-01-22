@@ -8,6 +8,8 @@ from typing import Optional, Dict, Any, List, Literal
 from datetime import date, datetime, time
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, field_serializer
 
+from app.schemas.common import ConsultaBaseOut
+
 
 # ===================================================================
 # Modelos anidados (reutilizables y limpios)
@@ -288,3 +290,15 @@ class PacienteCreateDerivado(BaseModel):
     model_config = {
         "extra": "forbid"
     }
+    
+class PacientesConConsultas(BaseModel):
+    cui: Optional[int] = None
+    expediente: Optional[str] = None
+    pasaporte: Optional[str] = None
+    nombre: Nombre
+    sexo: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    datos_extra: Optional[Dict[str, Any]] = None
+    consultas: List[ConsultaBaseOut]
+
+    model_config = ConfigDict(from_attributes=True)

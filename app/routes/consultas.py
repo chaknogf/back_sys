@@ -122,6 +122,7 @@ def obtener_consulta(
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
     return consulta
 
+
 # =============================================================================
 # ACTUALIZAR CONSULTA
 # =============================================================================

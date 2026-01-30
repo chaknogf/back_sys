@@ -53,6 +53,7 @@ def normalizar_metadatos(paciente):
 @router.get("/", response_model=PacienteListResponse)
 def buscar_pacientes(
     q: Optional[str] = Query(None, description="Búsqueda libre"),
+    id: Optional[int] = Query(None),
     cui: Optional[str] = Query(None),
     expediente: Optional[str] = Query(None),
     nombre: Optional[str] = Query(None),
@@ -116,7 +117,8 @@ def buscar_pacientes(
                 func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_apellido').ilike(f"%{nombre_clean}%")
             )
         )
-
+    if id:
+        query = query.filter(PacienteModel.id == id)
     if sexo:
         query = query.filter(PacienteModel.sexo == sexo.upper())
 
@@ -363,24 +365,105 @@ def actualizar_paciente(
 # =============================================================================
 # ELIMINAR PACIENTE
 # =============================================================================
-@router.delete("/{paciente_id}", status_code=204)
-def eliminar_paciente(
+# =============================================================================
+@router.patch("/{paciente_id}/desactivar", status_code=200)
+def desactivar_paciente(
     paciente_id: int,
-    fisico: bool = Query(False, description="True=eliminación física, False=lógica"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
     """
-    Eliminar un paciente
-    - fisico=False: Eliminación lógica (cambia estado a 'I')
-    - fisico=True: Eliminación física (borra el registro)
+    Desactivar un paciente (eliminación lógica)
+    Cambia el estado a 'I' (Inactivo) para mantener la información
+    """
+    paciente = db.get(PacienteModel, paciente_id)
+    if not paciente:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Paciente con ID {paciente_id} no encontrado"
+        )
+    
+    if paciente.estado == "I":
+        raise HTTPException(
+            status_code=400,
+            detail="El paciente ya está inactivo"
+        )
+
+    paciente.estado = "I"
+    db.commit()
+    db.refresh(paciente)
+    
+    return {
+        "message": "Paciente desactivado exitosamente",
+        "paciente_id": paciente_id,
+        "estado": paciente.estado
+    }
+
+
+@router.patch("/{paciente_id}/activar", status_code=200)
+def activar_paciente(
+    paciente_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Reactivar un paciente inactivo
+    Cambia el estado de 'I' a 'A' (Activo)
+    """
+    paciente = db.get(PacienteModel, paciente_id)
+    if not paciente:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Paciente con ID {paciente_id} no encontrado"
+        )
+    
+    if paciente.estado == "A":
+        raise HTTPException(
+            status_code=400,
+            detail="El paciente ya está activo"
+        )
+
+    paciente.estado = "A"
+    db.commit()
+    db.refresh(paciente)
+    
+    return {
+        "message": "Paciente activado exitosamente",
+        "paciente_id": paciente_id,
+        "estado": paciente.estado
+    }
+
+
+@router.delete("/{paciente_id}/eliminar-permanente", status_code=204)
+def eliminar_paciente_permanente(
+    paciente_id: int,
+    confirmacion: str = Query(..., description="Escribe 'CONFIRMAR' para eliminar permanentemente"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    ⚠️ ELIMINACIÓN FÍSICA PERMANENTE ⚠️
+    
+    ÚLTIMO RECURSO: Elimina el registro completamente de la base de datos.
+    Esta acción NO SE PUEDE DESHACER.
+    
+    - Solo administradores pueden usar este endpoint
+    - Requiere confirmación explícita escribiendo 'CONFIRMAR'
+    - Se pierde toda la información del paciente
     """
     
     # Solo admin puede eliminar físicamente
-    if fisico and current_user.role != "admin":
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=403, 
-            detail="Solo administradores pueden eliminar físicamente"
+            detail="Solo administradores pueden eliminar permanentemente"
+        )
+    
+    # Validar confirmación
+    if confirmacion != "CONFIRMAR":
+        raise HTTPException(
+            status_code=400,
+            detail="Debe escribir 'CONFIRMAR' para eliminar permanentemente"
         )
 
     paciente = db.get(PacienteModel, paciente_id)
@@ -390,14 +473,10 @@ def eliminar_paciente(
             detail=f"Paciente con ID {paciente_id} no encontrado"
         )
 
-    if fisico:
-        # Eliminación física
-        db.delete(paciente)
-    else:
-        # Eliminación lógica
-        paciente.estado = "I"
-
+    # Eliminación física
+    db.delete(paciente)
     db.commit()
+    
     return None
 
 
@@ -430,72 +509,4 @@ def debug_count(db: Session = Depends(get_db)):
         ]
     }
     
-# =============================================================================
-# LISTAR PACIENTES CON CONSULTAS
-# =============================================================================
-# @router.get("/c", response_model=List[PacientesConConsultas])
-# def listar_pacientes_con_consultas(
-#     paciente_id: Optional[int] = None,
-#     expediente: Optional[str] = None,
-#     cui: Optional[int] = None,
-#     primer_nombre: Optional[str] = None,
-#     primer_apellido: Optional[str] = None,
-#     tipo_consulta: Optional[int] = None,
-#     especialidad: Optional[str] = None,
-#     fecha: Optional[date] = None,
-#     db: Session = Depends(get_db),
-#     current_user: UserModel = Depends(get_current_user)
-# ):
-#     query = db.query(PacienteModel)
 
-#     # ======================
-#     # Filtros de PACIENTE
-#     # ======================
-#     if paciente_id:
-#         query = query.filter(PacienteModel.id == paciente_id)
-
-#     if expediente:
-#         query = query.filter(PacienteModel.expediente == expediente)
-
-#     if cui:
-#         query = query.filter(PacienteModel.cui == cui)
-
-#     if primer_nombre:
-#         query = query.filter(
-#             cast(PacienteModel.nombre["primer_nombre"], String)
-#             .ilike(f"%{primer_nombre}%")
-#         )
-
-#     if primer_apellido:
-#         query = query.filter(
-#             cast(PacienteModel.nombre["primer_apellido"], String)
-#             .ilike(f"%{primer_apellido}%")
-#         )
-
-#     # ======================
-#     # Filtros sobre CONSULTAS
-#     # ======================
-#     if any([tipo_consulta, especialidad, fecha]):
-#         query = query.join(PacienteModel.consultas)
-
-#         if tipo_consulta:
-#             query = query.filter(ConsultaModel.tipo_consulta == tipo_consulta)
-
-#         if especialidad:
-#             query = query.filter(ConsultaModel.especialidad == especialidad)
-
-#         if fecha:
-#             inicio = datetime.combine(fecha, time.min)
-#             fin = datetime.combine(fecha, time.max)
-#             query = query.filter(
-#                 ConsultaModel.fecha_consulta.between(inicio, fin)
-#             )
-
-#     pacientes = (
-#         query
-#         .distinct()
-#         .order_by(PacienteModel.id.desc())
-#         .all()
-#     )
-
-#     return pacientes

@@ -137,7 +137,7 @@ class PacienteBase(BaseModel):
     contacto: Optional[Contacto] = None
     referencias: Optional[List[Referencia]] = None
     datos_extra: Optional[Dict[str, Any]] = None
-    estado: Optional[str] = Field("V", pattern=r"^(V|F|I)$", description="V=Vivo, F=Fallecido, I=Inactivo")
+    estado: Optional[str] = Field("V", pattern=r"^(V|F|I|A)$", description="V=Vivo, F=Fallecido, I=Inactivo, A=Activo")
     # metadatos: Optional[List[MetadataEvento]] = None
     
     @field_validator("cui", mode="before")

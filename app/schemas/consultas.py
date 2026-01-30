@@ -6,7 +6,7 @@ Totalmente compatibles con FastAPI + Pydantic v2 + OpenAPI.
 
 from typing import List, Literal, Optional, Dict, Any, Union
 from datetime import date, time
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.paciente import PacienteOutConsulta
 
@@ -42,6 +42,7 @@ EstadoCiclo = Literal[
     "tratamiento",    # Recibiendo tratamiento
     "observacion",    # En observación
     "evolucion",      # Seguimiento/evolución
+    "seguimiento",    # En seguimiento
     "procedimiento",  # Realizando procedimiento
     "recuperacion",   # En recuperación
     "egreso",         # Alta médica
@@ -105,41 +106,105 @@ class CicloClinico(BaseModel):
             return None
         return v
 
-    model_config = ConfigDict(extra="allow", from_attributes=True)
+    model_config = ConfigDict(
+        extra="allow", 
+        from_attributes=True,
+        # 🔥 CLAVE: Excluir None al serializar
+        json_schema_extra={
+            "exclude_none": True
+        }
+    )
 
 class CicloUpdate(BaseModel):
     estado: EstadoCiclo = "actualizado"
     especialidad: Optional[str] = None
     servicio: Optional[str] = None
-    detalle_clinicos: Optional[Dict[str, Any]] = None
-    signos_vitales: Optional[Dict[str, Any]] = None
-    antecedentes: Optional[Dict[str, Any]] = None
-    ordenes: Optional[Dict[str, Any]] = None
-    estudios: Optional[Dict[str, Any]] = None
-    comentario: Optional[Union[str, Dict[str, Any]]] = None  
-    impresion_clinica: Optional[Dict[str, Any]] = None
-    tratamiento: Optional[Dict[str, Any]] = None
-    examen_fisico: Optional[Dict[str, Any]] = None
-    nota_enfermeria: Optional[Dict[str, Any]] = None
-    contraindicado: Optional[str] = None
-    presa_quirurgica: Optional[Dict[str, Any]] = None
-    egreso: Optional[Dict[str, Any]] = None
+    # ========== VALIDADORES ==========
     @field_validator('estado', mode='before')
     @classmethod
     def normalizar_estado(cls, v):
-        """Normaliza estados a minúsculas para compatibilidad con datos legacy"""
-        if isinstance(v, str):
-            return v.lower()
-        return v
-    @field_validator('comentario', mode='before')
-    @classmethod
-    def normalizar_comentario(cls, v):
-        """Convierte dict vacío a None"""
-        if isinstance(v, dict) and not v:
-            return None
-        return v
-    model_config = ConfigDict(extra="allow", from_attributes=True)
+        """Normaliza estados a minúsculas"""
+        return v.lower() if isinstance(v, str) else v
+    
+    @model_validator(mode='after')
+    def limpiar_campos_vacios(self):
+        """
+        Elimina cualquier campo que sea None, dict vacío, lista vacía o string vacío.
+        """
+        # Obtener todos los campos del modelo (definidos + extra)
+        campos_a_eliminar = []
+        
+        for field_name, field_value in self.__dict__.items():
+            # Verificar si el campo está vacío
+            if field_value is None:
+                campos_a_eliminar.append(field_name)
+            elif isinstance(field_value, dict) and not field_value:
+                campos_a_eliminar.append(field_name)
+            elif isinstance(field_value, list) and not field_value:
+                campos_a_eliminar.append(field_name)
+            elif isinstance(field_value, str) and not field_value.strip():
+                campos_a_eliminar.append(field_name)
+        
+        # Eliminar campos vacíos
+        for field_name in campos_a_eliminar:
+            delattr(self, field_name)
+        
+        return self
+    
+    model_config = ConfigDict(
+        extra="allow",  # ✅ Acepta cualquier campo adicional
+        from_attributes=True
+    )
 
+
+# app/schemas/consultas.py
+
+class CicloConsultaUpdate(BaseModel):
+    """
+    Schema minimalista para actualizar ciclo clínico.
+    Solo incluye campos obligatorios de auditoría.
+    Cualquier otro campo se acepta dinámicamente vía extra="allow".
+    """
+    # ========== SOLO CAMPOS OBLIGATORIOS ==========
+    estado: EstadoCiclo = Field(..., description="Estado del ciclo clínico")
+    
+    # ========== VALIDADORES ==========
+    @field_validator('estado', mode='before')
+    @classmethod
+    def normalizar_estado(cls, v):
+        """Normaliza estados a minúsculas"""
+        return v.lower() if isinstance(v, str) else v
+    
+    @model_validator(mode='after')
+    def limpiar_campos_vacios(self):
+        """
+        Elimina cualquier campo que sea None, dict vacío, lista vacía o string vacío.
+        """
+        # Obtener todos los campos del modelo (definidos + extra)
+        campos_a_eliminar = []
+        
+        for field_name, field_value in self.__dict__.items():
+            # Verificar si el campo está vacío
+            if field_value is None:
+                campos_a_eliminar.append(field_name)
+            elif isinstance(field_value, dict) and not field_value:
+                campos_a_eliminar.append(field_name)
+            elif isinstance(field_value, list) and not field_value:
+                campos_a_eliminar.append(field_name)
+            elif isinstance(field_value, str) and not field_value.strip():
+                campos_a_eliminar.append(field_name)
+        
+        # Eliminar campos vacíos
+        for field_name in campos_a_eliminar:
+            delattr(self, field_name)
+        
+        return self
+    
+    model_config = ConfigDict(
+        extra="allow",  # ✅ Acepta cualquier campo adicional
+        from_attributes=True
+    )
+       
 # ===================================================================
 # Schema base (común)
 # ===================================================================
@@ -153,7 +218,7 @@ class ConsultaBase(BaseModel):
     fecha_consulta: Optional[date] = None
     hora_consulta: Optional[time] = None
     indicadores: Optional[Indicador] = None
-    ciclo: Optional[List[CicloClinico]] = None  
+    ciclo: Optional[List[CicloUpdate]] = None  
     orden: Optional[int] = Field(None, ge=0)
     activo: bool = True
 
@@ -196,7 +261,28 @@ class ConsultaUpdate(BaseModel):
     orden: Optional[int] = None
     activo: Optional[bool] = None
     model_config = ConfigDict(extra="ignore")
-
+    
+    @field_validator("ciclo", mode="before")
+    @classmethod
+    def no_aceptar_listas(cls, v):
+        if isinstance(v, list):
+            raise ValueError("El campo 'ciclo' debe ser un objeto, no una lista")
+        return v
+class ConsultaUpdateCiclo(BaseModel):
+    """
+    Para actualizar una consulta en ciclo.
+    El campo 'ciclo' aquí es UN SOLO objeto que se agregará al historial.
+    """
+    ciclo: Optional[Dict[str, Any]] = None
+    activo: Optional[bool] = None
+    model_config = ConfigDict(extra="ignore")
+    
+    @field_validator("ciclo", mode="before")
+    @classmethod
+    def no_aceptar_listas(cls, v):
+        if isinstance(v, list):
+            raise ValueError("El campo 'ciclo' debe ser un objeto, no una lista")
+        return v
 
 class ConsultaOut(ConsultaBase):
     id: int = Field(..., description="ID único de la consulta")

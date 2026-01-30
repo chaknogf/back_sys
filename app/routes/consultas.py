@@ -5,13 +5,18 @@ Router de consultas médicas - Búsqueda avanzada, creación inteligente y CRUD 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import String, cast, desc, func, text, or_
+from sqlalchemy.orm.attributes import flag_modified
 from typing import Optional, List
 from datetime import datetime, date, time
 
 from app.database.db import get_db
 from app.models.consultas import ConsultaModel
 from app.models.pacientes import PacienteModel
-from app.schemas.consultas import ConsultaBase, ConsultaCreate, ConsultaListResponse, ConsultaOut, ConsultaUpdate, RegistroConsultaCreate, RegistroConsultaOut, Indicador, CicloClinico
+from app.schemas.consultas import (
+    CicloConsultaUpdate, ConsultaBase, ConsultaCreate, ConsultaListResponse, ConsultaOut, 
+    ConsultaUpdate, ConsultaUpdateCiclo, RegistroConsultaCreate, RegistroConsultaOut, 
+    Indicador, CicloClinico
+)
 from app.utils.expediente import generar_expediente, generar_emergencia
 from app.database.security import get_current_user
 from app.models.user import UserModel
@@ -20,6 +25,9 @@ from sqlalchemy.orm import joinedload
 router = APIRouter(prefix="/consultas", tags=["Consultas Médicas"])
 
 
+# =============================================================================
+# BUSCAR CONSULTAS (TODAS)
+# =============================================================================
 @router.get("/", response_model=List[ConsultaOut])
 def buscar_consultas(
     paciente_id: Optional[int] = None,
@@ -109,8 +117,9 @@ def buscar_consultas(
 
     return resultados
 
+
 # =============================================================================
-# OBTENER UNA CONSULTAS ACTIVAS
+# BUSCAR CONSULTAS ACTIVAS
 # =============================================================================
 @router.get("/activas", response_model=List[ConsultaOut])
 def buscar_consultas_activas(
@@ -134,7 +143,7 @@ def buscar_consultas_activas(
 
     query = query.filter(ConsultaModel.activo.is_(True))
 
-   # ======================
+    # ======================
     # Filtros de CONSULTA
     # ======================
     if paciente_id is not None:
@@ -218,11 +227,13 @@ def obtener_consulta(
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
     return consulta
 
-# =============================================================================
-# ACTUALIZAR CONSULTA
-# =============================================================================
-# app/routes/consultas.py
 
+# =============================================================================
+# ACTUALIZAR CONSULTA (PATCH - Actualización parcial)
+# =============================================================================
+# =============================================================================
+# ACTUALIZAR CONSULTA (PATCH - Actualización parcial)
+# =============================================================================
 @router.patch("/{consulta_id}", response_model=ConsultaOut)
 def actualizar_consulta(
     consulta_id: int,
@@ -285,7 +296,7 @@ def actualizar_consulta(
     # ======================
     # 6. AGREGAR nuevo registro al historial del ciclo
     # ======================
-    if update_data.ciclo:
+    if hasattr(update_data, 'ciclo') and update_data.ciclo is not None:
         # Obtener historial actual (o crear lista vacía)
         ciclo_historial = consulta.ciclo or []
         if not isinstance(ciclo_historial, list):
@@ -299,9 +310,9 @@ def actualizar_consulta(
         nuevo_ciclo["registro"] = datetime.now().isoformat()
         nuevo_ciclo["usuario"] = current_user.username
         
-        # AGREGAR al historial (no sobrescribir)
-        ciclo_historial.append(nuevo_ciclo)
-        datos["ciclo"] = ciclo_historial
+        # 🔥 CRÍTICO: Crear nueva lista para que SQLAlchemy detecte el cambio
+        consulta.ciclo = ciclo_historial + [nuevo_ciclo]
+        flag_modified(consulta, "ciclo")
     
     # ======================
     # 7. Recalcular orden si es necesario
@@ -352,7 +363,113 @@ def actualizar_consulta(
 
 
 # =============================================================================
-# REGISTRO DE CONSULTA - ENDPOINT COMPLETO
+# AGREGAR CICLO A CONSULTA (PUT - Endpoint específico)
+# =============================================================================
+@router.put("/{consulta_id}", response_model=ConsultaOut)
+def actualizar_consulta(
+    consulta_id: int,
+    consulta_in: ConsultaUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Endpoint específico para agregar un nuevo registro al ciclo clínico.
+    También permite actualizar otros campos de la consulta simultáneamente.
+    """
+    consulta = db.get(ConsultaModel, consulta_id)
+    if not consulta:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+
+    # ======== Actualizar campos simples ========
+    for field, value in consulta_in.model_dump(exclude_unset=True).items():
+        if field != "ciclo":
+            setattr(consulta, field, value)
+
+    # ======== Agregar nuevo ciclo ========
+    if consulta_in.ciclo:
+        # 🔥 Excluir None al serializar
+        nuevo_ciclo = consulta_in.ciclo.model_dump(exclude_none=True)
+        
+        # ✅ Agregar auditoría 
+        nuevo_ciclo["registro"] = datetime.utcnow().isoformat()
+        nuevo_ciclo["usuario"] = current_user.username
+        
+        # ✅ Garantizar que 'estado' existe
+        if "estado" not in nuevo_ciclo:
+            nuevo_ciclo["estado"] = "actualizado"
+
+        # ✅ Obtener historial actual
+        historial = consulta.ciclo or []
+        
+        # 🔥 CRÍTICO: Crear una NUEVA lista para que SQLAlchemy detecte el cambio
+        consulta.ciclo = historial + [nuevo_ciclo]
+        
+        # 🔥 Notificar a SQLAlchemy del cambio
+        flag_modified(consulta, "ciclo")
+
+    try:
+        db.commit()
+        db.refresh(consulta)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al actualizar ciclo: {str(e)}"
+        )
+    
+    return consulta
+
+
+# app/routes/consultas.py
+
+@router.put("/{consulta_id}/ciclo", response_model=ConsultaOut)
+def agregar_ciclo_a_consulta(
+    consulta_id: int,
+    ciclo_data: CicloConsultaUpdate,  # 👈 Este ES el ciclo, no tiene campo .ciclo
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Endpoint específico para agregar un nuevo registro al ciclo clínico.
+    """
+    consulta = db.get(ConsultaModel, consulta_id)
+    if not consulta:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+
+    # 🔥 ciclo_data YA ES el ciclo, convertir directamente a dict
+    nuevo_ciclo = ciclo_data.model_dump(
+        exclude_none=True,  # ✅ Excluir campos None
+        exclude_unset=True,  # ✅ Excluir campos no enviados
+        mode='json'
+    )
+    
+    # ✅ Agregar auditoría automática
+    nuevo_ciclo["registro"] = datetime.utcnow().isoformat()
+    nuevo_ciclo["usuario"] = current_user.username
+
+    # ✅ Obtener historial actual
+    historial = consulta.ciclo or []
+    
+    # 🔥 CRÍTICO: Crear una NUEVA lista para que SQLAlchemy detecte el cambio
+    consulta.ciclo = historial + [nuevo_ciclo]
+    
+    # 🔥 Notificar a SQLAlchemy del cambio
+    flag_modified(consulta, "ciclo")
+
+    try:
+        db.commit()
+        db.refresh(consulta)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al actualizar ciclo: {str(e)}"
+        )
+    
+    return consulta
+
+# =============================================================================
+# REGISTRO DE CONSULTA - ENDPOINT SIMPLIFICADO
 # =============================================================================
 @router.post("/registro", response_model=RegistroConsultaOut, status_code=201)
 def registrar_consulta(

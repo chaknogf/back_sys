@@ -14,9 +14,9 @@ class MunicipioSchema(BaseModel):
     """
     codigo: str = Field(
         ..., 
-        max_length=5,
-        pattern=r"^\d{5}$",
-        description="Código RENAP de 5 dígitos (ej: 01001 para Guatemala)"
+        max_length=4,
+        pattern=r"^\d{4}$",
+        description="Código RENAP de 4 dígitos (ej: 0101 para Guatemala)"
     )
     vecindad: str = Field(
         ..., 
@@ -64,3 +64,14 @@ class MunicipioSimple(BaseModel):
             codigo=municipio.codigo,
             label=f"{municipio.municipio}, {municipio.departamento}"
         )
+        
+# ===================================================================
+# Schema para Departamento 
+# ===================================================================
+class DepartamentoOut(BaseModel):
+    codigo: str
+    departamento: str
+
+    model_config = {
+        "from_attributes": True
+    }

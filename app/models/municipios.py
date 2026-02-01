@@ -6,7 +6,7 @@ from app.database.db import Base
 class MunicipiosModel(Base):
     __tablename__ = "municipios"
 
-    codigo = Column(String(5), primary_key=True)
+    codigo = Column(String(4), primary_key=True)
     vecindad = Column(String(150), nullable=True)
     municipio = Column(String(50), nullable=False)
     departamento = Column(String(50), nullable=False)

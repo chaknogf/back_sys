@@ -152,44 +152,6 @@ def buscar_pacientes(
 
 
 # =============================================================================
-# AUTOCOMPLETE - CORREGIDO
-# =============================================================================
-@router.get("/buscar", response_model=List[PacienteSimple])
-def autocomplete(
-    q: str = Query(..., min_length=1),  # CAMBIO: min_length=1 en lugar de 3
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
-):
-    """
-    Búsqueda rápida para autocomplete
-    Busca en CUI, expediente y nombre completo
-    """
-    q_clean = q.strip().upper()
-    
-    # Construir query
-    resultados = db.query(PacienteModel).filter(
-        or_(
-            cast(PacienteModel.cui, String).ilike(f"%{q_clean}%"),
-            PacienteModel.expediente.ilike(f"%{q_clean}%"),
-            PacienteModel.nombre_completo.ilike(f"%{q_clean}%")
-        )
-    ).limit(15).all()
-    
-    # Filtro por defecto: excluir inactivos
-    query = query.filter(PacienteModel.estado != "I")
-
-    return [
-        PacienteSimple(
-            id=p.id,
-            cui=p.cui,
-            expediente=p.expediente,
-            nombre_completo=p.nombre_completo or "",
-            fecha_nacimiento=p.fecha_nacimiento
-        )
-        for p in resultados
-    ]
-
-# =============================================================================
 # OBTENER PACIENTE POR ID
 # =============================================================================
 @router.get("/{paciente_id}", response_model=PacienteOut)
@@ -284,14 +246,14 @@ def crear_paciente(
 # ACTUALIZAR PACIENTE (OPTIMIZADO)
 # =============================================================================
 
-@router.patch("/{paciente_id}", response_model=PacienteOut)
-def actualizar_paciente(
+@router.patch("/{paciente_id}", response_model=PacienteOut | dict)
+def gestionar_paciente(
     paciente_id: int,
-    paciente_update: PacienteUpdate,
-    accion_expediente: str = Query(
+    paciente_update: Optional[PacienteUpdate] = None,
+    accion: str = Query(
         default="mantener",
-        regex="^(mantener|generar|sobrescribir)$",
-        description="'mantener': no modifica expediente | 'generar': genera si no existe | 'sobrescribir': genera nuevo"
+        regex="^(mantener|generar|sobrescribir|activar|desactivar)$",
+        description="Acción a ejecutar sobre el paciente"
     ),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
@@ -303,31 +265,90 @@ def actualizar_paciente(
             detail=f"Paciente con ID {paciente_id} no encontrado"
         )
 
+    # ============================================================
+    # 🟢 ACTIVAR
+    # ============================================================
+    if accion == "activar":
+        if paciente.estado == "A":
+            raise HTTPException(
+                status_code=400,
+                detail="El paciente ya está activo"
+            )
+
+        paciente.estado = "A"
+        agregar_evento(
+            paciente,
+            usuario=current_user.username,
+            accion="ACTIVADO"
+        )
+        db.commit()
+        db.refresh(paciente)
+
+        return {
+            "message": "Paciente activado exitosamente",
+            "paciente_id": paciente_id,
+            "estado": paciente.estado
+        }
+
+    # ============================================================
+    # 🔴 DESACTIVAR
+    # ============================================================
+    if accion == "desactivar":
+        if paciente.estado == "I":
+            raise HTTPException(
+                status_code=400,
+                detail="El paciente ya está inactivo"
+            )
+
+        paciente.estado = "I"
+        agregar_evento(
+            paciente,
+            usuario=current_user.username,
+            accion="DESACTIVADO"
+        )
+        db.commit()
+        db.refresh(paciente)
+
+        return {
+            "message": "Paciente desactivado exitosamente",
+            "paciente_id": paciente_id,
+            "estado": paciente.estado
+        }
+
+    # ============================================================
+    # ✏️ ACTUALIZAR (mantener | generar | sobrescribir)
+    # ============================================================
+    if not paciente_update:
+        raise HTTPException(
+            status_code=400,
+            detail="Se requieren datos para actualizar el paciente"
+        )
+
     try:
         datos_update = paciente_update.model_dump(exclude_unset=True)
 
         expediente_anterior = paciente.expediente
         expediente_generado = False
 
-        # 🔧 MANEJO DE EXPEDIENTE
-        if accion_expediente == "generar":
+        if accion == "generar":
             if not paciente.expediente or paciente.expediente.strip() == "":
                 datos_update["expediente"] = generar_expediente(db)
                 expediente_generado = True
             else:
                 datos_update.pop("expediente", None)
 
-        elif accion_expediente == "sobrescribir":
+        elif accion == "sobrescribir":
             datos_update["expediente"] = generar_expediente(db)
             expediente_generado = True
 
+        elif accion == "mantener":
+            datos_update.pop("expediente", None)
+
         datos_update.pop("metadatos", None)
-        
-        # 🔄 Aplicar cambios
+
         for key, value in datos_update.items():
             setattr(paciente, key, value)
 
-        # 🧾 Evento de auditoría
         agregar_evento(
             paciente,
             usuario=current_user.username,
@@ -339,7 +360,6 @@ def actualizar_paciente(
 
         db.commit()
         db.refresh(paciente)
-        # 🧼 LIMPIEZA FINAL ANTES DE RESPONDER
         normalizar_metadatos(paciente)
         return paciente
 
@@ -362,77 +382,6 @@ def actualizar_paciente(
                 status_code=400,
                 detail="Datos duplicados o inválidos"
             )
-# =============================================================================
-# ELIMINAR PACIENTE
-# =============================================================================
-# =============================================================================
-@router.patch("/{paciente_id}/desactivar", status_code=200)
-def desactivar_paciente(
-    paciente_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
-):
-    """
-    Desactivar un paciente (eliminación lógica)
-    Cambia el estado a 'I' (Inactivo) para mantener la información
-    """
-    paciente = db.get(PacienteModel, paciente_id)
-    if not paciente:
-        raise HTTPException(
-            status_code=404, 
-            detail=f"Paciente con ID {paciente_id} no encontrado"
-        )
-    
-    if paciente.estado == "I":
-        raise HTTPException(
-            status_code=400,
-            detail="El paciente ya está inactivo"
-        )
-
-    paciente.estado = "I"
-    db.commit()
-    db.refresh(paciente)
-    
-    return {
-        "message": "Paciente desactivado exitosamente",
-        "paciente_id": paciente_id,
-        "estado": paciente.estado
-    }
-
-
-@router.patch("/{paciente_id}/activar", status_code=200)
-def activar_paciente(
-    paciente_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
-):
-    """
-    Reactivar un paciente inactivo
-    Cambia el estado de 'I' a 'A' (Activo)
-    """
-    paciente = db.get(PacienteModel, paciente_id)
-    if not paciente:
-        raise HTTPException(
-            status_code=404, 
-            detail=f"Paciente con ID {paciente_id} no encontrado"
-        )
-    
-    if paciente.estado == "A":
-        raise HTTPException(
-            status_code=400,
-            detail="El paciente ya está activo"
-        )
-
-    paciente.estado = "A"
-    db.commit()
-    db.refresh(paciente)
-    
-    return {
-        "message": "Paciente activado exitosamente",
-        "paciente_id": paciente_id,
-        "estado": paciente.estado
-    }
-
 
 @router.delete("/{paciente_id}/eliminar-permanente", status_code=204)
 def eliminar_paciente_permanente(

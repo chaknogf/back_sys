@@ -1,27 +1,33 @@
-# app/database/security.py
 """
 Módulo central de autenticación y autorización.
-Aquí vive TODO lo relacionado con:
-- Hash de contraseñas (Argon2)
-- JWT
-- OAuth2
-- Usuario actual
+
+Responsabilidades:
+- Hash y verificación de contraseñas (Argon2)
+- Creación y validación de JWT
+- OAuth2 Bearer
+- Obtención del usuario autenticado
 """
 
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
+
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
+
 from app.database.db import get_db
 from app.models.user import UserModel
-from app.database.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.database.config import (
+    SECRET_KEY,
+    ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+)
 
-# ======================
-# CRYPT CONTEXT – ARGON2 (MÁS SEGURO 2025)
-# ======================
+# ======================================================
+# CONTEXTO CRIPTOGRÁFICO – ARGON2 (SEGURIDAD MODERNA)
+# ======================================================
 pwd_context = CryptContext(
     schemes=["argon2"],
     deprecated="auto",
@@ -30,42 +36,54 @@ pwd_context = CryptContext(
     argon2__parallelism=4,
 )
 
-# ======================
-# OAUTH2 SCHEME
-# ======================
+# ======================================================
+# OAUTH2
+# ======================================================
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-# ======================
-# HASH Y VERIFICACIÓN
-# ======================
+# ======================================================
+# HASH DE CONTRASEÑAS
+# ======================================================
 def hash_password(password: str) -> str:
-    """Encripta una contraseña con Argon2"""
+    """Genera un hash seguro usando Argon2."""
     return pwd_context.hash(password)
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifica contraseña plana contra hash"""
+    """Verifica una contraseña contra su hash."""
     return pwd_context.verify(plain_password, hashed_password)
 
-# ======================
+# ======================================================
 # JWT
-# ======================
-def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+# ======================================================
+def create_access_token(
+    data: dict,
+    expires_delta: timedelta | None = None
+) -> str:
+    """
+    Crea un JWT firmado.
+    `data` debe incluir al menos el campo 'sub'.
+    """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(timezone.utc) + (
+        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire})
+
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-# ======================
-# USUARIO ACTUAL
-# ======================
+# ======================================================
+# USUARIO AUTENTICADO
+# ======================================================
 def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> UserModel:
     """
-    Dependencia que decodifica el JWT y devuelve el usuario autenticado.
-    Úsala en cualquier endpoint protegido.
+    Decodifica el JWT y devuelve el usuario autenticado
+    como una instancia de UserModel.
     """
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Token inválido o expirado",
@@ -75,26 +93,45 @@ def get_current_user(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str | None = payload.get("sub")
-        if username is None:
+
+        if not username:
             raise credentials_exception
+
     except JWTError:
         raise credentials_exception
 
-    user = db.query(UserModel).filter(UserModel.username == username).first()
-    if user is None:
+    user = (
+        db.query(UserModel)
+        .filter(UserModel.username == username)
+        .first()
+    )
+
+    if not user:
         raise credentials_exception
 
     return user
 
-# ======================
-# USUARIO ADMIN
-# ======================
-def get_current_admin_user(current_user: UserModel = Depends(get_current_user)) -> UserModel:
+# ======================================================
+# USUARIO ADMINISTRADOR
+# ======================================================
+def get_current_admin_user(
+    current_user: UserModel = Depends(get_current_user),
+) -> UserModel:
+    """
+    Verifica que el usuario autenticado tenga rol admin.
+    """
+
     if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Acceso denegado: se requieren permisos de administrador")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado: se requieren permisos de administrador",
+        )
+
     return current_user
 
-# Exporta todo lo útil
+# ======================================================
+# EXPORTS
+# ======================================================
 __all__ = [
     "hash_password",
     "verify_password",
@@ -102,5 +139,5 @@ __all__ = [
     "oauth2_scheme",
     "get_current_user",
     "get_current_admin_user",
-    "pwd_context"
+    "pwd_context",
 ]

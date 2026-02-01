@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from app.database.db import get_db
 from app.models.municipios import MunicipiosModel
-from app.schemas.municipios import MunicipioSchema, MunicipioListResponse, MunicipioSimple
+from app.schemas.municipios import DepartamentoOut, MunicipioSchema, MunicipioListResponse, MunicipioSimple
 from app.database.security import get_current_user
 from app.models.user import UserModel
 
@@ -45,27 +45,6 @@ def listar_municipios(
     municipios = query.offset(skip).limit(limit).all()
 
     return MunicipioListResponse(total=total, municipios=municipios)
-
-
-# =============================================================================
-# AUTOCOMPLETE - IDEAL PARA <select> EN FRONTEND
-# =============================================================================
-@router.get("/select", response_model=List[MunicipioSimple])
-def para_select(
-    q: Optional[str] = Query(None, min_length=2),
-    db: Session = Depends(get_db)
-):
-    query = db.query(MunicipiosModel).order_by(MunicipiosModel.departamento, MunicipiosModel.municipio)
-
-    if q:
-        q = q.strip()
-        query = query.filter(
-            func.unaccent(MunicipiosModel.municipio).ilike(func.unaccent(f"%{q}%"))
-            | func.unaccent(MunicipiosModel.departamento).ilike(func.unaccent(f"%{q}%"))
-        )
-
-    resultados = query.limit(20).all()
-    return [MunicipioSimple.from_orm(m) for m in resultados]
 
 
 # =============================================================================
@@ -128,3 +107,20 @@ def eliminar_municipio(
     db.delete(municipio)
     db.commit()
     return None
+
+# =============================================================================
+# LISTAR DEPARTAMENTOS (DISTINCT DESDE MUNICIPIOS)
+# =============================================================================
+@router.get("/departamentos", response_model=List[DepartamentoOut])
+def listar_departamentos(db: Session = Depends(get_db)):
+    resultados = (
+        db.query(
+            func.substr(MunicipiosModel.codigo, 1, 2).label("codigo"),
+            MunicipiosModel.departamento.label("departamento")
+        )
+        .distinct()
+        .order_by("codigo")
+        .all()
+    )
+
+    return resultados

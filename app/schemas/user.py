@@ -13,7 +13,7 @@ class UserBase(BaseModel):
     email: EmailStr = Field(..., description="Correo electrónico válido")
     role: str = Field(
         ..., 
-        pattern=r"^(admin|medico|enfermeria|recepcion|laboratorio|farmacia|usuario)$",
+        pattern=r"^(admin|medico|enfermeria|recepcion|laboratorio|farmacia|usuario|registros)$",
         description="Rol del usuario en el sistema"
     )
     unidad: Optional[int] = Field(None, ge=1, description="ID de la unidad de salud")

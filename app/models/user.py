@@ -21,9 +21,6 @@ class UserModel(Base):
     unidad: Mapped[int] = mapped_column(Integer, nullable=True)
     estado: Mapped[str] = mapped_column(String(1), server_default="A", nullable=False)
     
-    # creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    # actualizado_en: Mapped[datetime] = mapped_column(
-    #     DateTime(timezone=True), 
-    #     server_default=func.now(), 
-    #     onupdate=func.now()
-    # )
+    @property
+    def is_admin(self) -> bool:
+        return self.role == "admin"

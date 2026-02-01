@@ -22,12 +22,19 @@ from app.models.user import UserModel
 
 router = APIRouter(prefix="/pacientes", tags=["Pacientes"])
 
-def agregar_evento(paciente, usuario, accion, expediente_duplicado=None):
+def agregar_evento(
+    paciente,
+    usuario,
+    accion,
+    expediente_duplicado: bool | None = None,
+    detalle: str = ""
+):
     evento = {
         "usuario": usuario or "sistema",
         "registro": datetime.now(timezone.utc).isoformat(),
         "accion": accion,
-        "expediente_duplicado": expediente_duplicado
+        "expediente_duplicado": expediente_duplicado,
+        "detalle": detalle
     }
 
     if paciente.metadatos is None:

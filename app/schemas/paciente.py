@@ -102,7 +102,7 @@ class Referencia(BaseModel):
 class MetadataEvento(BaseModel):
     usuario: Optional[str] = None
     registro: Optional[datetime] = None
-    accion: Optional[Literal["CREADO", "ACTUALIZADO", "MERGE_PACIENTE", "MERGE_CAMPO_DUPLICADO"]] = None
+    accion: Optional[Literal["CREADO", "ACTUALIZADO", "MERGE_PACIENTE"]] = None
     expediente_duplicado: Optional[bool] = None,
     detalle: Optional[str] = None
     
@@ -110,7 +110,8 @@ class MetadataEvento(BaseModel):
 class Neonatales(BaseModel):
     peso_nacimiento: Optional[str] = None
     edad_gestacional: Optional[str] = None
-    parto: Optional[str] = None
+    tipo_parto: Optional[str] = None
+    clase_parto: Optional[str] = None
     gemelo: Optional[str] = None
     expediente_madre: Optional[str] = None
     extrahositalario: Optional[bool] = False

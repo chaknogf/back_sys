@@ -18,6 +18,7 @@ class UserBase(BaseModel):
     )
     unidad: Optional[int] = Field(None, ge=1, description="ID de la unidad de salud")
     estado: str = Field("A", pattern=r"^(A|I)$", description="A=Activo, I=Inactivo")
+    datos_extra: Optional[dict] = None
 
 
 class UserCreate(UserBase):
@@ -33,6 +34,8 @@ class UserUpdate(BaseModel):
     unidad: Optional[int] = None
     estado: Optional[str] = None
     password: Optional[str] = Field(None, min_length=4, description="Nueva contraseña (opcional)")
+    datos_extra: Optional[dict] = None
+    
 
 
 class UserResponse(UserBase):

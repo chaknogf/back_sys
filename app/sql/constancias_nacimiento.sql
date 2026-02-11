@@ -1,0 +1,21 @@
+CREATE TABLE constancia_nacimiento (
+    id SERIAL PRIMARY KEY,
+    documento VARCHAR(20) UNIQUE NOT NULL,
+    paciente_id INTEGER NOT NULL,
+    medico_id INTEGER NOT NULL,
+    registrador_id INTEGER NOT NULL,
+    nombre_madre VARCHAR(200) NOT NULL,
+    vecindad_madre VARCHAR(200),
+    fecha_registro DATE NOT NULL DEFAULT CURRENT_DATE,
+    menor_edad JSONB,
+    hijos INTEGER,
+    vivos INTEGER,
+    muertos INTEGER,
+    observaciones TEXT,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_constancia_paciente FOREIGN KEY (paciente_id) REFERENCES pacientes (id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_constancia_medico FOREIGN KEY (medico_id) REFERENCES medicos (id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_constancia_registrador FOREIGN KEY (registrador_id) REFERENCES users (id) ON UPDATE CASCADE ON DELETE RESTRICT
+);

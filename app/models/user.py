@@ -1,5 +1,5 @@
 # app/models/user.py
-from sqlalchemy import Column, Integer, String, DateTime, text, func
+from sqlalchemy import Column, Integer, String, DateTime, text, func, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database.db import Base
 from datetime import datetime
@@ -20,6 +20,7 @@ class UserModel(Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     unidad: Mapped[int] = mapped_column(Integer, nullable=True)
     estado: Mapped[str] = mapped_column(String(1), server_default="A", nullable=False)
+    datos_extra: Mapped[dict] = mapped_column(JSON, nullable=True)
     
     @property
     def is_admin(self) -> bool:

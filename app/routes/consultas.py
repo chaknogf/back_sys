@@ -43,6 +43,7 @@ def buscar_consultas_activas(
     fecha: Optional[date] = None,
     activo: bool = Query(True, description="Filtrar solo consultas activas"),
     db: Session = Depends(get_db),
+    limit: int = 1000,
     current_user: UserModel = Depends(get_current_user)
 ): 
     query = (
@@ -116,6 +117,7 @@ def buscar_consultas_activas(
         query
         .distinct()
         .order_by(ConsultaModel.fecha_consulta.desc())
+        .limit(limit)
         .all()
     )
 

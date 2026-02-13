@@ -18,7 +18,7 @@ class Nombre(BaseModel):
     primer_nombre: str = Field(..., min_length=1, max_length=50)
     segundo_nombre: Optional[str] = Field(None, max_length=50)
     otro_nombre: Optional[str] = Field(None, max_length=50)
-    primer_apellido: str = Field(..., min_length=1, max_length=50)  # Cambiado de 2 a 1
+    primer_apellido: Optional[str] = Field(None, max_length=50)
     segundo_apellido: Optional[str] = Field(None, max_length=50)
     apellido_casada: Optional[str] = Field(None, max_length=50)
 

@@ -8,7 +8,7 @@ from typing import List, Literal, Optional, Dict, Any, Union
 from datetime import date, time
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.schemas.paciente import PacienteOutConsulta
+from app.schemas.paciente import PacienteConsultaBase, PacienteOutConsulta
 
 
 # ===================================================================
@@ -286,8 +286,8 @@ class ConsultaUpdateCiclo(BaseModel):
 
 class ConsultaOut(ConsultaBase):
     id: int = Field(..., description="ID único de la consulta")
-    paciente: Optional[PacienteOutConsulta] = None
-
+    paciente: Optional[PacienteConsultaBase] = None
+ 
     @field_validator('ciclo', mode='before')
     @classmethod
     def convertir_ciclo_a_lista(cls, v):

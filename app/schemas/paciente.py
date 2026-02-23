@@ -305,3 +305,24 @@ class PacientesConConsultas(BaseModel):
     consultas: List[ConsultaBaseOut]
 
     model_config = ConfigDict(from_attributes=True)
+    
+    
+class PacienteConsultaBase(BaseModel):
+    id: int
+    cui: Optional[int] = None
+    expediente: Optional[str] = Field(None, max_length=20)
+    pasaporte: Optional[str] = Field(None, max_length=20)
+    nombre: Nombre 
+    sexo: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    contacto: Optional[Contacto] = None
+    # datos_extra: Optional[Dict[str, Any]] = None
+    estado: Optional[str] = Field("V", pattern=r"^(V|F|I|A)$", description="V=Vivo, F=Fallecido, I=Inactivo, A=Activo")
+    # metadatos: Optional[List[MetadataEvento]] = None
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        extra="ignore"
+    )
+

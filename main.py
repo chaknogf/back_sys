@@ -12,6 +12,7 @@ from app.routes.consultas import router as consultas
 from app.routes.expediente import router as expediente
 from app.routes.municipios import router as municipios
 from app.routes.paises_iso import router as paises
+from app. routes.medicos import router as medicos
 from app.routes.total import router as total
 
 from app.routes.renap import router as renap
@@ -68,6 +69,7 @@ app.include_router(pacientes)
 app.include_router(pacientes_duplicados)
 app.include_router(merge_paciente)
 app.include_router(recienNacido)
+app.include_router(medicos)
 app.include_router(expediente)
 app.include_router(consultas)
 app.include_router(municipios)

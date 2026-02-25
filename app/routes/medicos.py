@@ -25,15 +25,40 @@ def crear_medico(data: MedicoCreate, db: Session = Depends(get_db)):
 
 @router.get("/", response_model=List[MedicoOut])
 def listar_medicos(
+    id: int | None = None,
     activo: bool | None = None,
+    nombre: str | None = None,
+    colegiado: str | None = None,
+    especialidad: str | None = None,
+    limit: int = 100,
     db: Session = Depends(get_db)
 ):
     query = db.query(MedicoModel)
 
+    if id is not None:
+        query = query.filter(MedicoModel.id == id)
+        return query.all()  # si viene id, ya no tiene sentido limitar ni ordenar más
+
     if activo is not None:
         query = query.filter(MedicoModel.activo == activo)
 
-    return query.order_by(MedicoModel.nombre).all()
+    if nombre:
+        query = query.filter(MedicoModel.nombre.ilike(f"%{nombre}%"))
+
+    if colegiado:
+        query = query.filter(MedicoModel.colegiado.ilike(f"%{colegiado}%"))
+
+    if especialidad:
+        query = query.filter(MedicoModel.especialidad.ilike(f"%{especialidad}%"))
+
+    limit = min(limit, 500)
+
+    return (
+        query
+        .order_by(MedicoModel.nombre)
+        .limit(limit)
+        .all()
+    )
 
 
 @router.get("/{medico_id}", response_model=MedicoOut)

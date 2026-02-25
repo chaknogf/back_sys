@@ -4,6 +4,7 @@ import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from app.routes.user import router as user
+from app.routes.nacimientos_legacy import router as nacimientos_legacy
 from app.routes.pacientes import router as pacientes
 from app.routes.merge_paciente import router as merge_paciente
 from app.routes.pacientes_duplicados import router as pacientes_duplicados
@@ -65,6 +66,7 @@ app.add_middleware(
 
 app.include_router(login)
 app.include_router(user)
+app.include_router(nacimientos_legacy)
 app.include_router(pacientes)
 app.include_router(pacientes_duplicados)
 app.include_router(merge_paciente)

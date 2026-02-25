@@ -1,0 +1,42 @@
+from sqlalchemy import Column, Integer, String, Date, Time, BigInteger, TIMESTAMP
+from sqlalchemy.sql import func
+from app.database.db import Base
+
+class NacimientoLegacy(Base):
+    __tablename__ = "nacimientos_legacy"
+
+    id = Column(Integer, primary_key=True, index=True)
+    fecha = Column(Date)
+    cor = Column(Integer)
+    ao = Column(Integer)
+    doc = Column(String(12), unique=True)
+    fecha_parto = Column(Date)
+    madre = Column(String(100))
+    dpi = Column(BigInteger)
+    passport = Column(String(30))
+    libro = Column(Integer)
+    folio = Column(Integer)
+    partida = Column(String(10))
+    muni = Column(Integer)
+    edad = Column(Integer)
+    vecindad = Column(Integer)
+    sexo_rn = Column(String(1))
+    lb = Column(Integer)
+    onz = Column(Integer)
+    hora = Column(Time)
+    medico = Column(String(200))
+    colegiado = Column(Integer)
+    dpi_medico = Column(BigInteger)
+    hijos = Column(Integer)
+    vivos = Column(Integer)
+    muertos = Column(Integer)
+    tipo_parto = Column(Integer)
+    clase_parto = Column(Integer)
+    certifica = Column(String(200))
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    create_by = Column(String(10))
+    depto = Column(Integer)
+    expediente = Column(Integer)
+    pais = Column(String(25))
+    nacionalidad = Column(String(25))

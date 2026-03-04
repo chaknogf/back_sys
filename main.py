@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from app.routes.user import router as user
 from app.routes.nacimientos_legacy import router as nacimientos_legacy
+from app.routes.constancia_nacimiento import router as constancia_nacimiento
 from app.routes.pacientes import router as pacientes
 from app.routes.merge_paciente import router as merge_paciente
 from app.routes.pacientes_duplicados import router as pacientes_duplicados
@@ -14,6 +15,7 @@ from app.routes.expediente import router as expediente
 from app.routes.municipios import router as municipios
 from app.routes.paises_iso import router as paises
 from app. routes.medicos import router as medicos
+from app.routes.citas import router as citas
 from app.routes.total import router as total
 
 from app.routes.renap import router as renap
@@ -66,14 +68,17 @@ app.add_middleware(
 
 app.include_router(login)
 app.include_router(user)
-app.include_router(nacimientos_legacy)
+
 app.include_router(pacientes)
 app.include_router(pacientes_duplicados)
 app.include_router(merge_paciente)
 app.include_router(recienNacido)
-app.include_router(medicos)
-app.include_router(expediente)
 app.include_router(consultas)
+app.include_router(citas)
+app.include_router(medicos)
+app.include_router(nacimientos_legacy)
+app.include_router(constancia_nacimiento)
+app.include_router(expediente)
 app.include_router(municipios)
 app.include_router(paises)
 app.include_router(renap)

@@ -1,6 +1,7 @@
 # app/models/medicos.py
 
 from sqlalchemy import Column, Integer, String, BigInteger, Boolean, TIMESTAMP, text, Index
+from sqlalchemy.orm import relationship
 from app.database.db import Base
 
 class MedicoModel(Base):
@@ -8,7 +9,7 @@ class MedicoModel(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(200), nullable=False, index=True)
-    colegiado = Column(String(20), index=True)
+    colegiado = Column(Integer, index=True)
     dpi = Column(BigInteger, index=True)
     sexo = Column(String(1))
     especialidad = Column(String(100), index=True)
@@ -25,3 +26,8 @@ class MedicoModel(Base):
         Index("idx_medicos_especialidad", "especialidad"),
         Index("idx_medicos_nombre", "nombre"),
     )
+    
+    constancias = relationship(
+    "ConstanciaNacimientoModel",
+    back_populates="medico"
+)

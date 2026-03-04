@@ -114,6 +114,7 @@ class Neonatales(BaseModel):
     clase_parto: Optional[str] = None
     gemelo: Optional[str] = None
     expediente_madre: Optional[str] = None
+    id_madre: Optional[str] = None
     extrahositalario: Optional[bool] = False
     hora_nacimiento: Optional[time] = None
     

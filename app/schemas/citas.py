@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any
 
 class CitaBase(BaseModel):
     fecha: Optional[date] = None
+    expediente: Optional[str] = None
     paciente_id: Optional[int] = None
     especialidad: Optional[str] = None
     agenda: Optional[date] = None

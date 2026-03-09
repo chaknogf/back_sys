@@ -24,8 +24,26 @@ def crear_cita(cita: CitaCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/", response_model=List[CitaResponse])
-def listar_citas(db: Session = Depends(get_db)):
-    return db.query(CitaModel).all()
+def listar_citas(
+    id: int = None,
+    expediente: str = None,
+    paciente_id: int = None,
+    especialidad: str = None,
+    fecha: str = None,
+    limite: int = 200,
+    db: Session = Depends(get_db)):
+    query = db.query(CitaModel)
+    if id is not None:
+        query = query.filter(CitaModel.id == id)
+    if expediente is not None:
+        query = query.filter(CitaModel.expediente == expediente)
+    if paciente_id is not None:
+        query = query.filter(CitaModel.paciente_id == paciente_id)
+    if especialidad is not None:
+        query = query.filter(CitaModel.especialidad == especialidad)
+    if fecha is not None:
+        query = query.filter(CitaModel.agenda == fecha)
+    return query.limit(limite).all()
 
 
 @router.get("/{cita_id}", response_model=CitaResponse)

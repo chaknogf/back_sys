@@ -12,6 +12,8 @@ class CitaModel(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     fecha = Column(Date, nullable=True)
+    
+    expediente = Column(String(20), nullable=True)
 
     paciente_id = Column(
         Integer,

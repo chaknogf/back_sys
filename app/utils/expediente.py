@@ -48,8 +48,10 @@ class ConstanciaMedicaControl(Base):
 # FUNCIONES PARA GENERAR CORRELATIVOS
 # ======================
 
+# app/utils/expediente.py
+
 def generar_expediente(db: Session) -> str:
-    anio_actual = int(datetime.now().strftime("%y"))  # 25 para 2025
+    anio_actual = int(datetime.now().strftime("%y"))
 
     control = (
         db.query(ExpedienteControl)
@@ -59,22 +61,18 @@ def generar_expediente(db: Session) -> str:
     )
 
     if not control:
-        # Año nuevo o tabla vacía → iniciar en 0
-        control = ExpedienteControl(
-            anio=anio_actual,
-            ultimo_correlativo=0
-        )
+        control = ExpedienteControl(anio=anio_actual, ultimo_correlativo=0)
         db.add(control)
-        db.flush()  # asegura persistencia sin commit
+        db.flush()
 
-    # Incremento SIEMPRE después
     control.ultimo_correlativo += 1
     correlativo = control.ultimo_correlativo
-
+    db.commit()  # ← persiste el cambio
     return f"{anio_actual}A-{correlativo}"
 
+
 def generar_emergencia(db: Session) -> str:
-    anio_actual = int(datetime.now().strftime("%y"))  # 25 para 2025
+    anio_actual = int(datetime.now().strftime("%y"))
 
     control = (
         db.query(EmergenciaControl)
@@ -84,20 +82,18 @@ def generar_emergencia(db: Session) -> str:
     )
 
     if not control:
-        control = EmergenciaControl(
-            anio=anio_actual,
-            ultimo_correlativo=0
-        )
+        control = EmergenciaControl(anio=anio_actual, ultimo_correlativo=0)
         db.add(control)
         db.flush()
 
     control.ultimo_correlativo += 1
     correlativo = control.ultimo_correlativo
-
+    db.commit()  # ← persiste el cambio
     return f"{correlativo}-E{anio_actual}"
 
+
 def generar_constancia_nacimiento(db: Session) -> str:
-    anio_actual = int(datetime.now().strftime("%y"))  # 25 para 2025
+    anio_actual = int(datetime.now().strftime("%y"))
 
     control = (
         db.query(ConstanciaNacimientoControl)
@@ -107,22 +103,18 @@ def generar_constancia_nacimiento(db: Session) -> str:
     )
 
     if not control:
-        # Año nuevo o tabla vacía → iniciar en 0
-        control = ConstanciaNacimientoControl(
-            anio=anio_actual,
-            ultimo_correlativo=0
-        )
+        control = ConstanciaNacimientoControl(anio=anio_actual, ultimo_correlativo=0)
         db.add(control)
-        db.flush()  # asegura persistencia sin commit
+        db.flush()
 
-    # Incremento SIEMPRE después
     control.ultimo_correlativo += 1
     correlativo = control.ultimo_correlativo
-
+    db.commit()  # ← persiste el cambio
     return f"CN-{correlativo}-{anio_actual}"
 
+
 def generar_constancia_medica(db: Session) -> str:
-    anio_actual = int(datetime.now().strftime("%y"))  # 25 para 2025
+    anio_actual = int(datetime.now().strftime("%y"))
 
     control = (
         db.query(ConstanciaMedicaControl)
@@ -132,21 +124,35 @@ def generar_constancia_medica(db: Session) -> str:
     )
 
     if not control:
-        # Año nuevo o tabla vacía → iniciar en 0
-        control = ConstanciaMedicaControl(
-            anio=anio_actual,
-            ultimo_correlativo=0
-        )
+        control = ConstanciaMedicaControl(anio=anio_actual, ultimo_correlativo=0)
         db.add(control)
-        db.flush()  # asegura persistencia sin commit
+        db.flush()
 
-    # Incremento SIEMPRE después
     control.ultimo_correlativo += 1
     correlativo = control.ultimo_correlativo
-
+    db.commit()  # ← persiste el cambio
     return f"CM-{correlativo}-{anio_actual}"
 
+
 def generar_defuncion(db: Session) -> str:
+    anio_actual = int(datetime.now().strftime("%y"))
+
+    control = (
+        db.query(DefuncionControl)
+        .filter(DefuncionControl.anio == anio_actual)
+        .with_for_update()
+        .first()
+    )
+
+    if not control:
+        control = DefuncionControl(anio=anio_actual, ultimo_correlativo=0)
+        db.add(control)
+        db.flush()
+
+    control.ultimo_correlativo += 1
+    correlativo = control.ultimo_correlativo
+    db.commit()  # ← persiste el cambio
+    return f"DF-{correlativo}-{anio_actual}"
     anio_actual = int(datetime.now().strftime("%y"))  # 25 para 2025
 
     control = (

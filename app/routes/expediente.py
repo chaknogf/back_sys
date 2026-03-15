@@ -48,7 +48,7 @@ def generar_nuevo_expediente(
         }
     except Exception as e:
         raise HTTPException(
-            status_code=500,
+            status_code=500, 
             detail=f"Error al generar expediente: {str(e)}"
         )
 

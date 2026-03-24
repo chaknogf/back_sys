@@ -261,6 +261,7 @@ class ConsultaUpdate(BaseModel):
     orden: Optional[int] = None
     activo: Optional[bool] = None
     model_config = ConfigDict(extra="ignore")
+    egreso: Optional[date] = None
     
     @field_validator("ciclo", mode="before")
     @classmethod
@@ -330,6 +331,7 @@ class RegistroConsultaOut(BaseModel):
     ciclo: List[CicloClinico]
     orden: int
     activo: Optional[bool] = None
+    egreso: Optional[date] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -369,5 +371,6 @@ class ConsultaBaseOut(BaseModel):
     hora_consulta: Optional[time] = None
     indicadores: Optional[Indicador] = None
     activo: Optional[bool] = None
+    egreso: Optional[date] = None
 
     model_config = ConfigDict(from_attributes=True)

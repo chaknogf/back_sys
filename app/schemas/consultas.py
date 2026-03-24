@@ -56,6 +56,18 @@ EstadoCiclo = Literal[
     "descartado"      # Consulta descartada/cancelada
 ]
 
+# ===================================================================
+# Egreso clínico
+# ===================================================================
+class Egreso(BaseModel):
+    """Datos del egreso médico de la consulta"""
+    registro: Optional[str] = Field(None, description="Timestamp ISO del egreso")
+    condicion: Optional[str] = Field(None, max_length=100, description="Condición al egreso: alta, fallecido, referido, etc.")
+    referencia: Optional[str] = Field(None, max_length=200, description="Institución o servicio de referencia si aplica")
+    diagnosticos: Optional[List[Dict[str, Any]]] = Field(None, description="Lista de diagnósticos al egreso")
+    medico: Optional[str] = Field(None, max_length=100, description="Médico responsable del egreso")
+
+    model_config = ConfigDict(from_attributes=True)
 
 # ===================================================================
 # Ciclo clínico completo (estructura flexible pero tipada)
@@ -261,7 +273,7 @@ class ConsultaUpdate(BaseModel):
     orden: Optional[int] = None
     activo: Optional[bool] = None
     model_config = ConfigDict(extra="ignore")
-    egreso: Optional[date] = None
+    egreso: Optional[Egreso] = None
     
     @field_validator("ciclo", mode="before")
     @classmethod
@@ -331,7 +343,7 @@ class RegistroConsultaOut(BaseModel):
     ciclo: List[CicloClinico]
     orden: int
     activo: Optional[bool] = None
-    egreso: Optional[date] = None
+    egreso: Optional[Egreso] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -371,6 +383,6 @@ class ConsultaBaseOut(BaseModel):
     hora_consulta: Optional[time] = None
     indicadores: Optional[Indicador] = None
     activo: Optional[bool] = None
-    egreso: Optional[date] = None
-
+    egreso: Optional[Egreso] = None
+    
     model_config = ConfigDict(from_attributes=True)

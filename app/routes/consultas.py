@@ -15,7 +15,7 @@ from app.models.pacientes import PacienteModel
 from app.schemas.consultas import (
     CicloConsultaUpdate, ConsultaBase, ConsultaCreate, ConsultaListResponse, ConsultaOut, 
     ConsultaUpdate, ConsultaUpdateCiclo, RegistroConsultaCreate, RegistroConsultaOut, 
-    Indicador, CicloClinico
+    Indicador, CicloClinico, Egreso
 )
 from app.utils.expediente import generar_expediente, generar_emergencia
 from app.database.security import get_current_user
@@ -202,7 +202,23 @@ def actualizar_consulta(
         indicadores_actuales = consulta.indicadores or {}
         indicadores_nuevos = datos["indicadores"] or {}
         datos["indicadores"] = {**indicadores_actuales, **indicadores_nuevos}
-    
+        
+    # ======================
+    # 5b. Manejar actualización de egreso (merge) y agregar registro automático
+    # ======================
+    if "egreso" in datos:
+        if isinstance(datos["egreso"], Egreso):
+            datos["egreso"] = datos["egreso"].model_dump(exclude_none=True)
+
+        egreso_actual = consulta.egreso or {}
+        egreso_nuevo = datos["egreso"] or {}
+
+        # Agregar timestamp automático si no viene
+        if "registro" not in egreso_nuevo:
+            egreso_nuevo["registro"] = datetime.now().isoformat()
+
+        datos["egreso"] = {**egreso_actual, **egreso_nuevo}
+        
     # ======================
     # 6. AGREGAR nuevo registro al historial del ciclo
     # ======================

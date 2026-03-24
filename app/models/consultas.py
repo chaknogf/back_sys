@@ -21,6 +21,7 @@ class ConsultaModel(Base):
     ciclo = Column(JSONB, nullable=True)
     orden = Column(Integer, nullable=True)
     activo = Column(Boolean, default=True)
+    egreso = Column(TIMESTAMP(timezone=True), nullable=True)
     
     paciente = relationship("PacienteModel", back_populates="consultas")
     # eventos = relationship("EventoConsultaModel", back_populates="consulta", cascade="all, delete-orphan", passive_deletes=True)

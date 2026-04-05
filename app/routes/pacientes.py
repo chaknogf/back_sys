@@ -64,6 +64,10 @@ def buscar_pacientes(
     cui: Optional[str] = Query(None),
     expediente: Optional[str] = Query(None),
     nombre: Optional[str] = Query(None),
+    primer_nombre: Optional[str] = Query(None),
+    segundo_nombre: Optional[str] = Query(None),
+    primer_apellido: Optional[str] = Query(None),
+    segundo_apellido: Optional[str] = Query(None),
     sexo: Optional[str] = Query(None),
     estado: Optional[str] = Query(None),  # CAMBIO: era "A" por defecto, ahora None
     fecha_nac: Optional[str] = Query(None, description="YYYY-MM-DD"),
@@ -111,7 +115,7 @@ def buscar_pacientes(
             query = query.filter(cast(PacienteModel.cui, String).ilike(f"%{cui}%"))
 
     if expediente:
-        query = query.filter(PacienteModel.expediente.ilike(f"%{expediente}%"))
+        query = query.filter(PacienteModel.expediente == expediente)
 
     if nombre:
         nombre_clean = nombre.strip().upper()
@@ -124,6 +128,15 @@ def buscar_pacientes(
                 func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_apellido').ilike(f"%{nombre_clean}%")
             )
         )
+    if primer_nombre:
+        query = query.filter(func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_nombre').ilike(f"%{primer_nombre.strip().upper()}%"))
+    if segundo_nombre:
+        query = query.filter(func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_nombre').ilike(f"%{segundo_nombre.strip().upper()}%"))
+    if primer_apellido:
+        query = query.filter(func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_apellido').ilike(f"%{primer_apellido.strip().upper()}%"))
+    if segundo_apellido:
+        query = query.filter(func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_apellido').ilike(f"%{segundo_apellido.strip().upper()}%"))
+    
     if id:
         query = query.filter(PacienteModel.id == id)
     if sexo:

@@ -327,3 +327,29 @@ class PacienteConsultaBase(BaseModel):
         extra="ignore"
     )
 
+
+class PacienteNacimientoConstancia(BaseModel):
+    id: int
+    cui: Optional[int] = None
+    expediente: Optional[str] = Field(None, max_length=20)
+    pasaporte: Optional[str] = Field(None, max_length=20)
+    nombre: Nombre 
+    sexo: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    referencias: Optional[List[Referencia]] = None
+    datos_extra: Optional[Dict[str, Any]] = None
+    
+    @field_validator('referencias')
+    @classmethod
+    def filtrar_madre(cls, value):
+        if not value:
+            return value
+        return [r for r in value if r.parentesco == 'madre']
+
+
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        extra="ignore"
+    )

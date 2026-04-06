@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import date, datetime
+from app.schemas.paciente import PacienteNacimientoConstancia
 
 
 class ConstanciaNacimientoBase(BaseModel):
@@ -17,10 +18,11 @@ class ConstanciaNacimientoBase(BaseModel):
     menor_edad: Optional[Dict[str, Any]] = None
     hijos: Optional[int] = None
     vivos: Optional[int] = None
-    muertos: Optional[int] = None
+    muertos: Optional[int] = None 
 
     observaciones: Optional[str] = None
     metadatos: Optional[Dict[str, Any]] = None
+    paciente: Optional[PacienteNacimientoConstancia] = None
 
 
 class ConstanciaNacimientoCreate(ConstanciaNacimientoBase):
@@ -37,12 +39,14 @@ class ConstanciaNacimientoUpdate(BaseModel):
     observaciones: Optional[str] = None
     metadatos: Optional[Dict[str, Any]] = None
     motivo: str  # obligatorio para historial
+    paciente: Optional[PacienteNacimientoConstancia] = None
 
 
 class ConstanciaNacimientoResponse(ConstanciaNacimientoBase):
     id: int
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
+    paciente: Optional[PacienteNacimientoConstancia] = None
 
     class Config:
         from_attributes = True

@@ -15,7 +15,7 @@ from app.models.pacientes import PacienteModel
 from app.schemas.consultas import (
     CicloConsultaUpdate, ConsultaBase, ConsultaCreate, ConsultaListResponse, ConsultaOut, 
     ConsultaUpdate, ConsultaUpdateCiclo, RegistroConsultaCreate, RegistroConsultaOut, 
-    Indicador, CicloClinico, Egreso
+    Indicador, CicloClinico, Egreso, ConsultaHistoriaResumidaOut
 )
 from app.utils.expediente import generar_expediente, generar_emergencia
 from app.database.security import get_current_user
@@ -538,3 +538,37 @@ def registrar_consulta(
         ciclo=[CicloClinico(**c) for c in nueva_consulta.ciclo],
         orden=nueva_consulta.orden
     )
+    
+
+# =============================================================================
+# Consultas por paciente_id
+# =============================================================================
+@router.get("/pacienteId/{paciente_id}", response_model=List[ConsultaHistoriaResumidaOut])
+def buscar_consultas_activas(
+    paciente_id: int,  # ← FALTABA ESTO
+    activo: bool = Query(True, description="Filtrar solo consultas activas"),
+    db: Session = Depends(get_db),
+    limit: int = 100,
+    skip: int = 0,
+    current_user: UserModel = Depends(get_current_user)
+): 
+    query = (
+        db.query(ConsultaModel)
+        .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
+        .filter(ConsultaModel.paciente_id == paciente_id)  # ← FILTRO CLAVE
+    )
+
+    # Filtro por estado activo
+    if activo is not None:
+        query = query.filter(ConsultaModel.activo.is_(activo))
+
+    resultados = (
+        query
+        .distinct()
+        .order_by(ConsultaModel.fecha_consulta.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return resultados

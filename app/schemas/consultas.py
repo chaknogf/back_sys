@@ -8,7 +8,7 @@ from typing import List, Literal, Optional, Dict, Any, Union
 from datetime import date, time
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.schemas.paciente import PacienteConsultaBase, PacienteOutConsulta
+from app.schemas.paciente import PacienteConsultaBase, PacienteOutConsulta, PacientesNombre
 
 
 # ===================================================================
@@ -385,4 +385,15 @@ class ConsultaBaseOut(BaseModel):
     activo: Optional[bool] = None
     egreso: Optional[Egreso] = None
     
+    model_config = ConfigDict(from_attributes=True)
+
+class ConsultaHistoriaResumidaOut(ConsultaBaseOut):
+    id: int
+    paciente: Optional[PacientesNombre] = None
+    tipo_consulta: Optional[int] = None
+    especialidad: Optional[str] = None
+    fecha_consulta: Optional[date] = None
+    hora_consulta: Optional[time] = None
+    
+
     model_config = ConfigDict(from_attributes=True)

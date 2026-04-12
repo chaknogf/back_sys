@@ -353,3 +353,15 @@ class PacienteNacimientoConstancia(BaseModel):
         populate_by_name=True,
         extra="ignore"
     )
+    
+    
+class PacientesNombre(BaseModel):
+    id: int
+    nombre: Nombre
+    expediente: Optional[str] = Field(None, max_length=20) 
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        extra="ignore"
+    )

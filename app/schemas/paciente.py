@@ -365,3 +365,17 @@ class PacientesNombre(BaseModel):
         populate_by_name=True,
         extra="ignore"
     )
+    
+class PacienteContacto(BaseModel):
+    id: int
+    nombre: Nombre
+    sexo: str
+    fecha_nacimiento: date
+    expediente: Optional[str] = Field(None, max_length=20)
+    contacto: Contacto
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        extra="ignore"
+    )

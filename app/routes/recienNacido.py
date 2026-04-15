@@ -105,7 +105,7 @@ def crear_paciente_desde_madre(
 
     # Construir nombre del hijo/a usando Pydantic para validación
     nombre_hijo = Nombre(
-        primer_nombre="HIJA" if payload.sexo == "F" else "HIJO",
+        primer_nombre="Hija de" if payload.sexo == "F" else "Hijo de",
         segundo_nombre=nombre_madre.get("primer_nombre"),
         otro_nombre=" ".join(
             filter(None, [

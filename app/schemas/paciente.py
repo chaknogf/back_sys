@@ -358,7 +358,10 @@ class PacienteNacimientoConstancia(BaseModel):
 class PacientesNombre(BaseModel):
     id: int
     nombre: Nombre
-    expediente: Optional[str] = Field(None, max_length=20) 
+    expediente: Optional[str] = Field(None, max_length=20)
+    sexo: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    contacto: Optional[Contacto] = None
     
     model_config = ConfigDict(
         from_attributes=True,

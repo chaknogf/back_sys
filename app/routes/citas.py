@@ -3,10 +3,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-
+from datetime import datetime, date, time
 from app.database.db import get_db
+from app.models.user import UserModel
 from app.models.citas import CitaModel
-from app.schemas.citas import CitaCreate, CitaUpdate, CitaResponse
+from app.schemas.citas import CitaCreate, CitaUpdate, CitaResponse, CitaBase
+from app.database.security import get_current_user
 
 router = APIRouter(
     prefix="/citas",
@@ -14,9 +16,22 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=CitaResponse)
-def crear_cita(cita: CitaCreate, db: Session = Depends(get_db)):
-    nueva_cita = CitaModel(**cita.dict())
+@router.post("/", response_model=CitaBase)
+def crear_cita(
+    cita: CitaCreate,
+    current_user: UserModel = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    nueva_cita = CitaModel(
+        created_by = current_user.id,  
+        fecha_registro = cita.fecha_registro,  
+        expediente = cita.expediente,
+        paciente_id = cita.paciente_id,
+        especialidad = cita.especialidad,
+        fecha_cita = cita.fecha_cita,
+        datos_extra = cita.datos_extra
+    )
+
     db.add(nueva_cita)
     db.commit()
     db.refresh(nueva_cita)
@@ -29,7 +44,7 @@ def listar_citas(
     expediente: str = None,
     paciente_id: int = None,
     especialidad: str = None,
-    fecha: str = None,
+    fecha_cita: str = None,
     limite: int = 200,
     db: Session = Depends(get_db)):
     query = db.query(CitaModel)
@@ -41,8 +56,8 @@ def listar_citas(
         query = query.filter(CitaModel.paciente_id == paciente_id)
     if especialidad is not None:
         query = query.filter(CitaModel.especialidad == especialidad)
-    if fecha is not None:
-        query = query.filter(CitaModel.agenda == fecha)
+    if fecha_cita is not None:
+        query = query.filter(CitaModel.agenda == fecha_cita)
     return query.limit(limite).all()
 
 

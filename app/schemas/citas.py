@@ -3,16 +3,17 @@
 from pydantic import BaseModel
 from datetime import date, datetime
 from typing import Optional, Dict, Any
+from app.schemas.paciente import PacientesNombre
 
 
 class CitaBase(BaseModel):
-    fecha: Optional[date] = None
+    fecha_registro: Optional[date] = None
     expediente: Optional[str] = None
     paciente_id: Optional[int] = None
     especialidad: Optional[str] = None
-    agenda: Optional[date] = None
+    fecha_cita: Optional[date] = None
     datos_extra: Optional[Dict[str, Any]] = None
-    created_by: Optional[str] = None
+   
 
 
 class CitaCreate(CitaBase):
@@ -20,19 +21,21 @@ class CitaCreate(CitaBase):
 
 
 class CitaUpdate(BaseModel):
-    fecha: Optional[date] = None
+    id: int
+    fecha_registro: Optional[date] = None
     paciente_id: Optional[int] = None
     expediente: Optional[str] = None
     especialidad: Optional[str] = None
-    agenda: Optional[date] = None
+    fecha_cita: Optional[date] = None
     datos_extra: Optional[Dict[str, Any]] = None
-    created_by: Optional[str] = None
+
 
 
 class CitaResponse(CitaBase):
     id: int
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
+    created_by: str
+    paciente: PacientesNombre
+   
 
     class Config:
         from_attributes = True

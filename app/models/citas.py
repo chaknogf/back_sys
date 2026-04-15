@@ -1,7 +1,8 @@
 # app/models/citas.py
 
-from sqlalchemy import Column, Integer, Date, String, ForeignKey, text
+from sqlalchemy import Column, Integer, Date, String, ForeignKey, text, func
 from sqlalchemy.dialects.postgresql import TIMESTAMP, JSONB
+from datetime import date
 from sqlalchemy.orm import relationship
 from app.database.db import Base
 
@@ -11,7 +12,7 @@ class CitaModel(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    fecha = Column(Date, nullable=True)
+    fecha_registro = Column(Date, default=date.today)
     
     expediente = Column(String(20), nullable=True)
 
@@ -23,7 +24,7 @@ class CitaModel(Base):
 
     especialidad = Column(String(6), nullable=True)
 
-    agenda = Column(Date, nullable=True)
+    fecha_cita = Column(Date, nullable=True)
 
     datos_extra = Column(JSONB, nullable=True)
 

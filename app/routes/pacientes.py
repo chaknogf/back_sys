@@ -13,7 +13,7 @@ from app.models.consultas import ConsultaModel
 from app.models.pacientes import PacienteModel
 from app.schemas.paciente import (
     
-    PacienteCreate, PacienteOut, PacienteUpdate, PacienteSimple, PacienteListResponse, MetadataEvento, PacientesConConsultas
+    PacienteCreate, PacienteOut, PacienteUpdate, PacienteContacto, PacienteListResponse, MetadataEvento, PacientesConConsultas
 ) 
 from app.utils.expediente import generar_expediente
 from app.database.security import get_current_user
@@ -478,4 +478,17 @@ def debug_count(db: Session = Depends(get_db)):
         ]
     }
     
+@router.get("/expediente/{expediente}", response_model=PacienteContacto)
+def expediente(
+    expediente: str,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    paciente = db.query(PacienteModel).filter(
+        PacienteModel.expediente == expediente
+    ).first()
 
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+    return paciente

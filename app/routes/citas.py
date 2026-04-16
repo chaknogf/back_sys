@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import datetime, date, time
 from app.database.db import get_db
 from app.models.user import UserModel
@@ -40,12 +40,14 @@ def crear_cita(
 
 @router.get("/", response_model=List[CitaResponse])
 def listar_citas(
-    id: int = None,
-    expediente: str = None,
-    paciente_id: int = None,
-    especialidad: str = None,
-    fecha_cita: str = None,
-    limite: int = 200,
+    id: Optional[int] = None,
+    expediente: Optional[str] = None,
+    paciente_id: Optional[int] = None,
+    especialidad: Optional[str] = None,
+    fecha_cita: Optional[date] = date.now(),
+    limit: int = 200,
+    skip: int = 0,
+    current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)):
     query = db.query(CitaModel)
     if id is not None:
@@ -57,8 +59,8 @@ def listar_citas(
     if especialidad is not None:
         query = query.filter(CitaModel.especialidad == especialidad)
     if fecha_cita is not None:
-        query = query.filter(CitaModel.agenda == fecha_cita)
-    return query.limit(limite).all()
+        query = query.filter(CitaModel.fecha_cita == fecha_cita)
+    return query.offset(skip).limit(limit).all()
 
 
 @router.get("/{cita_id}", response_model=CitaResponse)

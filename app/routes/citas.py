@@ -16,6 +16,8 @@ router = APIRouter(
 )
 
 
+
+
 @router.post("/", response_model=CitaBase)
 def crear_cita(
     cita: CitaCreate,
@@ -44,12 +46,14 @@ def listar_citas(
     expediente: Optional[str] = None,
     paciente_id: Optional[int] = None,
     especialidad: Optional[str] = None,
-    fecha_cita: Optional[date] = date.now(),
+    fecha_cita: Optional[date] = None,
     limit: int = 200,
     skip: int = 0,
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)):
     query = db.query(CitaModel)
+    if fecha_cita is None:
+        fecha_cita = date.today()
     if id is not None:
         query = query.filter(CitaModel.id == id)
     if expediente is not None:
@@ -59,8 +63,9 @@ def listar_citas(
     if especialidad is not None:
         query = query.filter(CitaModel.especialidad == especialidad)
     if fecha_cita is not None:
+
         query = query.filter(CitaModel.fecha_cita == fecha_cita)
-    return query.offset(skip).limit(limit).all()
+    return query.order_by(CitaModel.id.desc()).offset(skip).limit(limit).all()
 
 
 @router.get("/{cita_id}", response_model=CitaResponse)

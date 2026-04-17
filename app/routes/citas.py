@@ -69,7 +69,10 @@ def listar_citas(
 
 
 @router.get("/{cita_id}", response_model=CitaResponse)
-def obtener_cita(cita_id: int, db: Session = Depends(get_db)):
+def obtener_cita(
+    cita_id: int, 
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)):
     cita = db.query(CitaModel).filter(CitaModel.id == cita_id).first()
     if not cita:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
@@ -77,22 +80,41 @@ def obtener_cita(cita_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{cita_id}", response_model=CitaResponse)
-def actualizar_cita(cita_id: int, datos: CitaUpdate, db: Session = Depends(get_db)):
+def actualizar_cita(
+    cita_id: int,
+    datos: CitaUpdate,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     cita = db.query(CitaModel).filter(CitaModel.id == cita_id).first()
 
     if not cita:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
 
-    for key, value in datos.dict(exclude_unset=True).items():
-        setattr(cita, key, value)
+    try:
+        datos_dict = datos.dict(exclude_unset=True)
 
-    db.commit()
-    db.refresh(cita)
+        for campo, valor in datos_dict.items():
+            setattr(cita, campo, valor)
+
+        db.commit()
+        db.refresh(cita)
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al actualizar: {str(e)}"
+        )
+
     return cita
 
 
 @router.delete("/{cita_id}")
-def eliminar_cita(cita_id: int, db: Session = Depends(get_db)):
+def eliminar_cita(
+    cita_id: int, 
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)):
     cita = db.query(CitaModel).filter(CitaModel.id == cita_id).first()
 
     if not cita:

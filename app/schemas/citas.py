@@ -21,8 +21,6 @@ class CitaCreate(CitaBase):
 
 
 class CitaUpdate(BaseModel):
-    id: int
-    fecha_registro: Optional[date] = None
     paciente_id: Optional[int] = None
     expediente: Optional[str] = None
     especialidad: Optional[str] = None

@@ -2,12 +2,13 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timedelta
 from app.database.db import get_db
 from app.models.user import UserModel
 from app.models.citas import CitaModel
-from app.schemas.citas import CitaCreate, CitaUpdate, CitaResponse, CitaBase
+from app.schemas.citas import CitaCreate, CitaUpdate, CitaResponse, CitaBase, CitasPorFechaRazon
 from app.database.security import get_current_user
 
 router = APIRouter(
@@ -65,8 +66,36 @@ def listar_citas(
     if fecha_cita is not None:
 
         query = query.filter(CitaModel.fecha_cita == fecha_cita)
-    return query.order_by(CitaModel.id.desc()).offset(skip).limit(limit).all()
+    return query.order_by(CitaModel.expediente.asc()).offset(skip).limit(limit).all()
 
+@router.get("/disponibles", response_model=List[CitasPorFechaRazon])
+def citas_por_especialidad(
+    especialidad: str,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    fecha_inicio = date.today() + timedelta(days=1)
+    razon = CitaModel.datos_extra['razon_consulta'].astext
+    resultados = (
+        db.query(
+            CitaModel.fecha_cita,
+            razon.label("razon_consulta"),
+            func.count(CitaModel.id).label("total")
+        )
+        .filter(
+            CitaModel.especialidad == especialidad,
+            CitaModel.fecha_cita >= fecha_inicio
+        )
+        .group_by(
+            CitaModel.fecha_cita,
+            razon
+        )
+        .order_by(
+            CitaModel.fecha_cita.asc()
+        )
+        .all()
+    )
+    return resultados
 
 @router.get("/{cita_id}", response_model=CitaResponse)
 def obtener_cita(
@@ -77,6 +106,7 @@ def obtener_cita(
     if not cita:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
     return cita
+
 
 
 @router.put("/{cita_id}", response_model=CitaResponse)

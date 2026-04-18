@@ -29,6 +29,11 @@ class CitaUpdate(BaseModel):
 
 
 
+class CitasPorFechaRazon(BaseModel):
+    fecha_cita: date
+    razon_consulta: Optional[str]
+    total: int
+
 class CitaResponse(CitaBase):
     id: int
     created_by: str

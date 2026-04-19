@@ -234,16 +234,6 @@ class PacienteOut(PacienteOutConsulta):
     model_config = ConfigDict(from_attributes=True)
 
 
-# ===================================================================
-# Lista de pacientes (paginación)
-# ===================================================================
-class PacienteListResponse(BaseModel):
-    total: int
-    pacientes: List[PacienteOut]
-    
-
-    model_config = ConfigDict(from_attributes=True)
-
 
 # ===================================================================
 # Búsqueda rápida para autocomplete
@@ -265,9 +255,32 @@ class PacienteSimple(BaseModel):
             fecha_nacimiento=paciente.fecha_nacimiento
         )
         
-        
 
-        
+class PacientesResumen(BaseModel):
+    id: int
+    cui: Optional[int] = None
+    expediente: Optional[str] = None
+    pasaporte: Optional[str] = None
+    nombre: Nombre
+    nombre_completo: str
+    sexo: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    estado: Optional[str] = None
+    
+
+    model_config = ConfigDict(from_attributes=True) 
+
+# ===================================================================
+# Lista de pacientes (paginación)
+# ===================================================================
+class PacienteListResponse(BaseModel):
+    total: int
+    pacientes: List[PacientesResumen]
+    
+
+    model_config = ConfigDict(from_attributes=True)
+
+  
 class PacienteCreateDerivado(BaseModel):
     """
     Schema para crear un paciente derivado (hijo/a) a partir de la madre.

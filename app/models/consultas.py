@@ -24,8 +24,10 @@ class ConsultaModel(Base):
     egreso = Column(JSONB, nullable=True)
     
     paciente = relationship("PacienteModel", back_populates="consultas")
-    # eventos = relationship("EventoConsultaModel", back_populates="consulta", cascade="all, delete-orphan", passive_deletes=True)
-
+    ciclos = relationship("CiclosConsulta", back_populates="consulta")
+    laboratorios = relationship("Laboratorios",back_populates="consulta")
+    rayos_x = relationship("RayosX", back_populates="consulta")
+    
     __table_args__ = (
         # Índice compuesto para filtros frecuentes y ordenamiento
         Index("idx_consulta_paciente_tipo_fecha", "paciente_id", "tipo_consulta", "fecha_consulta"),
@@ -35,3 +37,4 @@ class ConsultaModel(Base):
     )
 
 
+ 

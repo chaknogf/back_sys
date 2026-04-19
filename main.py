@@ -17,6 +17,7 @@ from app.routes.paises_iso import router as paises
 from app. routes.medicos import router as medicos
 from app.routes.citas import router as citas
 from app.routes.total import router as total
+from app.routes.ciclos import router as ciclos
 
 from app.routes.renap import router as renap
 
@@ -41,8 +42,8 @@ app = FastAPI(
     - Desarrollado por Ronald Chacón  www.ronchak.dev
     """,
     contact={
-        "name": "Departamento de Informática - Hospital General Tipo I de Tecpán Guatemala",
-        "email": "sistemas@hospitaltecpan.gob.gt",
+        "name": "Departamento de Registros Médicos y Estadísticas - Hospital General Tipo I de Tecpán Guatemala",
+        "email": "chaknogf@gmail.com",
     },
     license_info={
         "name": "Ronald Chacón",
@@ -74,6 +75,7 @@ app.include_router(pacientes_duplicados)
 app.include_router(merge_paciente)
 app.include_router(recienNacido)
 app.include_router(consultas)
+app.include_router(ciclos)
 app.include_router(citas)
 app.include_router(medicos)
 app.include_router(nacimientos_legacy)

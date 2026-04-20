@@ -262,13 +262,36 @@ class PacientesResumen(BaseModel):
     expediente: Optional[str] = None
     pasaporte: Optional[str] = None
     nombre: Nombre
-    nombre_completo: str
+    nombre_completo: Optional[str] = None
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     estado: Optional[str] = None
+    defuncion: Optional[str] = None
     
+    @model_validator(mode="before")
+    @classmethod
+    def extraer_defuncion(cls, data):
+        # Si viene como ORM
+        if hasattr(data, "__dict__"):
+            raw = data.__dict__.copy()
+            if "datos_extra" in raw and raw["datos_extra"]:
+                raw["defuncion"] = raw["datos_extra"].get("defuncion")
+            return raw
+        # Si ya es dict
+        if isinstance(data, dict):
+            if "datos_extra" in data and data["datos_extra"]:
+                data["defuncion"] = data["datos_extra"].get("defuncion")
+        return data
 
-    model_config = ConfigDict(from_attributes=True) 
+    model_config = ConfigDict(
+
+        from_attributes=True,
+
+        populate_by_name=True,
+
+        extra="ignore"
+
+    )
 
 # ===================================================================
 # Lista de pacientes (paginación)
@@ -375,11 +398,31 @@ class PacientesNombre(BaseModel):
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     contacto: Optional[Contacto] = None
+    defuncion: Optional[str] = None
     
+    @model_validator(mode="before")
+    @classmethod
+    def extraer_defuncion(cls, data):
+        # Si viene como ORM
+        if hasattr(data, "__dict__"):
+            raw = data.__dict__.copy()
+            if "datos_extra" in raw and raw["datos_extra"]:
+                raw["defuncion"] = raw["datos_extra"].get("defuncion")
+            return raw
+        # Si ya es dict
+        if isinstance(data, dict):
+            if "datos_extra" in data and data["datos_extra"]:
+                data["defuncion"] = data["datos_extra"].get("defuncion")
+        return data
+
     model_config = ConfigDict(
+
         from_attributes=True,
+
         populate_by_name=True,
+
         extra="ignore"
+
     )
     
 class PacienteContacto(BaseModel):
@@ -389,9 +432,29 @@ class PacienteContacto(BaseModel):
     fecha_nacimiento: date
     expediente: Optional[str] = Field(None, max_length=20)
     contacto: Contacto
+    defuncion: Optional[str] = None
     
+    @model_validator(mode="before")
+    @classmethod
+    def extraer_defuncion(cls, data):
+        # Si viene como ORM
+        if hasattr(data, "__dict__"):
+            raw = data.__dict__.copy()
+            if "datos_extra" in raw and raw["datos_extra"]:
+                raw["defuncion"] = raw["datos_extra"].get("defuncion")
+            return raw
+        # Si ya es dict
+        if isinstance(data, dict):
+            if "datos_extra" in data and data["datos_extra"]:
+                data["defuncion"] = data["datos_extra"].get("defuncion")
+        return data
+
     model_config = ConfigDict(
+
         from_attributes=True,
+
         populate_by_name=True,
+
         extra="ignore"
+
     )

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import date
 from app.database.db import get_db
 from app.models.pacientes import PacienteModel
-from app.schemas.paciente import PacienteOut, PacienteCreateDerivado, Nombre
+from app.schemas.paciente import PacienteOut, PacienteCreateDerivado, Nombre, Referencia
 from app.database.security import get_current_user
 from app.models.user import UserModel
 from app.routes.pacientes import agregar_evento
@@ -117,6 +117,27 @@ def crear_paciente_desde_madre(
         segundo_apellido=nombre_madre.get("segundo_apellido"),
         apellido_casada=nombre_madre.get("apellido_casada"),
     )
+    
+    refernciaHijo = Referencia (
+        nombre=nombre_madre,
+        parentesco="Madre",
+        telefono=madre.contacto.get("telefonos") if madre.contacto else None,
+        expediente=madre.expediente,
+        idpersona=str(madre.cui) if madre.cui else (madre.pasaporte or (madre.datos_extra.get("personaid") if madre.datos_extra else None)),
+        responsable=True
+    )
+    
+    datosExtras = {
+        "idpersona_madre": madre.id if madre.id else None,
+    "demograficos": {
+      "idioma": madre.datos_extra.get("demografico", {}).get("idioma") if madre.datos_extra else None,
+      "pueblo": madre.datos_extra.get("demografico", {}).get("pueblo") if madre.datos_extra else None,
+      "vecindad": "0406",
+      "nacionalidad": "GTM",
+      "lugar_nacimiento": "0406"
+    }
+        
+    }
 
     # Crear el nuevo paciente
     nuevo = PacienteModel(
@@ -125,8 +146,10 @@ def crear_paciente_desde_madre(
         fecha_nacimiento=payload.fecha_nacimiento,
         contacto=madre.contacto,
         expediente=expediente,
-        datos_extra=datos_extra,
+        datos_extra=datosExtras,
         estado=payload.estado,
+        referencias=[refernciaHijo]
+
     )
 
     # Evento de creación

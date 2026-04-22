@@ -317,7 +317,7 @@ class PacienteCreateDerivado(BaseModel):
     fecha_nacimiento: date = Field(..., description="Fecha de nacimiento")
     # =========================
     # Datos clínicos neonatales
-    # =========================
+    # ========================= 
     datos_extra: Neonatales = Field(
         ...,
         description="Datos neonatales del recién nacido"

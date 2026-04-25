@@ -36,6 +36,7 @@ EstadoCiclo = Literal[
     "iniciado",       # Estado inicial legacy
     "pendiente",      # Estado inicial
     "admision",       # Paciente admitido
+    "triage",         # En triage
     "signos",         # Toma de signos vitales
     "consulta",       # En consulta con el médico
     "estudios",       # Realizando estudios/laboratorios
@@ -66,41 +67,18 @@ class Egreso(BaseModel):
     referencia: Optional[str] = Field(None, max_length=200, description="Institución o servicio de referencia si aplica")
     diagnosticos: Optional[List[Dict[str, Any]]] = Field(None, description="Lista de diagnósticos al egreso")
     medico: Optional[str] = Field(None, max_length=100, description="Médico responsable del egreso")
-
     model_config = ConfigDict(from_attributes=True)
 
 # ===================================================================
 # Ciclo clínico completo (estructura flexible pero tipada)
 # ===================================================================
 class CicloClinico(BaseModel):
-    """
-    Representa UN registro individual del ciclo clínico.
-    Se acumula en una lista, no se sobrescribe.
-    """
-    # Campos obligatorios de auditoría (siempre se registran)
-    estado: EstadoCiclo = Field(
-        ..., 
-        description="Estado actual del ciclo clínico"
-    )
-    registro: str = Field(..., description="Timestamp ISO del registro")
-    usuario: str = Field(..., description="Usuario que realizó la acción")
-    
-    # Campos clínicos opcionales (se llenan según el flujo)
+    estado: EstadoCiclo
+    registro: str 
+    usuario: str 
     especialidad: Optional[str] = None
     servicio: Optional[str] = None
-    detalle_clinicos: Optional[Dict[str, Any]] = None
-    signos_vitales: Optional[Dict[str, Any]] = None
-    antecedentes: Optional[Dict[str, Any]] = None
-    ordenes: Optional[Dict[str, Any]] = None
-    estudios: Optional[Dict[str, Any]] = None
-    comentario: Optional[Union[str, Dict[str, Any]]] = None  # 👈 Acepta str O dict
-    impresion_clinica: Optional[Dict[str, Any]] = None
-    tratamiento: Optional[Dict[str, Any]] = None
-    examen_fisico: Optional[Dict[str, Any]] = None
-    nota_enfermeria: Optional[Dict[str, Any]] = None
-    contraindicado: Optional[str] = None
-    presa_quirurgica: Optional[Dict[str, Any]] = None
-    egreso: Optional[Dict[str, Any]] = None
+    comentario: Optional[str] = None
 
     @field_validator('estado', mode='before')
     @classmethod
@@ -298,36 +276,75 @@ class ConsultaUpdateCiclo(BaseModel):
         return v
 
 class ConsultaOut(ConsultaBase):
+    expediente: Optional[str] = Field(None, max_length=20)
+    paciente_id: int = Field(..., gt=0)
+    tipo_consulta: Optional[int] = Field(None, ge=1)
+    especialidad: Optional[str] = Field(None, max_length=50)
+    servicio: Optional[str] = Field(None, max_length=50)
+    documento: Optional[str] = Field(None, max_length=20)
+    fecha_consulta: Optional[date] = None
+    hora_consulta: Optional[time] = None
+    indicadores: Optional[Indicador] = None
+    ciclo: Optional[List[CicloUpdate]] = None  
+    orden: Optional[int] = Field(None, ge=0)
+    activo: bool = True
     id: int = Field(..., description="ID único de la consulta")
     paciente: Optional[PacienteConsultaBase] = None
- 
+    ultimo_estado: Optional[str] = None  # ✅ Solo el estado del último ciclo
+    
+
     @field_validator('ciclo', mode='before')
     @classmethod
     def convertir_ciclo_a_lista(cls, v):
-        """
-        Convierte ciclo de dict a lista para compatibilidad
-        con datos legacy.
-        """
         if v is None:
             return None
-        
-        # Si es un dict vacío, retornar lista vacía
         if isinstance(v, dict) and not v:
             return []
-        
-        # Si es un dict con datos, convertir a lista con un elemento
         if isinstance(v, dict):
             return [v]
-        
-        # Si ya es una lista, retornarla tal cual
         if isinstance(v, list):
             return v
-        
-        # Caso inesperado
         return []
 
-    model_config = ConfigDict(from_attributes=True)
+    @model_validator(mode='after')
+    def extraer_ultimo_estado(self):
+        if self.ciclo and len(self.ciclo) > 0:
+            self.ultimo_estado = self.ciclo[-1].estado
+        return self
 
+    model_config = ConfigDict(from_attributes=True)
+    
+class ConsultasModel(BaseModel):
+    id: int
+    expediente: Optional[str] = None
+    paciente_id: int
+    tipo_consulta: Optional[int] = None
+    especialidad: Optional[str] = None
+    servicio: Optional[str] = None
+    documento: Optional[str] = None
+    fecha_consulta: Optional[date] = None
+    hora_consulta: Optional[time] = None
+    indicadores: Optional[Indicador] = None
+    orden: Optional[int] = None
+    activo: bool = True
+    paciente: Optional[PacientesNombre] = None
+    ultimo_estado: Optional[str] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def extraer_ultimo_estado(cls, data):
+        ciclo = getattr(data, 'ciclo', None) or []
+        if isinstance(ciclo, dict):
+            ciclo = [ciclo]
+        if ciclo:
+            ultimo = ciclo[-1]
+            data.__dict__['ultimo_estado'] = (
+                ultimo.get('estado') if isinstance(ultimo, dict) 
+                else getattr(ultimo, 'estado', None)
+            )
+        return data
+
+    model_config = ConfigDict(from_attributes=True)
 
 class RegistroConsultaOut(BaseModel):
     id: int

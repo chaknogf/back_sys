@@ -13,7 +13,7 @@ from app.database.db import get_db
 from app.models.consultas import ConsultaModel
 from app.models.pacientes import PacienteModel
 from app.schemas.consultas import (
-    CicloConsultaUpdate, ConsultaBase, ConsultaCreate, ConsultaListResponse, ConsultaOut, 
+    CicloConsultaUpdate, ConsultasModel, ConsultaOut,
     ConsultaUpdate, ConsultaUpdateCiclo, RegistroConsultaCreate, RegistroConsultaOut, 
     Indicador, CicloClinico, Egreso, ConsultaHistoriaResumidaOut
 )
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/consultas", tags=["Consultas Médicas"])
 # BUSCAR CONSULTAS (TODAS)
 # =============================================================================
 
-@router.get("/", response_model=List[ConsultaOut])
+@router.get("/", response_model=List[ConsultasModel])
 def buscar_consultas_activas(
     paciente_id: Optional[int] = None,
     expediente: Optional[str] = None,
@@ -46,7 +46,7 @@ def buscar_consultas_activas(
     limit: int = 100,
     skip: int = 0,
     current_user: UserModel = Depends(get_current_user)
-): 
+     ): 
     query = (
         db.query(ConsultaModel)
         .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
@@ -150,7 +150,7 @@ def actualizar_consulta(
     update_data: ConsultaUpdate,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
-):
+    ):
     """
     Actualiza una consulta existente.
     
@@ -297,7 +297,7 @@ def actualizar_consulta(
     consulta_in: ConsultaUpdate,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
-):
+  ):
     """
     Endpoint específico para agregar un nuevo registro al ciclo clínico.
     También permite actualizar otros campos de la consulta simultáneamente.
@@ -398,11 +398,11 @@ def agregar_ciclo_a_consulta(
 # REGISTRO DE CONSULTA - ENDPOINT SIMPLIFICADO
 # =============================================================================
 @router.post("/registro", response_model=RegistroConsultaOut, status_code=201)
-def registrar_consulta(
+def registrar_consulta( 
     datos: RegistroConsultaCreate,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
-):
+        ):
     """
     Registro rápido de consulta:
     - Tipos 1 y 2:
@@ -551,7 +551,7 @@ def buscar_consultas_activas(
     limit: int = 100,
     skip: int = 0,
     current_user: UserModel = Depends(get_current_user)
-): 
+                                                                ): 
     query = (
         db.query(ConsultaModel)
         .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)

@@ -15,7 +15,7 @@ from app.models.pacientes import PacienteModel
 from app.schemas.consultas import (
     CicloConsultaUpdate, ConsultasModel, ConsultaOut,
     ConsultaUpdate, ConsultaUpdateCiclo, RegistroConsultaCreate, RegistroConsultaOut, 
-    Indicador, CicloClinico, Egreso, ConsultaHistoriaResumidaOut
+    Indicador, CicloClinico, Egreso, ConsultaHistoriaResumidaOut, ConsultaListResponse
 )
 from app.utils.expediente import generar_expediente, generar_emergencia
 from app.database.security import get_current_user
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/consultas", tags=["Consultas Médicas"])
 # BUSCAR CONSULTAS (TODAS)
 # =============================================================================
 
-@router.get("/", response_model=List[ConsultasModel])
+@router.get("/", response_model=ConsultaListResponse)
 def buscar_consultas_activas(
     paciente_id: Optional[int] = None,
     expediente: Optional[str] = None,
@@ -43,8 +43,8 @@ def buscar_consultas_activas(
     fecha: Optional[date] = None,
     activo: bool = Query(True, description="Filtrar solo consultas activas"),
     db: Session = Depends(get_db),
-    limit: int = 100,
-    skip: int = 0,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     current_user: UserModel = Depends(get_current_user)
      ): 
     query = (
@@ -114,6 +114,7 @@ def buscar_consultas_activas(
             .ilike(f"%{segundo_apellido}%")
         )
 
+    total = query.count()
     resultados = (
         query
         .distinct()
@@ -122,7 +123,10 @@ def buscar_consultas_activas(
         .all()
     )
 
-    return resultados
+    return ConsultaListResponse(
+        total=total,
+        consultas=resultados
+    )
 
 
 # =============================================================================

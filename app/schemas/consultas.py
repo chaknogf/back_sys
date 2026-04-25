@@ -9,7 +9,7 @@ from datetime import date, time
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.paciente import PacienteConsultaBase, PacienteOutConsulta, PacientesNombre
-
+ 
 
 # ===================================================================
 # Indicadores clínicos (banderas sí/no)
@@ -369,7 +369,7 @@ class RegistroConsultaOut(BaseModel):
 # ===================================================================
 class ConsultaListResponse(BaseModel):
     total: int
-    consultas: List[ConsultaOut]
+    consultas: List[ConsultasModel]
 
     model_config = ConfigDict(from_attributes=True)
 

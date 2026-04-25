@@ -6,6 +6,19 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.schemas.consultas import ConsultaHistoriaResumidaOut
 
 # ===================================================================
+# Egreso clínico
+# ===================================================================
+class Egreso(BaseModel):
+    """Datos del egreso médico de la consulta"""
+    registro: Optional[str] = Field(None, description="Timestamp ISO del egreso")
+    condicion: Optional[str] = Field(None, max_length=100, description="Condición al egreso: alta, fallecido, referido, etc.")
+    referencia: Optional[str] = Field(None, max_length=200, description="Institución o servicio de referencia si aplica")
+    diagnosticos: Optional[List[Dict[str, Any]]] = Field(None, description="Lista de diagnósticos al egreso")
+    medico: Optional[str] = Field(None, max_length=100, description="Médico responsable del egreso")
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ===================================================================
 # Schema base (común)
 # ===================================================================
 class CicloConsultaBase(BaseModel): #para crear y actualizar
@@ -18,7 +31,7 @@ class CicloConsultaBase(BaseModel): #para crear y actualizar
     servicio: Optional[str] = None
     contenido: Optional[str] = None
     datos_medicos: Optional[Dict[str, Any]] = None
-    
+    egreso: Optional[Egreso] = None
     model_config = ConfigDict(from_attributes=True)
 
 class CicloConsulta (CicloConsultaBase): #para mostrar un ciclo consulta específico

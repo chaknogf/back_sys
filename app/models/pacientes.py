@@ -35,7 +35,17 @@ class PacienteModel(Base):
     )
 
     consultas = relationship("ConsultaModel", back_populates="paciente", cascade="all, delete-orphan")
-    constancias_nacimiento = relationship( "ConstanciaNacimientoModel",  back_populates="paciente")
+    constancias_nacimiento = relationship(
+    "ConstanciaNacimientoModel",
+    foreign_keys="ConstanciaNacimientoModel.paciente_id",  # 🔥 CLAVE
+    back_populates="paciente"
+)
+
+    constancias_como_madre = relationship(
+        "ConstanciaNacimientoModel",
+        foreign_keys="ConstanciaNacimientoModel.madre_id",
+        back_populates="madre"
+    )
     citas = relationship("CitaModel", back_populates="paciente")
 
     @validates("nombre")

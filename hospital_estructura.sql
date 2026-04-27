@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict je6dDKbJVFZm2RvgAXpPXdkV7vLEHt5OczvaN9lbUcWIjfLK8XimJFET6jS20DO
+\restrict cjgzkUfcJkWSpJabufHO4qDfRP0L5QP30IO3sE8UHzprWGxFHWI88KgL60kxJuQ
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -90,22 +90,60 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: ciclos_consulta; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ciclos_consulta (
+    id integer NOT NULL,
+    consulta_id integer NOT NULL,
+    numero integer NOT NULL,
+    activo boolean DEFAULT true NOT NULL,
+    registro timestamp without time zone DEFAULT now() NOT NULL,
+    usuario text NOT NULL,
+    especialidad text,
+    servicio text,
+    contenido text,
+    datos_medicos jsonb,
+    created_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT check_numero_positivo CHECK ((numero > 0))
+);
+
+
+--
+-- Name: ciclos_consulta_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ciclos_consulta_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ciclos_consulta_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ciclos_consulta_id_seq OWNED BY public.ciclos_consulta.id;
+
+
+--
 -- Name: citas; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.citas (
     id integer NOT NULL,
-    fecha date,
+    fecha_registro date,
     paciente_id integer,
-    especialidad integer,
+    especialidad character varying(6),
     fecha_cita date,
-    nota character varying(255),
-    tipo integer,
+    datos_extra jsonb,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     created_by character varying(8),
-    lab integer,
-    fecha_lab date
+    expediente character varying(20)
 );
 
 
@@ -140,13 +178,13 @@ CREATE TABLE public.constancia_medica_control (
 
 CREATE TABLE public.constancia_nacimiento (
     id integer NOT NULL,
-    documento character varying(20) NOT NULL,
+    documento character varying(20),
     paciente_id integer NOT NULL,
-    medico_id integer NOT NULL,
-    registrador_id integer NOT NULL,
-    nombre_madre character varying(200) NOT NULL,
+    medico_id integer,
+    registrador_id integer,
+    nombre_madre character varying(200),
     vecindad_madre character varying(200),
-    fecha_registro date DEFAULT CURRENT_DATE NOT NULL,
+    fecha_registro date DEFAULT CURRENT_DATE,
     menor_edad jsonb,
     hijos integer,
     vivos integer,
@@ -154,7 +192,8 @@ CREATE TABLE public.constancia_nacimiento (
     observaciones text,
     metadatos jsonb,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    madre_id integer
 );
 
 
@@ -242,7 +281,8 @@ CREATE TABLE public.consultas (
     orden integer,
     creado_en timestamp without time zone DEFAULT now(),
     actualizado_en timestamp without time zone DEFAULT now(),
-    activo boolean DEFAULT true NOT NULL
+    activo boolean DEFAULT true NOT NULL,
+    egreso jsonb
 );
 
 
@@ -333,6 +373,44 @@ CREATE TABLE public.expediente_control (
     ultimo_correlativo integer DEFAULT 0 NOT NULL,
     actualizado_en timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
+
+
+--
+-- Name: laboratorios; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.laboratorios (
+    id integer NOT NULL,
+    cod_lab text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    registro timestamp without time zone,
+    usuario text,
+    activo boolean DEFAULT true NOT NULL,
+    ciclo_consulta_id integer,
+    consulta_id integer NOT NULL,
+    resultados jsonb,
+    metadatos jsonb
+);
+
+
+--
+-- Name: laboratorios_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.laboratorios_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: laboratorios_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.laboratorios_id_seq OWNED BY public.laboratorios.id;
 
 
 --
@@ -517,6 +595,44 @@ ALTER SEQUENCE public.paises_iso_id_seq OWNED BY public.paises_iso.id;
 
 
 --
+-- Name: rayos_x; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.rayos_x (
+    id integer NOT NULL,
+    cod_rx text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    registro timestamp without time zone,
+    usuario text,
+    activo boolean DEFAULT true NOT NULL,
+    ciclo_consulta_id integer,
+    consulta_id integer NOT NULL,
+    resultados jsonb,
+    metadatos jsonb
+);
+
+
+--
+-- Name: rayos_x_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.rayos_x_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: rayos_x_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.rayos_x_id_seq OWNED BY public.rayos_x.id;
+
+
+--
 -- Name: users; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -627,6 +743,13 @@ UNION ALL
 
 
 --
+-- Name: ciclos_consulta id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ciclos_consulta ALTER COLUMN id SET DEFAULT nextval('public.ciclos_consulta_id_seq'::regclass);
+
+
+--
 -- Name: constancia_nacimiento id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -655,6 +778,13 @@ ALTER TABLE ONLY public.eventos_consulta ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
+-- Name: laboratorios id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.laboratorios ALTER COLUMN id SET DEFAULT nextval('public.laboratorios_id_seq'::regclass);
+
+
+--
 -- Name: medicos id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -676,10 +806,25 @@ ALTER TABLE ONLY public.paises_iso ALTER COLUMN id SET DEFAULT nextval('public.p
 
 
 --
+-- Name: rayos_x id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rayos_x ALTER COLUMN id SET DEFAULT nextval('public.rayos_x_id_seq'::regclass);
+
+
+--
 -- Name: users id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
+
+
+--
+-- Name: ciclos_consulta ciclos_consulta_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ciclos_consulta
+    ADD CONSTRAINT ciclos_consulta_pkey PRIMARY KEY (id);
 
 
 --
@@ -771,6 +916,14 @@ ALTER TABLE ONLY public.expediente_control
 
 
 --
+-- Name: laboratorios laboratorios_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.laboratorios
+    ADD CONSTRAINT laboratorios_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: medicos medicos_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -851,11 +1004,62 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: rayos_x rayos_x_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rayos_x
+    ADD CONSTRAINT rayos_x_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ciclos_consulta unique_ciclo_por_consulta; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ciclos_consulta
+    ADD CONSTRAINT unique_ciclo_por_consulta UNIQUE (consulta_id, numero);
+
+
+--
 -- Name: municipios unique_codigo; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.municipios
     ADD CONSTRAINT unique_codigo UNIQUE (codigo);
+
+
+--
+-- Name: idx_ciclos_activo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ciclos_activo ON public.ciclos_consulta USING btree (activo);
+
+
+--
+-- Name: idx_ciclos_consulta_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ciclos_consulta_id ON public.ciclos_consulta USING btree (consulta_id);
+
+
+--
+-- Name: idx_ciclos_datos_medicos; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ciclos_datos_medicos ON public.ciclos_consulta USING gin (datos_medicos);
+
+
+--
+-- Name: idx_ciclos_registro; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ciclos_registro ON public.ciclos_consulta USING btree (registro);
+
+
+--
+-- Name: idx_ciclos_timeline; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ciclos_timeline ON public.ciclos_consulta USING btree (consulta_id, registro DESC);
 
 
 --
@@ -982,6 +1186,48 @@ CREATE INDEX idx_eventos_consulta_tipo_evento ON public.eventos_consulta USING b
 --
 
 CREATE INDEX idx_fecha_nacimiento ON public.pacientes USING btree (fecha_nacimiento);
+
+
+--
+-- Name: idx_lab_activo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_lab_activo ON public.laboratorios USING btree (activo);
+
+
+--
+-- Name: idx_lab_ciclo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_lab_ciclo ON public.laboratorios USING btree (ciclo_consulta_id);
+
+
+--
+-- Name: idx_lab_consulta; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_lab_consulta ON public.laboratorios USING btree (consulta_id);
+
+
+--
+-- Name: idx_lab_registro; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_lab_registro ON public.laboratorios USING btree (registro);
+
+
+--
+-- Name: idx_lab_resultados; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_lab_resultados ON public.laboratorios USING gin (resultados);
+
+
+--
+-- Name: idx_lab_timeline; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_lab_timeline ON public.laboratorios USING btree (consulta_id, created_at DESC);
 
 
 --
@@ -1132,10 +1378,60 @@ CREATE INDEX idx_referencias_gin ON public.pacientes USING gin (referencias);
 
 
 --
+-- Name: idx_rx_activo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_rx_activo ON public.rayos_x USING btree (activo);
+
+
+--
+-- Name: idx_rx_ciclo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_rx_ciclo ON public.rayos_x USING btree (ciclo_consulta_id);
+
+
+--
+-- Name: idx_rx_consulta; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_rx_consulta ON public.rayos_x USING btree (consulta_id);
+
+
+--
+-- Name: idx_rx_registro; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_rx_registro ON public.rayos_x USING btree (registro);
+
+
+--
+-- Name: idx_rx_resultados; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_rx_resultados ON public.rayos_x USING gin (resultados);
+
+
+--
+-- Name: idx_rx_timeline; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_rx_timeline ON public.rayos_x USING btree (consulta_id, created_at DESC);
+
+
+--
 -- Name: pacientes trg_set_nombre_completo; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER trg_set_nombre_completo BEFORE INSERT OR UPDATE ON public.pacientes FOR EACH ROW EXECUTE FUNCTION public.actualizar_nombre_completo();
+
+
+--
+-- Name: ciclos_consulta ciclos_consulta_consulta_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ciclos_consulta
+    ADD CONSTRAINT ciclos_consulta_consulta_id_fkey FOREIGN KEY (consulta_id) REFERENCES public.consultas(id) ON UPDATE CASCADE ON DELETE RESTRICT;
 
 
 --
@@ -1144,6 +1440,14 @@ CREATE TRIGGER trg_set_nombre_completo BEFORE INSERT OR UPDATE ON public.pacient
 
 ALTER TABLE ONLY public.citas
     ADD CONSTRAINT fk_citas_paciente FOREIGN KEY (paciente_id) REFERENCES public.pacientes(id) ON UPDATE CASCADE ON DELETE RESTRICT;
+
+
+--
+-- Name: constancia_nacimiento fk_constancia_madre; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.constancia_nacimiento
+    ADD CONSTRAINT fk_constancia_madre FOREIGN KEY (madre_id) REFERENCES public.pacientes(id) ON UPDATE CASCADE ON DELETE SET NULL;
 
 
 --
@@ -1187,8 +1491,40 @@ ALTER TABLE ONLY public.constancia_nacimiento_historial
 
 
 --
+-- Name: laboratorios laboratorios_ciclo_consulta_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.laboratorios
+    ADD CONSTRAINT laboratorios_ciclo_consulta_id_fkey FOREIGN KEY (ciclo_consulta_id) REFERENCES public.ciclos_consulta(id) ON UPDATE CASCADE ON DELETE SET NULL;
+
+
+--
+-- Name: laboratorios laboratorios_consulta_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.laboratorios
+    ADD CONSTRAINT laboratorios_consulta_id_fkey FOREIGN KEY (consulta_id) REFERENCES public.consultas(id) ON UPDATE CASCADE ON DELETE RESTRICT;
+
+
+--
+-- Name: rayos_x rayos_x_ciclo_consulta_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rayos_x
+    ADD CONSTRAINT rayos_x_ciclo_consulta_id_fkey FOREIGN KEY (ciclo_consulta_id) REFERENCES public.ciclos_consulta(id) ON UPDATE CASCADE ON DELETE SET NULL;
+
+
+--
+-- Name: rayos_x rayos_x_consulta_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rayos_x
+    ADD CONSTRAINT rayos_x_consulta_id_fkey FOREIGN KEY (consulta_id) REFERENCES public.consultas(id) ON UPDATE CASCADE ON DELETE RESTRICT;
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict je6dDKbJVFZm2RvgAXpPXdkV7vLEHt5OczvaN9lbUcWIjfLK8XimJFET6jS20DO
+\unrestrict cjgzkUfcJkWSpJabufHO4qDfRP0L5QP30IO3sE8UHzprWGxFHWI88KgL60kxJuQ
 

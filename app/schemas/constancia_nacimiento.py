@@ -67,7 +67,7 @@ class ConstanciaNacimientoResponse(ConstanciaNacimientoBase):
     # Relaciones serializadas
     paciente: Optional[PacienteNacimientoConstancia] = None
     # Si en el futuro serializas la madre también, agrega:
-    # madre: Optional[PacienteNacimientoConstancia] = None
+    madre: Optional[PacienteNacimientoConstancia] = None
 
     class Config:
         from_attributes = True

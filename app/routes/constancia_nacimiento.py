@@ -1,6 +1,6 @@
 from datetime import date
 from typing import Optional
-
+from app.utils.expediente import generar_constancia_nacimiento as generar_cn
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
@@ -67,6 +67,23 @@ def obtener_historial_constancia(
     historial = db.query(ConstanciaNacimientoHistorialModel).filter_by(constancia_id=constancia_id).all()
     return historial
 
+@router.get("/{constancia_id}", response_model=ConstanciaNacimientoResponse)
+def obtener_constanciaNac(
+    constancia_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    data = db.query(ConstanciaNacimientoModel).filter(
+        ConstanciaNacimientoModel.id == constancia_id
+    ).first()
+
+    if not data:
+        raise HTTPException(status_code=404, detail="No encontrado")
+
+    return data
+    
+    
+
 @router.put("/{constancia_id}", response_model=ConstanciaNacimientoResponse)
 def actualizar_constancia(
     constancia_id: int,
@@ -78,9 +95,12 @@ def actualizar_constancia(
     if not constancia:
         raise HTTPException(status_code=404, detail="Constancia no encontrada")
 
+    # ── Auto-generar documento si aún no tiene ────────────────────────────
+    if not constancia.documento:
+        constancia.documento = generar_cn(db)
+
     # Guardar historial antes de modificar
     state = inspect(constancia)
-
     historial = ConstanciaNacimientoHistorialModel(
         constancia_id=constancia.id,
         datos_anteriores={
@@ -90,11 +110,10 @@ def actualizar_constancia(
         usuario_id=current_user.id,
         motivo=data.motivo
     )
-
     db.add(historial)
 
     update_data = data.model_dump(exclude_unset=True)
-    update_data.pop("motivo")
+    update_data.pop("motivo", None)
 
     for key, value in update_data.items():
         setattr(constancia, key, value)
@@ -103,7 +122,6 @@ def actualizar_constancia(
     db.refresh(constancia)
 
     return constancia
-
 
 @router.delete("/{constancia_id}")
 def eliminar_constancia(

@@ -2,8 +2,10 @@ from datetime import date
 from typing import Optional
 from app.utils.expediente import generar_constancia_nacimiento as generar_cn
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import inspect
+from sqlalchemy import inspect, desc
 from sqlalchemy.orm import Session
+from datetime import date, datetime
+from decimal import Decimal
 from app.database.db import get_db
 from app.database.security import get_current_user
 from app.models.user import UserModel
@@ -18,6 +20,13 @@ from app.schemas.constancia_nacimiento import (
 
 router = APIRouter(prefix="/constancias-nacimiento", tags=["Constancias Nacimiento"])
 
+
+def _serializar(v):
+    if isinstance(v, (date, datetime)):
+        return v.isoformat()
+    if isinstance(v, Decimal):
+        return float(v)
+    return v
 
 @router.post("/", response_model=ConstanciaNacimientoResponse)
 def crear_constancia(
@@ -54,7 +63,7 @@ def listar_constancias(
         query = query.filter(ConstanciaNacimientoModel.fecha_registro == fecha)
     if documento is not None:
         query = query.filter(ConstanciaNacimientoModel.documento == documento)
-    constancias = query.offset(offset).limit(limit).all()
+    constancias = query.order_by(desc(ConstanciaNacimientoModel.id)).offset(offset).limit(limit).all()
     return constancias
 
 @router.get("/historial/{constancia_id}",
@@ -96,7 +105,7 @@ def actualizar_constancia(
         raise HTTPException(status_code=404, detail="Constancia no encontrada")
 
     # ── Auto-generar documento si aún no tiene ────────────────────────────
-    if not constancia.documento:
+    if not constancia.documento or not constancia.documento.strip():
         constancia.documento = generar_cn(db)
 
     # Guardar historial antes de modificar
@@ -104,16 +113,16 @@ def actualizar_constancia(
     historial = ConstanciaNacimientoHistorialModel(
         constancia_id=constancia.id,
         datos_anteriores={
-            attr.key: getattr(constancia, attr.key)
+            attr.key: _serializar(getattr(constancia, attr.key))
             for attr in state.mapper.column_attrs
         },
-        usuario_id=current_user.id,
-        motivo=data.motivo
-    )
+    usuario_id=current_user.id,
+   
+)
     db.add(historial)
 
     update_data = data.model_dump(exclude_unset=True)
-    update_data.pop("motivo", None)
+   
 
     for key, value in update_data.items():
         setattr(constancia, key, value)

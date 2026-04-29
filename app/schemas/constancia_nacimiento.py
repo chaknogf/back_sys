@@ -1,7 +1,9 @@
+# app/schema/constancia_nacimiento.py
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import date, datetime
 from app.schemas.paciente import PacienteNacimientoConstancia
+from app.schemas.medicos import MedicoBase
 
 
 class ConstanciaNacimientoBase(BaseModel):
@@ -40,7 +42,7 @@ class ConstanciaNacimientoCreate(ConstanciaNacimientoBase):
 class ConstanciaNacimientoUpdate(BaseModel):
     """
     Todos los campos editables son opcionales.
-    motivo es obligatorio para registrar historial.
+    
     """
     medico_id: Optional[int] = None
     documento: Optional[str] = Field(None, max_length=20)
@@ -56,8 +58,7 @@ class ConstanciaNacimientoUpdate(BaseModel):
     observaciones: Optional[str] = None
     metadatos: Optional[Dict[str, Any]] = None
 
-    motivo: str                                         # obligatorio para historial
-
+    
 
 class ConstanciaNacimientoResponse(ConstanciaNacimientoBase):
     id: int
@@ -67,7 +68,8 @@ class ConstanciaNacimientoResponse(ConstanciaNacimientoBase):
     # Relaciones serializadas
     paciente: Optional[PacienteNacimientoConstancia] = None
     # Si en el futuro serializas la madre también, agrega:
-    madre: Optional[PacienteNacimientoConstancia] = None
+    madre: Optional[PacienteNacimientoConstancia] = None 
+    medico: Optional[MedicoBase] = None
 
     class Config:
         from_attributes = True
@@ -78,7 +80,6 @@ class ConstanciaNacimientoHistorialResponse(BaseModel):
     constancia_id: int
     datos_anteriores: Dict[str, Any]
     usuario_id: int
-    motivo: str
     fecha: datetime
 
     class Config:

@@ -10,7 +10,7 @@ from app.schemas.paciente import PacienteOut, PacienteCreateDerivado, Nombre, Re
 from app.database.security import get_current_user
 from app.models.user import UserModel
 from app.routes.pacientes import agregar_evento
-from app.utils.expediente import generar_expediente
+from app.utils.expediente import generar_expediente, generar_constancia_nacimiento
 
 router = APIRouter(prefix="/pacientes", tags=["Pacientes"])
 
@@ -144,6 +144,7 @@ def crear_paciente_desde_madre(
         paciente_id=nuevo.id,       # ← neonato recién creado
         madre_id=madre.id,          # ← FK nueva a pacientes
         registrador_id=current_user.id,
+        documento=generar_constancia_nacimiento(db),
         nombre_madre=nombre_madre_str,
         vecindad_madre=str(vecindad_madre) if vecindad_madre else None,
         # medico_id, documento, hijos, vivos, muertos → nullable, se completan después con PUT

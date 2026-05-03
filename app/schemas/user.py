@@ -11,19 +11,16 @@ class UserBase(BaseModel):
     nombre: str = Field(..., min_length=3, max_length=100, description="Nombre completo del usuario")
     username: str = Field(..., min_length=4, max_length=20, description="Nombre de usuario único")
     email: EmailStr = Field(..., description="Correo electrónico válido")
-    role: str = Field(
-        ..., 
-        pattern=r"^(admin|medico|enfermeria|recepcion|laboratorio|farmacia|usuario|registros)$",
-        description="Rol del usuario en el sistema"
-    )
+    role: str 
     unidad: Optional[int] = Field(None, ge=1, description="ID de la unidad de salud")
     estado: str = Field("A", pattern=r"^(A|I)$", description="A=Activo, I=Inactivo")
     datos_extra: Optional[dict] = None
 
 
-class UserCreate(UserBase):
-    """Para crear un nuevo usuario (admin o registro)"""
-    password: str = Field(..., min_length=4, description="Contraseña plana (se hashea con Argon2)")
+class UserCreate(BaseModel):
+   nombre: str = Field(..., min_length=3, max_length=100, description="Nombre completo del usuario")
+   username: str = Field(..., min_length=4, max_length=20, description="Nombre de usuario único")
+   email: EmailStr = Field(..., description="Correo electrónico válido")
 
 
 class UserUpdate(BaseModel):
@@ -33,10 +30,12 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     unidad: Optional[int] = None
     estado: Optional[str] = None
-    password: Optional[str] = Field(None, min_length=4, description="Nueva contraseña (opcional)")
     datos_extra: Optional[dict] = None
     
-
+class RecuperarPassword(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=4)
+    
 
 class UserResponse(UserBase):
     id: Optional[int] = None

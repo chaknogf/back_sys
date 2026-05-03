@@ -19,19 +19,29 @@ def login(
     db: Session = Depends(get_db)
 ):
     user = db.query(UserModel).filter(UserModel.username == form_data.username).first()
-    
-    if not user or not verify_password(form_data.password, user.password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario o contraseña incorrectos",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    access_token = create_access_token(data={"sub": user.username, "role": user.role})
-
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+    if not verify_password(form_data.password, user.password):
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+    if user.estado != "A":
+        if user.estado == "I":
+            raise HTTPException(403, "Cuenta no activada. Revise su correo.")
+        elif user.estado == "B":
+            raise HTTPException(403, "Cuenta bloqueada.")
+        else:
+            raise HTTPException(403, "Usuario no autorizado.")
+    access_token = create_access_token(
+        data={"sub": user.username, "role": user.role, "estado": user.estado}
+    )
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
-        expires_in=86400,  # 24 horas
-        user={"id": user.id, "nombre": user.nombre, "role": user.role, "unidad": user.unidad}
+        expires_in=86400,
+        user={
+            "id": user.id,
+            "nombre": user.nombre,
+            "role": user.role,
+            "unidad": user.unidad
+        }
+
     )

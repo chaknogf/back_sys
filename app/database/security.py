@@ -79,36 +79,44 @@ def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     db: Session = Depends(get_db),
 ) -> UserModel:
-    """
-    Decodifica el JWT y devuelve el usuario autenticado
-    como una instancia de UserModel.
-    """
-
+    """Decodifica el JWT y devuelve el usuario autenticado
+    como una instancia de UserModel."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Token inválido o expirado",
         headers={"WWW-Authenticate": "Bearer"},
     )
-
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str | None = payload.get("sub")
-
         if not username:
             raise credentials_exception
-
     except JWTError:
         raise credentials_exception
-
     user = (
         db.query(UserModel)
         .filter(UserModel.username == username)
         .first()
     )
-
     if not user:
         raise credentials_exception
-
+    # 🔥 VALIDACIÓN CRÍTICA DE ESTADO
+    if user.estado != "A":
+        if user.estado == "I":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cuenta no activada"
+            )
+        elif user.estado == "B":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cuenta bloqueada"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario no autorizado"
+            )
     return user
 
 # ======================================================

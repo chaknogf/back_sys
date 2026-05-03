@@ -4,11 +4,11 @@ CRUD completo de usuarios - Solo admins
 """
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.database.db import get_db
 from app.models.user import UserModel
-from app.schemas.user import UserCreate, UserResponse, UserUpdate, UserBase
+from app.schemas.user import UserCreate, UserResponse, UserUpdate, UserBase, UsersList
 from app.database.security import get_current_user, hash_password
 from app.config.mail_config import conf
 from fastapi_mail import FastMail, MessageSchema, MessageType
@@ -17,20 +17,45 @@ router = APIRouter(prefix="/users", tags=["Usuarios"])
 
 
 # === LISTAR USUARIOS ===
-@router.get("/", response_model=List[UserResponse])
+@router.get("/", response_model=UsersList)
 def listar_usuarios(
+    username: Optional[str] = None,
+    id: Optional[int] = None,
+    email: Optional[str] = None,
+    rol: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    # Opcional: solo admins
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="No autorizado")
 
-    usuarios = db.query(UserModel).offset(skip).limit(limit).all()
-    return usuarios
+    query = db.query(UserModel)
 
+    # 🔍 Filtros
+    if id is not None:
+        query = query.filter(UserModel.id == id)
+
+    if username:
+        query = query.filter(UserModel.username.ilike(f"%{username}%"))
+
+    if email:
+        query = query.filter(UserModel.email.ilike(f"%{email}%"))
+
+    if rol:
+        query = query.filter(UserModel.role == rol)
+
+    # 📊 Total antes de paginar
+    total = query.count()
+
+    # 📦 Datos paginados
+    usuarios = query.offset(skip).limit(limit).all()
+
+    return {
+        "total": total,
+        "usuarios": usuarios
+    }
 
 # === CREAR USUARIO + CORREO BIENVENIDA ===
 @router.post("/", response_model=UserResponse, status_code=201)

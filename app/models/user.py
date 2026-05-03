@@ -25,3 +25,4 @@ class UserModel(Base):
     @property
     def is_admin(self) -> bool:
         return self.role == "admin"
+    

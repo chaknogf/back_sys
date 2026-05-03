@@ -39,10 +39,13 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(UserBase):
-    """Respuesta al frontend - NUNCA incluye password"""
-    id: int = Field(..., description="ID único del usuario")
-    # creado_en: Optional[datetime] = None
-    # actualizado_en: Optional[datetime] = None
+    id: Optional[int] = None
+    nombre: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[str] = None
+    unidad: Optional[int] = None
+    estado: Optional[str] = None
+    datos_extra: Optional[dict] = None
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -55,4 +58,9 @@ class UserInDB(UserResponse):
     """Solo para uso interno (CRUD) - incluye hash"""
     password: str  # Hash Argon2
 
+    model_config = ConfigDict(from_attributes=True)
+    
+class UsersList(BaseModel):
+    total: int
+    usuarios: list[UserResponse]
     model_config = ConfigDict(from_attributes=True)

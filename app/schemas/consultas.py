@@ -8,7 +8,7 @@ from typing import List, Literal, Optional, Dict, Any, Union
 from datetime import date, time
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.schemas.paciente import PacienteConsultaBase, PacienteOutConsulta, PacientesNombre
+from app.schemas.paciente import PacienteConsultaBase, PacientesNombre, PacienteSchema
  
 
 # ===================================================================
@@ -21,7 +21,7 @@ class Indicador(BaseModel):
     accidente_laboral: Optional[bool] = None
     discapacidad: Optional[bool] = None
     accidente_transito: Optional[bool] = None
-    arma_fuego: Optional[bool] = None
+    arma_fuego: Optional[bool] = None 
     arma_blanca: Optional[bool] = None
     ambulancia: Optional[bool] = None
     embarazo: Optional[bool] = None
@@ -336,7 +336,7 @@ class ConsultasModel(BaseModel):
         ciclo = getattr(data, 'ciclo', None) or []
         if isinstance(ciclo, dict):
             ciclo = [ciclo]
-        if ciclo:
+        if ciclo: 
             ultimo = ciclo[-1]
             data.__dict__['ultimo_estado'] = (
                 ultimo.get('estado') if isinstance(ultimo, dict) 
@@ -346,6 +346,38 @@ class ConsultasModel(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class ConsultaBusqueda(BaseModel):
+    id: int
+    expediente: Optional[str] = None
+    paciente_id: int
+    documento: Optional[str] = None
+    indicadores: Optional[Indicador] = None
+    paciente: Optional[PacienteSchema] = None
+    ultimo_estado: Optional[str] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def extraer_ultimo_estado(cls, data):
+        ciclo = getattr(data, 'ciclo', None) or []
+        if isinstance(ciclo, dict):
+            ciclo = [ciclo]
+        ultimo_estado = None
+        if ciclo:
+            ultimo = ciclo[-1]
+            if isinstance(ultimo, dict):
+                ultimo_estado = ultimo.get('estado')
+            else:
+                ultimo_estado = getattr(ultimo, 'estado', None)
+        if isinstance(data, dict):
+            data['ultimo_estado'] = ultimo_estado
+        else:
+            setattr(data, 'ultimo_estado', ultimo_estado)
+        return data
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ConsultaListado(BaseModel):
+    consultas: list[ConsultaBusqueda]
 class RegistroConsultaOut(BaseModel):
     id: int
     expediente: Optional[str] = None
@@ -373,7 +405,7 @@ class ConsultaListResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    
+
 # ===================================================================
 # Schema específico para registro de consultas
 # ===================================================================

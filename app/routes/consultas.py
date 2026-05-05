@@ -12,9 +12,10 @@ from datetime import datetime, date, time
 from app.database.db import get_db
 from app.models.consultas import ConsultaModel
 from app.models.pacientes import PacienteModel
+from app.schemas.paciente import PacienteSimple
 from app.schemas.consultas import (
-    CicloConsultaUpdate, ConsultasModel, ConsultaOut,
-    ConsultaUpdate, ConsultaUpdateCiclo, RegistroConsultaCreate, RegistroConsultaOut, 
+    CicloConsultaUpdate, ConsultaListado, ConsultaOut,
+    ConsultaUpdate, ConsultaBusqueda, RegistroConsultaCreate, RegistroConsultaOut, 
     Indicador, CicloClinico, Egreso, ConsultaHistoriaResumidaOut, ConsultaListResponse
 )
 from app.utils.expediente import generar_expediente, generar_emergencia
@@ -33,6 +34,7 @@ router = APIRouter(prefix="/consultas", tags=["Consultas Médicas"])
 def buscar_consultas_activas(
     paciente_id: Optional[int] = None,
     expediente: Optional[str] = None,
+    documento: Optional[str] = None,
     cui: Optional[int] = None,
     primer_nombre: Optional[str] = None,
     segundo_nombre: Optional[str] = None,
@@ -62,6 +64,9 @@ def buscar_consultas_activas(
 
     if tipo_consulta is not None:
         query = query.filter(ConsultaModel.tipo_consulta == tipo_consulta)
+        
+    if documento is not None:
+        query = query.filter(ConsultaModel.documento == documento)
 
     if especialidad:
         query = query.filter(ConsultaModel.especialidad == especialidad)
@@ -127,6 +132,82 @@ def buscar_consultas_activas(
         total=total,
         consultas=resultados
     )
+    
+
+@router.get("/buscarpaciente", response_model=List[PacienteSimple])
+def buscar_pacientes(
+    paciente_id: Optional[int] = None,
+    expediente: Optional[str] = None,
+    documento: Optional[str] = None,
+    cui: Optional[int] = None,
+    primer_nombre: Optional[str] = None,
+    segundo_nombre: Optional[str] = None,
+    primer_apellido: Optional[str] = None,
+    segundo_apellido: Optional[str] = None,
+    db: Session = Depends(get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: UserModel = Depends(get_current_user)
+):
+    # ======================
+    # BASE QUERY — ahora sobre PacienteModel
+    # ======================
+    query = db.query(PacienteModel)
+
+    if paciente_id is not None:
+        query = query.filter(PacienteModel.id == paciente_id)
+
+    if cui is not None:
+        query = query.filter(PacienteModel.cui == cui)
+
+    if expediente:
+        query = query.filter(PacienteModel.expediente == expediente)
+
+    if primer_nombre:
+        query = query.filter(
+            cast(PacienteModel.nombre["primer_nombre"], String)
+            .ilike(f"%{primer_nombre}%")
+        )
+    if segundo_nombre:
+        query = query.filter(
+            cast(PacienteModel.nombre["segundo_nombre"], String)
+            .ilike(f"%{segundo_nombre}%")
+        )
+    if primer_apellido:
+        query = query.filter(
+            cast(PacienteModel.nombre["primer_apellido"], String)
+            .ilike(f"%{primer_apellido}%")
+        )
+    if segundo_apellido:
+        query = query.filter(
+            cast(PacienteModel.nombre["segundo_apellido"], String)
+            .ilike(f"%{segundo_apellido}%")
+        )
+
+    # ======================
+    # FILTRO POR DOCUMENTO — requiere JOIN con consultas
+    # Solo se hace el JOIN si realmente se filtra por documento
+    # ======================
+    if documento is not None:
+        query = (
+            query
+            .join(ConsultaModel, ConsultaModel.paciente_id == PacienteModel.id)
+            .filter(ConsultaModel.documento == documento)
+        )
+
+    # ======================
+    # EJECUCIÓN
+    # ======================
+    pacientes = (
+        query
+        .distinct()
+        .order_by(PacienteModel.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return [PacienteSimple.from_orm(p) for p in pacientes]
 
 
 # =============================================================================

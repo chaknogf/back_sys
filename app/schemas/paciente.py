@@ -105,8 +105,7 @@ class MetadataEvento(BaseModel):
     accion: Optional[Literal["CREADO", "ACTUALIZADO", "MERGE_PACIENTE"]] = None
     expediente_duplicado: Optional[bool] = None,
     detalle: Optional[str] = None
-    
-    
+      
 class Neonatales(BaseModel):
     peso_nacimiento: Optional[str] = None
     edad_gestacional: Optional[str] = None
@@ -124,7 +123,6 @@ class Neonatales(BaseModel):
         if hora is None:
             return None
         return hora.strftime('%H:%M:%S')
-
 
 # ===================================================================
 # Schema base del paciente
@@ -166,7 +164,9 @@ class PacienteBase(BaseModel):
         extra="ignore"
     )
 
-
+class PacienteSchema(PacienteBase):
+    id: int
+model_config = ConfigDict(from_attributes=True)    
 
 # ===================================================================
 # Para crear paciente

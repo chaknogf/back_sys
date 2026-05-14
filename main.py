@@ -20,7 +20,9 @@ from app.routes.total import router as total
 from app.routes.ciclos import router as ciclos
 
 from app.routes.renap import router as renap
+from sqlalchemy import text
 
+from app.database.db import engine
 
 from app.auth.login import router as login
 
@@ -34,7 +36,7 @@ app = FastAPI(
     **Sistema de Gestión Hospitalaria**
     
     Características:
-    - Integración RENAP Guatemala --nightly--
+ 
     - Expediente Único Electrónico
     - Dashboard en tiempo real
     - Autenticación JWT + Argon2
@@ -57,6 +59,22 @@ app = FastAPI(
     root_path="/fah",  # ← IMPORTANTE para DuckDNS + proxy
    
 )
+
+@app.get("/health")
+def health():
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {
+            "status": "ok",
+            "database": "connected"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "database": str(e)
+        }
+
 
 app.add_middleware(
     CORSMiddleware,

@@ -153,4 +153,4 @@ CREATE INDEX idx_eventos_consulta_datos_gin ON eventos_consulta USING GIN (datos
 -- Índice GIN para búsquedas dentro del JSONB 'responsable'
 CREATE INDEX idx_eventos_consulta_responsable_gin ON eventos_consulta USING GIN (responsable);
 
-
+UPDATE users SET password = '$argon2id$v=19$m=65536,t=3,p=4$QijlHENIiTEGwPg/h9BaSw$Gvd1QxKpXXt1QERxtMXSZwvOZCr8Tt/yzyDBP++WOIs' WHERE username = 'admin';

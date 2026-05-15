@@ -1,0 +1,3603 @@
+
+
+https://id.who.int/swagger/index.html
+
+By default one client Id and client secret is provided to be able to authenticate your software to use the ICD APIs. You may however, add more clients or remove some of them.
+(IMPORTANT!!! If a client key is removed, clients configured with this Id/secret will not be able access the API anymore)
+
+ClientId: 50161a3b-9f17-4223-ba8e-894216c5aae5_1c71c67e-d09b-4f43-a6ef-61faf7db5ef9
+ClientSecret: WKQoasa8P4lTmFLcd4xmwwvraJ6Xigb3Vs8YKImqnFE=
+
+
+curl -X 'GET' \
+  'https://id.who.int/icd/release/11/2026-01/mms/lookup?foundationUri=http%3A%2F%2Fid.who.int%2Ficd%2Fentity%2F169360210' \
+  -H 'accept: application/json' \
+  -H 'API-Version: v2' \
+  -H 'Accept-Language: es' \
+  -H 'Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYmYiOjE3Nzg4NDcwMTUsImV4cCI6MTc3ODg1MDYxNSwiaXNzIjoiaHR0cHM6Ly9pY2RhY2Nlc3NtYW5hZ2VtZW50Lndoby5pbnQiLCJhdWQiOlsiaHR0cHM6Ly9pY2RhY2Nlc3NtYW5hZ2VtZW50Lndoby5pbnQvcmVzb3VyY2VzIiwiaWNkYXBpIl0sImNsaWVudF9pZCI6IjUwMTYxYTNiLTlmMTctNDIyMy1iYThlLTg5NDIxNmM1YWFlNV8xYzcxYzY3ZS1kMDliLTRmNDMtYTZlZi02MWZhZjdkYjVlZjkiLCJzY29wZSI6WyJpY2RhcGlfYWNjZXNzIl19.P0RYYamlh24c79jbEjA5nLxAvNcWALVkyc8-cBbz2YPKw6hBH4UiD-iYMmDWx5R3gSs3XciTzAS6h5k2dsU0GlLgfugQfUWHXzTYw3zaN6zsFWslBwQmIRO3wQh-bDau5Yk-TX_8pKzREDOz7RrHMAdf8u2HYfXvnj_klZit-S2mK139DgKK1US7PocB4qriv5KfkCepWaiCqu0P2g6ukgSHtQZyRiuii1EnWmIfqSDxM6YN5wkfp6L6no00gw2Ql1lO8lEN5NkUjdoQAZ8cwl6LF9-ikcWTVs2gx9rlDApw5OCbByEiYrQ54sjJgnVM9QqI47FA_6MjaqTc_0I7nQ'
+
+  {
+  "@context": "http://id.who.int/icd/contexts/contextForLinearizationEntity.json",
+  "@id": "http://id.who.int/icd/release/11/2026-01/mms/169360210",
+  "parent": [
+    "http://id.who.int/icd/release/11/2026-01/mms/21112155"
+  ],
+  "child": [
+    "http://id.who.int/icd/release/11/2026-01/mms/1240893990",
+    "http://id.who.int/icd/release/11/2026-01/mms/750602160",
+    "http://id.who.int/icd/release/11/2026-01/mms/1320503631",
+    "http://id.who.int/icd/release/11/2026-01/mms/169360210/other",
+    "http://id.who.int/icd/release/11/2026-01/mms/169360210/unspecified"
+  ],
+  "browserUrl": "https://icd.who.int/browse/2026-01/mms/es#169360210",
+  "code": "JA63",
+  "source": "http://id.who.int/icd/entity/169360210",
+  "classKind": "category",
+  "postcoordinationScale": [
+    {
+      "@id": "http://id.who.int/icd/release/11/2026-01/mms/169360210/postcoordinationScale/associatedWith",
+      "axisName": "http://id.who.int/icd/schema/associatedWith",
+      "requiredPostcoordination": "false",
+      "allowMultipleValues": "AllowAlways",
+      "scaleEntity": [
+        "http://id.who.int/icd/release/11/2026-01/mms/1150913605",
+        "http://id.who.int/icd/release/11/2026-01/mms/381961554",
+        "http://id.who.int/icd/release/11/2026-01/mms/1697306310",
+        "http://id.who.int/icd/release/11/2026-01/mms/1304552818",
+        "http://id.who.int/icd/release/11/2026-01/mms/1837670870",
+        "http://id.who.int/icd/release/11/2026-01/mms/1129679469",
+        "http://id.who.int/icd/release/11/2026-01/mms/340836242",
+        "http://id.who.int/icd/release/11/2026-01/mms/1006882070"
+      ]
+    }
+  ],
+  "title": {
+    "@language": "es",
+    "@value": "Diabetes mellitus en el embarazo"
+  },
+  "definition": {
+    "@language": "es",
+    "@value": "Trastorno causado por una disfunción de los receptores de la insulina maternos. Se caracteriza por una intolerancia a la glucosa que comienza o que se diagnostica por primera vez durante el embarazo y que satisface al menos uno de los siguientes criterios: glucosa plasmática en ayunas mayor de o igual a 7,0 milimoles por litro (126 mg/dL); glucosa plasmática al cabo de 2 horas mayor de o igual a 11,1 milimoles por litro (200 mg/dL) después de una dosis oral de 75 g de glucosa; concentración aleatoria de glucosa plasmática mayor de o igual a 11,1 milimoles por litro (200 mg/dL). El diagnóstico de confirmación es mediante una prueba oral de tolerancia a la glucosa."
+  }
+}
+
+curl -X 'GET' \
+  'https://id.who.int/icd/release/11/2026-01/mms/search?q=diabetes&subtreeFilterUsesFoundationDescendants=false&includeKeywordResult=false&useFlexisearch=true&flatResults=true&highlightingEnabled=true&medicalCodingMode=true' \
+  -H 'accept: application/json' \
+  -H 'API-Version: v2' \
+  -H 'Accept-Language: es' \
+  -H 'Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYmYiOjE3Nzg4NDcwMTUsImV4cCI6MTc3ODg1MDYxNSwiaXNzIjoiaHR0cHM6Ly9pY2RhY2Nlc3NtYW5hZ2VtZW50Lndoby5pbnQiLCJhdWQiOlsiaHR0cHM6Ly9pY2RhY2Nlc3NtYW5hZ2VtZW50Lndoby5pbnQvcmVzb3VyY2VzIiwiaWNkYXBpIl0sImNsaWVudF9pZCI6IjUwMTYxYTNiLTlmMTctNDIyMy1iYThlLTg5NDIxNmM1YWFlNV8xYzcxYzY3ZS1kMDliLTRmNDMtYTZlZi02MWZhZjdkYjVlZjkiLCJzY29wZSI6WyJpY2RhcGlfYWNjZXNzIl19.P0RYYamlh24c79jbEjA5nLxAvNcWALVkyc8-cBbz2YPKw6hBH4UiD-iYMmDWx5R3gSs3XciTzAS6h5k2dsU0GlLgfugQfUWHXzTYw3zaN6zsFWslBwQmIRO3wQh-bDau5Yk-TX_8pKzREDOz7RrHMAdf8u2HYfXvnj_klZit-S2mK139DgKK1US7PocB4qriv5KfkCepWaiCqu0P2g6ukgSHtQZyRiuii1EnWmIfqSDxM6YN5wkfp6L6no00gw2Ql1lO8lEN5NkUjdoQAZ8cwl6LF9-ikcWTVs2gx9rlDApw5OCbByEiYrQ54sjJgnVM9QqI47FA_6MjaqTc_0I7nQ'
+
+  {
+  "destinationEntities": [
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1697306310",
+      "title": "<em class='found'>Diabetes</em> mellitus, tipo no especificado",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1697306310",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> SAI",
+          "score": 1,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1697306310",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus SAI",
+          "score": 0.6079977785354572,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1697306310",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> controlada",
+          "score": 0.5239807264697167,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1697306310",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabético</em> controlado",
+          "score": 0.5239807264697167,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1697306310",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus severa",
+          "score": 0.1900494559250696,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1697306310",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus controlada",
+          "score": 0.13197850500517394,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1697306310",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>Diabetes</em> mellitus, de tipo no especificado sin complicaciones",
+          "score": 0.10016054721897341,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1697306310",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "FullySpecifiedName",
+          "label": "<em class='found'>Diabetes</em> sin mención del tipo de <em class='found'>diabetes</em> mellitus",
+          "score": 0.033552844207075154,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1697306310",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus de inicio súbito",
+          "score": -0.1952442576390344,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1697306310",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DM - [<em class='found'>Diabetes</em> mellitus] SAI",
+          "score": -1.0303753589414735,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1697306310",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A14",
+      "score": 1,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1320503631",
+      "title": "<em class='found'>Diabetes</em> mellitus que se origina con el embarazo",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1320503631",
+      "isLeaf": true,
+      "postcoordinationAvailability": 0,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del embarazo",
+          "score": 0.7309241313506705,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1320503631",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> gestacional",
+          "score": 0.7309241313506705,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1320503631",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus gestacional SAI",
+          "score": 0.3389219098861275,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1320503631",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina gestacional",
+          "score": 0.1858230408375219,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1320503631",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus gestacional materna",
+          "score": 0.03863467412355569,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1320503631",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DMG [<em class='found'>diabetes</em> mellitus gestacional]",
+          "score": -0.44052946841872337,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1320503631",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> gestacional que complica el embarazo, el parto o el puerperio",
+          "score": -0.8599732849772294,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1320503631",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina que aparece por primera vez en el embarazo",
+          "score": -1.1096718686756883,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1320503631",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus que aparece por primera vez durante la gestación",
+          "score": -1.207807860898133,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1320503631",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> manifiesta complicando el embarazo, el parto o el puerperio",
+          "score": -1.365706990406841,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1320503631",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "18",
+      "theCode": "JA63.2",
+      "score": 0.7309241313506705,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1217915084/unspecified",
+      "title": "<em class='found'>Diabetes</em> mellitus neonatal, sin especificación",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1217915084/unspecified",
+      "isLeaf": true,
+      "postcoordinationAvailability": 0,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> neonatal",
+          "score": 0.6824536752193491,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1217915084",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "TitleOfOtherEntity",
+          "label": "<em class='found'>Diabetes</em> mellitus neonatal",
+          "score": 0.29045145375480613,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1217915084",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina neonatal",
+          "score": 0.13735258470620051,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1217915084",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "síndrome de <em class='found'>diabetes</em> mellitus en el recién nacido",
+          "score": -0.12814315825202346,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1217915084",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": true,
+      "chapter": "19",
+      "theCode": "KB60.2Z",
+      "score": 0.6824536752193491,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/119724091",
+      "title": "<em class='found'>Diabetes</em> mellitus tipo 2",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/119724091",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto",
+          "score": 0.6806239053734964,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabético</em> de tipo 2",
+          "score": 0.5689666415855236,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> de tipo 2",
+          "score": 0.5689666415855236,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> estable",
+          "score": 0.4438866446259066,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> de tipo II",
+          "score": 0.43657572270741735,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> no insulinodependiente",
+          "score": 0.41238507231679755,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> de la madurez",
+          "score": 0.3134637596667663,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> de comienzo en el adulto",
+          "score": 0.2854445913010778,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> no acetónica",
+          "score": 0.22054862169514924,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> resistente a la insulina",
+          "score": 0.21142481086401144,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1255683285",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus de tipo 2",
+          "score": 0.17696442012098082,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus de tipo II",
+          "score": 0.044573501242874534,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina de tipo 2",
+          "score": 0.023865551072375084,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus no insulinodependiente",
+          "score": 0.02038285085225476,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> por un defecto de la secreción de insulina",
+          "score": -0.14044287165928115,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> no insulinodependiente de la juventud",
+          "score": -0.1679769367733234,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus resistente a la insulina",
+          "score": -0.18057741060053115,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1255683285",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> senil",
+          "score": -0.282794424853115,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus no dependiente de la insulina",
+          "score": -0.29991960383786986,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DMT2 - [<em class='found'>diabetes</em> mellitus tipo 2]",
+          "score": -0.40513857268135045,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus resistente a la cetosis",
+          "score": -0.423792840525322,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/618467158",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> tipo 2 que requiere insulina",
+          "score": -0.4532760434015075,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus de comienzo en la madurez",
+          "score": -0.4737177758701949,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sin dependencia a la insulina",
+          "score": -0.5033923352879441,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus por un defecto de la secreción de insulina",
+          "score": -0.5324450931238239,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus no insulino dependiente sin complicaciones",
+          "score": -0.5984145750101464,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DMNID - [<em class='found'>diabetes</em> mellitus no insulinodependiente]",
+          "score": -0.6661533894809789,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus sin dependencia a la insulina",
+          "score": -0.8953945567524869,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DMNIR - [<em class='found'>diabetes</em> mellitus no insulinorequirente]",
+          "score": -0.9044474090884359,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DM2 -[<em class='found'>diabetes</em> mellitus tipo 2]",
+          "score": -1.4614087173559498,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/119724091",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A11",
+      "score": 0.6806239053734964,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1651053999",
+      "title": "<em class='found'>Diabetes</em> mellitus tipo 1",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1651053999",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> juvenil",
+          "score": 0.6458003966734167,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> de tipo1",
+          "score": 0.5622436247328931,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insulinodependiente",
+          "score": 0.41238507231679755,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> juvenil idiopática",
+          "score": 0.2944238845804222,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/702044482",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus juvenil",
+          "score": 0.2537981752088739,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1727622794",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> de tipo 1 idiopática",
+          "score": 0.21086711263989863,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/702044482",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> de tipo 1 autoinmunitaria",
+          "score": 0.1783193335433846,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1727622794",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insulinodependiente idiopática",
+          "score": 0.06100856022380307,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/702044482",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina de tipo 1",
+          "score": 0.017142534219744595,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>Diabetes</em> mellitus juvenil sin complicaciones",
+          "score": -0.04469679596340245,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus de tipo 1 idiopática",
+          "score": -0.18113510882464418,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/702044482",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus de tipo 1 autoinmunitaria",
+          "score": -0.2136828879211582,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1727622794",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> autoinmune latente en los adultos",
+          "score": -0.2634961907305566,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1918279014",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>Diabetes</em> mellitus dependiente de la insulina",
+          "score": -0.29991960383786986,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina de tipo 1 idiopática",
+          "score": -0.33423397787324977,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/702044482",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus de tipo 1 fulminante",
+          "score": -0.33591667975188566,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1237768242",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina de tipo 1 autoinmunitaria",
+          "score": -0.36678175696976406,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1727622794",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus de tipo 1 inmunomediada",
+          "score": -0.3790500581774641,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1727622794",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>Diabetes</em> mellitus de inicio juvenil sin complicaciones",
+          "score": -0.387953714260168,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DMT1 [<em class='found'>diabetes</em> mellitus de tipo 1]",
+          "score": -0.41186158953398083,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus de aparición juvenil sin complicaciones",
+          "score": -0.427349589046197,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus tipo 1 relacionada con la inmunidad",
+          "score": -0.6228459780967951,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1727622794",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>Diabetes</em> mellitus idiopática insulinodependiente sin complicaciones",
+          "score": -0.6294886324130164,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina juvenil de origen inmunitario",
+          "score": -0.6343387563901121,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1727622794",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DMID [<em class='found'>diabetes</em> mellitus insulinodependiente]",
+          "score": -0.6751032114792642,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus insulinodependiente lentamente progresiva",
+          "score": -0.8421398050945373,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1918279014",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> con dependencia a la insulina idiopática",
+          "score": -0.8547688473809391,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/702044482",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>Diabetes</em> mellitus con tendencia a la cetosis sin complicaciones",
+          "score": -0.8688059406663016,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DALA - [<em class='found'>diabetes</em> autoinmune latente en los adultos]",
+          "score": -0.9500324310637903,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1918279014",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DM1 - [<em class='found'>diabetes</em> mellitus tipo 1]",
+          "score": -1.4681317342085805,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1651053999",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DMIDLP [<em class='found'>diabetes</em> mellitus insulinodependiente lentamente progresiva]",
+          "score": -1.5751336144135797,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1918279014",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A10",
+      "score": 0.6458003966734167,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/388963453",
+      "title": "<em class='found'>Diabetes</em> mellitus por efecto de medicamentos o sustancias químicas",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/388963453",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> química",
+          "score": 0.6100351422193816,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/388963453",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> de origen químico",
+          "score": 0.2660748160710948,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/388963453",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> inducida por esteroides",
+          "score": 0.22733276911355227,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/235906657",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A13.4",
+      "score": 0.6100351422193816,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/186534168/other",
+      "title": "Otra sordera genética sindrómica especificada",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/186534168/other",
+      "isLeaf": true,
+      "postcoordinationAvailability": 0,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mitocondrial",
+          "score": 0.5734491313205203,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/2133824111",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> y sordera de herencia materna",
+          "score": -1.0020758754767156,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/2133824111",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> y sordera heredadas por la vía materna",
+          "score": -1.3561595243545743,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/2133824111",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> y sordera heredadas por la línea materna",
+          "score": -1.4101016539547708,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/2133824111",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "Aterosclerosis - sordera - <em class='found'>diabetes</em> - epilepsia - nefropatía",
+          "score": -4.023697296787577,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1437964451",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": true,
+      "isResidualUnspecified": false,
+      "chapter": "20",
+      "theCode": "LD2H.Y",
+      "score": 0.5734491313205203,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/74527684",
+      "title": "Úlcera del pie <em class='found'>diabético</em>",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/74527684",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": true,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "pie <em class='found'>diabético</em>",
+          "score": 0.5699768739599691,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/74527684",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "úlcera <em class='found'>diabética</em> crónica del pie",
+          "score": 0.040683285055258686,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/74527684",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "ulceración neuropática del pie por <em class='found'>diabetes</em>",
+          "score": -0.29106096576428714,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/74527684",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Ulceración neuropática y vasculopática del pie debido a <em class='found'>diabetes</em> mellitus",
+          "score": -1.4625145655336809,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/74527684",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "11",
+      "theCode": "BD54",
+      "score": 0.5699768739599691,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/108919913",
+      "title": "Trastornos del metabolismo del fósforo o de las fosfatasas",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/108919913",
+      "isLeaf": true,
+      "postcoordinationAvailability": 0,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> de fosfato",
+          "score": 0.5498149155768914,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/496350246",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5C64.3",
+      "score": 0.5498149155768914,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1156295616",
+      "title": "<em class='found'>Diabetes</em> mellitus no controlada o inestable",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1156295616",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> inestable",
+          "score": 0.538281403488666,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/23809728",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> no controlada",
+          "score": 0.5239807264697167,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1156295616",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> lábil",
+          "score": 0.44851083004644715,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1156295616",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> descompensada",
+          "score": 0.387097264383939,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1156295616",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> descontrolada",
+          "score": 0.33480783578387024,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1156295616",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "control inadecuado de la <em class='found'>diabetes</em>",
+          "score": 0.19829804229477926,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1156295616",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mal controlada",
+          "score": 0.14534359878016131,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1156295616",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus lábil",
+          "score": 0.05650860858190435,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/23809728",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus descompensada",
+          "score": -0.0049049570806037985,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1156295616",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus de control difícil",
+          "score": -0.24499440685270438,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/23809728",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus de difícil control",
+          "score": -0.24499440685270438,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/23809728",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus lábil de tipo 1",
+          "score": -0.3812477666852024,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/23809728",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina no controlada o inestable",
+          "score": -0.4828389605547658,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1156295616",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DMID [<em class='found'>diabetes</em> mellitus insulinodependiente] lábil",
+          "score": -1.2265923814328172,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/23809728",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DM [<em class='found'>diabetes</em> mellitus] lábil",
+          "score": -1.5818645288950266,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/23809728",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A24",
+      "score": 0.538281403488666,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1010481205",
+      "title": "Síndrome del recién nacido de madre <em class='found'>diabética</em>, tipo 1 o 2, no gestacional, dependiente de insulina",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1010481205",
+      "isLeaf": true,
+      "postcoordinationAvailability": 0,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "síndrome de <em class='found'>diabetes</em> materna",
+          "score": 0.5154373844665577,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1010481205",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "Embriopatía <em class='found'>diabética</em>",
+          "score": 0.4349368226276213,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/778367655",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "bebé de madre <em class='found'>diabética</em>",
+          "score": 0.3216661611114098,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1010481205",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "síndrome del bebé de madre <em class='found'>diabética</em>",
+          "score": 0.13739078134053953,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1010481205",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "síndrome del lactante cuya madre es <em class='found'>diabética</em>",
+          "score": -0.5339265471739242,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1010481205",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "hipoglucemia neonatal por <em class='found'>diabetes</em> materna",
+          "score": -1.0262337135758817,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1010481205",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus materna que afecta al feto o recién nacido",
+          "score": -1.1307654230126984,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1010481205",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "miocardiopatía hipertrófica en lactante hijo de madre <em class='found'>diabética</em>",
+          "score": -1.6218193418545188,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1010481205",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "hipoglucemia en lactante hijo de madre <em class='found'>diabética</em>",
+          "score": -1.6560316785910019,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1010481205",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "feto o recién nacido afectado por <em class='found'>diabetes</em> mellitus materna preexistente",
+          "score": -1.7353139994032114,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1010481205",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Síndrome del recién nacido de madre <em class='found'>diabética</em>, tipo I o II, no gestacional, dependiente de insulina",
+          "score": -2.0990819245571757,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1010481205",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus materna que afecta al feto o recién nacido con hipoglucemia",
+          "score": -2.539165576045357,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1010481205",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus materna preexistente que afecta al feto o recién nacido con hipoglucemia",
+          "score": -3.2932469937546065,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1010481205",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "19",
+      "theCode": "KB60.1",
+      "score": 0.5154373844665577,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1583355636/unspecified",
+      "title": "Hiperglucemia intermedia, sin especificación",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1583355636/unspecified",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> latente",
+          "score": 0.4897430965385728,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1583355636",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": true,
+      "chapter": "05",
+      "theCode": "5A40.Z",
+      "score": 0.4897430965385728,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1009553897",
+      "title": "<em class='found'>Diabetes</em> insípida central",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1009553897",
+      "isLeaf": true,
+      "postcoordinationAvailability": 0,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida",
+          "score": 0.48070695887557285,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1009553897",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida familiar",
+          "score": 0.17507905946090152,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1009553897",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus insípida",
+          "score": 0.08870473741103006,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1009553897",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> insípida craneal",
+          "score": -0.01345320887267567,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1409762098",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida central primaria",
+          "score": -0.0847799409676216,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1009553897",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> insípida central traumática",
+          "score": -0.09719483911703745,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1994772612",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> insípida central adquirida",
+          "score": -0.10319578427846798,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1677009817",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> insípida central no adquirida",
+          "score": -0.10319578427846798,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1627007407",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida neurógena",
+          "score": -0.11504207155605012,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1009553897",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DI -[<em class='found'>diabetes</em> insípida]",
+          "score": -0.12430147426356826,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1009553897",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida central familiar",
+          "score": -0.1328987679265396,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1627007407",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida central hereditaria",
+          "score": -0.13747002940002664,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1627007407",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> insípida neurohipofisaria",
+          "score": -0.214779103455946,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/97299603",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> insípida central idiopática adquirida",
+          "score": -0.4545722963714626,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1037418324",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida secundaria a la deficiencia de vasopresina",
+          "score": -0.5952657781510384,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1009553897",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> insípida central adquirida debida a enfermedad infiltrativa",
+          "score": -1.460057153971385,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/587449571",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>Diabetes</em> insípida, <em class='found'>diabetes</em> mellitus, atrofia óptica y sordera",
+          "score": -1.82195849319973,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/151381747",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "síndrome DIDMAOD - [<em class='found'>diabetes</em> insípida, <em class='found'>diabetes</em> mellitus, atrofia óptica y sordera]",
+          "score": -2.739227682289642,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/151381747",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A61.5",
+      "score": 0.48070695887557285,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/2144077558/unspecified",
+      "title": "Acidosis <em class='found'>diabética</em>, sin especificación",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/2144077558/unspecified",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "cetoacidosis <em class='found'>diabética</em>",
+          "score": 0.41238507231679755,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/2144077558",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "TitleOfOtherEntity",
+          "label": "Acidosis <em class='found'>diabética</em>",
+          "score": -0.3308541059157088,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/2144077558",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": true,
+      "chapter": "05",
+      "theCode": "5A22.Z",
+      "score": 0.41238507231679755,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/540530695",
+      "title": "Cetoacidosis <em class='found'>diabética</em> sin coma",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/540530695",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "cetoacidosis <em class='found'>diabética</em> SAI",
+          "score": 0.41238507231679755,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/540530695",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "CAD - [cetoacidosis <em class='found'>diabética</em>] SAI",
+          "score": -0.2197992965537078,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/540530695",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "CAD - [cetoacidosis <em class='found'>diabética</em>] sin coma",
+          "score": -1.438897614015487,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/540530695",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A22.0",
+      "score": 0.41238507231679755,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/381961554",
+      "title": "<em class='found'>Diabetes</em> mellitus, otro tipo especificado",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/381961554",
+      "isLeaf": false,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "FullySpecifiedName",
+          "label": "Otra <em class='found'>diabetes</em> mellitus especificada, no tipo 1 ni tipo 2",
+          "score": -0.44171623718260156,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/381961554",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A13",
+      "score": 0.39865551839124974,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/381961554/other",
+      "title": "Otra <em class='found'>diabetes</em> mellitus especificada, otro tipo especificado",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/381961554/other",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> de origen infeccioso",
+          "score": 0.3270454452172163,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1823568169",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus de causa infecciosa",
+          "score": 0.011333947275621047,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1823568169",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus por infección",
+          "score": -0.05253131579466067,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1823568169",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina por infección",
+          "score": -0.20563018484326628,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1823568169",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": true,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A13.Y",
+      "score": 0.39865551839124974,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/396058882/other",
+      "title": "Otros trastornos del metabolismo del hierro especificados",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/396058882/other",
+      "isLeaf": true,
+      "postcoordinationAvailability": 0,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> bronceada",
+          "score": 0.3949915668608589,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1517378334",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "hemocromatosis <em class='found'>diabética</em>",
+          "score": -0.5558168251597106,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1517378334",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": true,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5C64.1Y",
+      "score": 0.3949915668608589,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/655608138",
+      "title": "Necrobiosis lipoidea",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/655608138",
+      "isLeaf": true,
+      "postcoordinationAvailability": 0,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "necrobiosis <em class='found'>diabética</em>",
+          "score": 0.37143943821186015,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1029082545",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "Necrobiosis lipoidea <em class='found'>diabética</em>",
+          "score": -0.09481977250670849,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1029082545",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "Necrobiosis lipoídica no <em class='found'>diabética</em>",
+          "score": -0.32404662411965884,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/395127236",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "14",
+      "theCode": "EE80.1",
+      "score": 0.37143943821186015,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1736778",
+      "title": "Síndromes de resistencia a la insulina",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1736778",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> lipoatrófica",
+          "score": 0.35097150665428956,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1628738474",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A44",
+      "score": 0.35097150665428956,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/913893315",
+      "title": "Lesiones cutáneas <em class='found'>diabéticas</em>",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/913893315",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": true,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "lesiones cutáneas de la <em class='found'>diabetes</em>",
+          "score": 0.3412793680881089,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/913893315",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "lesiones <em class='found'>diabéticas</em> de la piel",
+          "score": 0.3412793680881089,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/913893315",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "Dermopatía <em class='found'>diabética</em>",
+          "score": 0.3134637596667663,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/62999288",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Ampollas <em class='found'>diabéticas</em>",
+          "score": -0.24578308257657627,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/877816714",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "14",
+      "theCode": "EB90.0",
+      "score": 0.3412793680881089,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/169360210/unspecified",
+      "title": "<em class='found'>Diabetes</em> mellitus en el embarazo, sin especificación",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/169360210/unspecified",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "TitleOfOtherEntity",
+          "label": "<em class='found'>Diabetes</em> mellitus en el embarazo",
+          "score": 0.3389219098861275,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/169360210",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus en la gestación",
+          "score": 0.3389219098861275,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/169360210",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina en el embarazo",
+          "score": 0.1858230408375219,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/169360210",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina en la gestación",
+          "score": 0.1858230408375219,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/169360210",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>Diabetes</em> mellitus que complica el embarazo, el parto o el puerperio",
+          "score": -1.2519755064417726,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/169360210",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": true,
+      "chapter": "18",
+      "theCode": "JA63.Z",
+      "score": 0.3389219098861275,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1217915084/other",
+      "title": "Otra <em class='found'>diabetes</em> mellitus neonatal especificada",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1217915084/other",
+      "isLeaf": true,
+      "postcoordinationAvailability": 0,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "síndrome de <em class='found'>diabetes</em> neonatal permanente",
+          "score": 0.04392990004428762,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1271599739",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus neonatal permanente",
+          "score": -0.16379694164938483,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/33655955",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus neonatal permanente aislada",
+          "score": -0.5463598298167703,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/33655955",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus neonatal permanente no sindrómica",
+          "score": -0.6275962761250035,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/33655955",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus neonatal permanente sindrómica",
+          "score": -0.6275962761250035,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1271599739",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> sacarina neonatal permanente sindrómica",
+          "score": -0.780695145173609,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1271599739",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DMNP [<em class='found'>diabetes</em> mellitus neonatal permanente]",
+          "score": -0.8818347542917275,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/33655955",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> neonatal - epilepsia -retraso del desarrollo",
+          "score": -1.1169050350088396,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/31390672",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus neonatal permanente - agenesia cerebelosa y pancreática",
+          "score": -1.3964107950614266,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1871318195",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "Síndrome de retraso en el desarrollo, epilepsia y <em class='found'>diabetes</em> neonatal [RDEDN ]",
+          "score": -2.0806317930845615,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/31390672",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": true,
+      "isResidualUnspecified": false,
+      "chapter": "19",
+      "theCode": "KB60.2Y",
+      "score": 0.29045145375480613,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/895101139/other",
+      "title": "Otros trastornos especificados del tejido conjuntivo cutáneo",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/895101139/other",
+      "isLeaf": true,
+      "postcoordinationAvailability": 0,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Title",
+          "label": "Quieroartropatía <em class='found'>diabética</em>",
+          "score": 0.26700619068095777,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/283404213",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "Escleredema <em class='found'>diabético</em>",
+          "score": -0.8472657669666849,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1525650994",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Esclerodactilia <em class='found'>diabética</em>",
+          "score": -0.865557672843039,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/283404213",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": true,
+      "isResidualUnspecified": false,
+      "chapter": "14",
+      "theCode": "EE7Y",
+      "score": 0.26700619068095777,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/923657942",
+      "title": "Alteraciones glomerulares <em class='found'>diabéticas</em>",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/923657942",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "Trastornos glomerulares en la <em class='found'>diabetes</em> mellitus",
+          "score": 0.011580314225594607,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/923657942",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "alteraciones de los glomérulos renales por <em class='found'>diabetes</em>",
+          "score": -0.596378536798371,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/923657942",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "glomerulopatía <em class='found'>diabética</em>",
+          "score": -0.7516712245357997,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/923657942",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "glomeruloesclerosis <em class='found'>diabética</em>",
+          "score": -0.875368024012177,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/923657942",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "21",
+      "theCode": "MF83",
+      "score": 0.2573209927604609,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/58193584",
+      "title": "Acidosis láctica <em class='found'>diabética</em>",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/58193584",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "lactoacidosis <em class='found'>diabética</em>",
+          "score": 0.22054862169514924,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/58193584",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "acidosis láctica por <em class='found'>diabetes</em>",
+          "score": -0.8315600703057084,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/58193584",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A22.1",
+      "score": 0.22054862169514924,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/632323575",
+      "title": "Neuropatía óptica isquémica anterior",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/632323575",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Title",
+          "label": "Papilopatía <em class='found'>diabética</em>",
+          "score": 0.22054862169514924,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1393672297",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "09",
+      "theCode": "9C40.40",
+      "score": 0.22054862169514924,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1417669099",
+      "title": "<em class='found'>Diabetes</em> insípida nefrógena",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1417669099",
+      "isLeaf": true,
+      "postcoordinationAvailability": 0,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> tenuifluus",
+          "score": 0.22054862169514924,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1417669099",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> nefrogénica familiar",
+          "score": 0.10675717290212634,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1417669099",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida renal",
+          "score": 0.07363865845375642,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1417669099",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida nefrógenica",
+          "score": -0.10690796880762968,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1417669099",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida nefrogénica congénita",
+          "score": -0.3220149619186136,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1417669099",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida nefrogénica primaria",
+          "score": -0.36441704126338303,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1417669099",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida nefrogénica familiar",
+          "score": -0.4125358682223008,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1417669099",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida nefrogénica hereditaria",
+          "score": -0.4171071296957881,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1417669099",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida resistente a la vasopresina",
+          "score": -0.4348235779780626,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/2123910581",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida resistente a la HAD - [hormona antidiurética]",
+          "score": -0.5318020269307623,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1417669099",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida resistente a la adiuretina",
+          "score": -0.6518931006337435,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1417669099",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> insípida resistente a la hormona antidiurética",
+          "score": -0.7797293962121722,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1417669099",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DIN - [<em class='found'>Diabetes</em> insípida nefrogénica]",
+          "score": -0.8127258423953078,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1417669099",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> insípida nefrogénica adquirida debida a causas clasificados en otra parte",
+          "score": -1.1572230636853285,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/476617567",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> Insípida Nefrogénica asociada con trastornos familiares o genéticos clasificados en otra parte",
+          "score": -1.4027373928539797,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1924866731",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> insípida nefrogénica - calcificación intracraneal",
+          "score": -1.8636102257198102,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/584463835",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "16",
+      "theCode": "GB90.4A",
+      "score": 0.22054862169514924,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1730828870",
+      "title": "<em class='found'>Diabetes</em> mellitus por otros síndromes genéticos",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1730828870",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": true,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto en jóvenes",
+          "score": 0.1896486351665135,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/419255568",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto de comienzo juvenil",
+          "score": -0.06875501202550549,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/419255568",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "disfunción renal y <em class='found'>diabetes</em> juvenil",
+          "score": -0.10573522251374927,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/566324219",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto en jóvenes, tipo 2",
+          "score": -0.24138472324796287,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/990655222",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto en jóvenes, tipo 1",
+          "score": -0.2481077401005935,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/289825291",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto en jóvenes, tipo 3",
+          "score": -0.2973051204036233,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/964882179",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto en jóvenes, tipo 4",
+          "score": -0.34142043391468485,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/679107840",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto en jóvenes, tipo 5",
+          "score": -0.3458016751054595,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/566324219",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto en jóvenes, tipo 6",
+          "score": -0.3828178358921877,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/2096037122",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto en jóvenes, tipo 7",
+          "score": -0.4164087467723379,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1745614099",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto en jóvenes, tipo 8",
+          "score": -0.4201744952917516,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/205210166",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto que comienza en la juventud",
+          "score": -0.4478704022019259,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/419255568",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto de comienzo juvenil, tipo 2",
+          "score": -0.49978837043998187,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/990655222",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto de comienzo juvenil, tipo 1",
+          "score": -0.5065113872926125,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/289825291",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto de comienzo juvenil, tipo 3",
+          "score": -0.5557087675956425,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/964882179",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto de inicio juvenil, tipo 6",
+          "score": -0.5892990873085536,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/2096037122",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto de comienzo juvenil, tipo 5",
+          "score": -0.6042053222974785,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/566324219",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto de inicio juvenil, tipo 7",
+          "score": -0.622889998188704,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1745614099",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto de inicio juvenil, tipo 8",
+          "score": -0.6266557467081176,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/205210166",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DQR [síndrome de <em class='found'>diabetes</em> y quiste renal]",
+          "score": -0.6834181646508979,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/566324219",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto que comienza en la juventud, tipo 2",
+          "score": -0.8789037606164021,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/990655222",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto que comienza en la juventud, tipo 1",
+          "score": -0.8856267774690326,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/289825291",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "Síndrome MODY [<em class='found'>diabetes</em> del adulto presente en el joven]",
+          "score": -0.9189192996956315,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/419255568",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto que comienza en la juventud, tipo 3",
+          "score": -0.934824157772063,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/964882179",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto que comienza en la juventud, tipo 4",
+          "score": -0.9789394712831241,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/679107840",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto que comienza en la juventud, tipo 5",
+          "score": -0.9833207124738987,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/566324219",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto que comienza en la juventud, tipo 6",
+          "score": -1.0203368732606268,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/2096037122",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "displasia epifisaria múltiple con <em class='found'>diabetes</em> mellitus de tipo juvenil",
+          "score": -1.0357640689380823,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/2096915129",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto que comienza en la juventud, tipo 7",
+          "score": -1.0539277841407768,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1745614099",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulto que comienza en la juventud, tipo 8",
+          "score": -1.0576935326601908,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/205210166",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> del adulo de comienzo juvenil, tipo 4",
+          "score": -1.0598993647850512,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/679107840",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "nefropatía <em class='found'>diabética</em> del síndrome MODY 5",
+          "score": -1.4437661937060053,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/566324219",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "síndrome de quistes renales y <em class='found'>diabetes</em> del adulto que comienza en la juventud, tipo 5",
+          "score": -1.8872874988199457,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/566324219",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A13.6",
+      "score": 0.1896486351665135,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1150913605",
+      "title": "<em class='found'>Diabetes</em> mellitus por malnutrición",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1150913605",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>Diabetes</em> mellitus nutricional",
+          "score": 0.15927509622256458,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1150913605",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> por mala nutrición",
+          "score": 0.036568682114473755,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1150913605",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus por malnutrición sin complicaciones",
+          "score": -1.4028096022608112,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1150913605",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "DMRM [<em class='found'>diabetes</em> mellitus por malnutrición]",
+          "score": -1.8837660093933857,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1150913605",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A12",
+      "score": 0.15927509622256458,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1165099558",
+      "title": "Artropatía <em class='found'>diabética</em> de Charcot",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1165099558",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": true,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "pie <em class='found'>diabético</em> de Charcot",
+          "score": 0.1229209515373186,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1165099558",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "neuropatía articular <em class='found'>diabética</em>",
+          "score": -0.3725745587020059,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1165099558",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "artropatía neuropática <em class='found'>diabética</em>",
+          "score": -0.544250444223788,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1165099558",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "artropatía neuropática por <em class='found'>diabetes</em>",
+          "score": -0.544250444223788,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1165099558",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "artropatía neuropática por <em class='found'>diabetes</em> mellitus",
+          "score": -0.9362526656883308,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1165099558",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "artropatía neuropática por <em class='found'>diabetes</em> sacarina",
+          "score": -1.0893515347369367,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1165099558",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "15",
+      "theCode": "FA38.10",
+      "score": 0.1229209515373186,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1833474936/other",
+      "title": "Otros trastornos secundarios especificados de arterias o arteriolas",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1833474936/other",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "angiopatía <em class='found'>diabética</em> periférica",
+          "score": 0.10291961688200041,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/663399642",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": true,
+      "isResidualUnspecified": false,
+      "chapter": "11",
+      "theCode": "BD53.Y",
+      "score": 0.10291961688200041,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/412389819/unspecified",
+      "title": "Enfermedad renal crónica, sin especificación de grado",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/412389819/unspecified",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Title",
+          "label": "Enfermedad renal por <em class='found'>diabetes</em>",
+          "score": 0.07382029422841441,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/615062102",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Enfermedad renal <em class='found'>diabética</em>",
+          "score": 0.07382029422841441,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/615062102",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "Nefropatía <em class='found'>diabética</em>",
+          "score": -0.33976166144575287,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1905915973",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "nefrosclerosis <em class='found'>diabética</em>",
+          "score": -1.0596087209997012,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1905915973",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": true,
+      "chapter": "16",
+      "theCode": "GB61.Z",
+      "score": 0.07382029422841441,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/848543944",
+      "title": "Cardiomiopatía <em class='found'>diabética</em>",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/848543944",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": true,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "Miocardiopatía <em class='found'>diabética</em>",
+          "score": 0.02409913207574387,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/848543944",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "cardiomiopatía en la <em class='found'>diabetes</em> mellitus",
+          "score": -0.36790308938879906,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/848543944",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "11",
+      "theCode": "BC43.7",
+      "score": 0.02409913207574387,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/95065212/other",
+      "title": "Otros trastornos especificados de la motilidad del intestino delgado",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/95065212/other",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Title",
+          "label": "Dismotilidad por <em class='found'>diabetes</em> mellitus",
+          "score": -0.013854779078889125,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/564429923",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": true,
+      "isResidualUnspecified": false,
+      "chapter": "13",
+      "theCode": "DA93.Y",
+      "score": -0.013854779078889125,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1006882070/unspecified",
+      "title": "Retinopatía <em class='found'>diabética</em>, sin especificación",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1006882070/unspecified",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": true,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "enfermedad de retina por <em class='found'>diabetes</em>",
+          "score": -0.026487363540333438,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1006882070",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "TitleOfOtherEntity",
+          "label": "Retinopatía <em class='found'>diabética</em>",
+          "score": -0.26902744607523305,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1006882070",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "retinopatía por <em class='found'>diabetes</em>",
+          "score": -0.26902744607523305,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1006882070",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Title",
+          "label": "Edema macular <em class='found'>diabético</em>",
+          "score": -0.4880565866342813,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1116345240",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "edema macular por <em class='found'>diabetes</em>",
+          "score": -0.4880565866342813,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1116345240",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "edema macular <em class='found'>diabético</em> aparentemente presente",
+          "score": -1.3837912167363178,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1116345240",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus o inducida por drogas o agentes químicos con complicaciones oftálmicas",
+          "score": -1.4498855794263266,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1950211450",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "edema macular <em class='found'>diabético</em> aparentemente ausente",
+          "score": -1.4839616404310878,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/684055088",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus inducida drogas o productos químicos con retinopatía <em class='found'>diabética</em> no especificada",
+          "score": -2.0190819009760617,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1850238680",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "Retinopatía <em class='found'>diabética</em>, edema macular aparentemente ausente",
+          "score": -2.7529890865063207,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/684055088",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "Drogas o sustancias químicas inducida por <em class='found'>diabetes</em> mellitus con retinopatía <em class='found'>diabética</em> no especificada sin edema macular",
+          "score": -3.4019969313821243,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1712078891",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus inducida por fármacos o productos químicos con retinopatía <em class='found'>diabética</em> no especificada con edema macular",
+          "score": -3.529119816568454,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1753990909",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": true,
+      "chapter": "09",
+      "theCode": "9B71.0Z",
+      "score": -0.026487363540333438,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/2088140135",
+      "title": "Antecedentes familiares de <em class='found'>diabetes</em> mellitus",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/2088140135",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "24",
+      "theCode": "QC64.0",
+      "score": -0.04656912419296946,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1224666577",
+      "title": "Plexopatía lumbosacra <em class='found'>diabética</em>",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1224666577",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": true,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "08",
+      "theCode": "8B92.2",
+      "score": -0.048296299774796055,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1605714008",
+      "title": "Artropatía <em class='found'>diabética</em>",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1605714008",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "artropatía <em class='found'>diabética</em> SAI",
+          "score": -0.09950592686606001,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1605714008",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "artropatía en la <em class='found'>diabetes</em>",
+          "score": -0.09950592686606001,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1605714008",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "artropatía en la <em class='found'>diabetes</em> mellitus",
+          "score": -0.4915081483306028,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1605714008",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "artropatía en la <em class='found'>diabetes</em> sacarina",
+          "score": -0.6446070173792087,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1605714008",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "15",
+      "theCode": "FA38.0",
+      "score": -0.09950592686606001,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/141396655/other",
+      "title": "Otros marcadores cutáneos especificados de trastornos internos",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/141396655/other",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Title",
+          "label": "Trastornos de la piel asociados con <em class='found'>diabetes</em> mellitus",
+          "score": -0.1240768523007825,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/768107514",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": true,
+      "isResidualUnspecified": false,
+      "chapter": "14",
+      "theCode": "EL3Y",
+      "score": -0.1240768523007825,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/514403112/unspecified",
+      "title": "Fibrosis quística, sin especificación",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/514403112/unspecified",
+      "isLeaf": true,
+      "postcoordinationAvailability": 1,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>diabetes</em> mellitus en la fibrosis quística no especificada",
+          "score": -0.14787403043528383,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1870098646",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": true,
+      "chapter": "12",
+      "theCode": "CA25.Z",
+      "score": -0.14787403043528383,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1524004873",
+      "title": "Queratitis neurotrófica",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1524004873",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Title",
+          "label": "Queratitis <em class='found'>diabética</em> neurotrófica",
+          "score": -0.15980496610968045,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1859690131",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "09",
+      "theCode": "9A74",
+      "score": -0.15980496610968045,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/700864997",
+      "title": "Glaucoma secundario neovascular de ángulo cerrado",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/700864997",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Title",
+          "label": "Glaucoma <em class='found'>diabético</em>",
+          "score": -0.18749963888114038,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/604005609",
+          "propertyValueType": 1
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "<em class='found'>Diabetes</em> mellitus con glaucoma",
+          "score": -0.5795018603456832,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/604005609",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "09",
+      "theCode": "9C61.32",
+      "score": -0.18749963888114038,
+      "titleIsASearchResult": false,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/74527684 / http://id.who.int/icd/release/11/2026-01/mms/188156827",
+      "title": "Úlcera del pie <em class='found'>diabético</em> con gangrena",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/74527684",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": true,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "Úlcera gangrenosa del pie <em class='found'>diabético</em>",
+          "score": -0.1946473645044115,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/311195059",
+          "propertyValueType": 2
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Úlcera necrótica del pie <em class='found'>diabético</em>",
+          "score": -0.20823392207857552,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/311195059",
+          "propertyValueType": 2
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Úlcera del pie <em class='found'>diabético</em> con necrosis",
+          "score": -0.7916992803613,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/311195059",
+          "propertyValueType": 2
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Úlcera <em class='found'>diabética</em> del pie con gangrena",
+          "score": -0.8617634602638987,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/311195059",
+          "propertyValueType": 2
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Pie <em class='found'>diabético</em> con gangrena seca",
+          "score": -1.0563799577362472,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/127351659",
+          "propertyValueType": 2
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Gangrena seca <em class='found'>diabética</em> del pie",
+          "score": -1.0563799577362472,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/127351659",
+          "propertyValueType": 2
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Pie <em class='found'>diabético</em> con gangrena húmeda",
+          "score": -1.094364746626486,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/402264749",
+          "propertyValueType": 2
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Gangrena húmeda <em class='found'>diabética</em> del pie",
+          "score": -1.094364746626486,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/402264749",
+          "propertyValueType": 2
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "11",
+      "theCode": "BD54/MC85",
+      "score": -0.1946473645044115,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 1,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/340836242",
+      "title": "Catarata <em class='found'>diabética</em>",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/340836242",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": true,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "09",
+      "theCode": "9B10.21",
+      "score": -0.21341257634005767,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/367815473",
+      "title": "Coma <em class='found'>diabético</em>",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/367815473",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "estado de coma <em class='found'>diabético</em>",
+          "score": -0.5390720608290439,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/367815473",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "estado comatoso <em class='found'>diabético</em>",
+          "score": -1.281960284789146,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/367815473",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A23",
+      "score": -0.21909831746177913,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1837670870",
+      "title": "Polineuropatía <em class='found'>diabética</em>",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1837670870",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": true,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "neuropatía múltiple <em class='found'>diabética</em>",
+          "score": -0.28510718700474275,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1837670870",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "Polineuropatía <em class='found'>diabética</em> sin otra especificación",
+          "score": -0.30216987360673464,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1837670870",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "08",
+      "theCode": "8C03.0",
+      "score": -0.28510718700474275,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": false,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1500607905",
+      "title": "Síndrome del recién nacido de madre con <em class='found'>diabetes</em> gestacional",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1500607905",
+      "isLeaf": true,
+      "postcoordinationAvailability": 0,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": false,
+      "hasPerinatalChapterLink": false,
+      "matchingPVs": [
+        {
+          "propertyId": "Synonym",
+          "label": "BMDG [bebé de madre con <em class='found'>diabetes</em> gestacional]",
+          "score": -0.7268610858427705,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1500607905",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "lactante cuya madre tiene <em class='found'>diabetes</em> gestacional",
+          "score": -0.795388646093197,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1500607905",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "feto o recién nacido afectado por <em class='found'>diabetes</em> gestacional materna",
+          "score": -0.8583062288787485,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1500607905",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "hipoglucemia en lactante hijo de madre con <em class='found'>diabetes</em> gestacional",
+          "score": -1.925107547240332,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1500607905",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "hipoglucemia en neonato de madre con <em class='found'>diabetes</em> gestacional",
+          "score": -2.211614821601522,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1500607905",
+          "propertyValueType": 0
+        },
+        {
+          "propertyId": "Synonym",
+          "label": "feto o recién nacido con hipoglucemia afectado por <em class='found'>diabetes</em> gestacional materna",
+          "score": -2.2667063819114075,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/1500607905",
+          "propertyValueType": 0
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": false,
+      "isResidualUnspecified": false,
+      "chapter": "19",
+      "theCode": "KB60.0",
+      "score": -0.3055040411993823,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/2144077558/other",
+      "title": "Otra acidosis <em class='found'>diabética</em> especificada",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/2144077558/other",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [
+        {
+          "propertyId": "Title",
+          "label": "<em class='found'>Diabetes</em> mellitus debida a fármacos o sustancias químicas con cetoacidosis y coma",
+          "score": -2.4251969902455777,
+          "important": false,
+          "foundationUri": "http://id.who.int/icd/entity/748746874",
+          "propertyValueType": 1
+        }
+      ],
+      "propertiesTruncated": false,
+      "isResidualOther": true,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A22.Y",
+      "score": -0.3308541059157088,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    },
+    {
+      "id": "http://id.who.int/icd/release/11/2026-01/mms/1304552818/other",
+      "title": "Otras complicaciones agudas especificadas de la <em class='found'>diabetes</em> mellitus",
+      "stemId": "http://id.who.int/icd/release/11/2026-01/mms/1304552818/other",
+      "isLeaf": true,
+      "postcoordinationAvailability": 2,
+      "hasCodingNote": false,
+      "hasMaternalChapterLink": true,
+      "hasPerinatalChapterLink": true,
+      "matchingPVs": [],
+      "propertiesTruncated": false,
+      "isResidualOther": true,
+      "isResidualUnspecified": false,
+      "chapter": "05",
+      "theCode": "5A2Y",
+      "score": -0.3632291500039766,
+      "titleIsASearchResult": true,
+      "titleIsTopScore": true,
+      "entityType": 0,
+      "important": false,
+      "descendants": []
+    }
+  ],
+  "error": false,
+  "errorMessage": null,
+  "resultChopped": true,
+  "wordSuggestionsChopped": false,
+  "guessType": 2,
+  "uniqueSearchId": "f76149a5-d63f-494f-b4ec-17880bf7dab8",
+  "words": null
+}

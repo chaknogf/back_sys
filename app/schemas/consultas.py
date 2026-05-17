@@ -63,10 +63,11 @@ EstadoCiclo = Literal[
 class Egreso(BaseModel):
     """Datos del egreso médico de la consulta"""
     registro: Optional[str] = Field(None, description="Timestamp ISO del egreso")
-    condicion: Optional[str] = Field(None, max_length=100, description="Condición al egreso: alta, fallecido, referido, etc.")
-    referencia: Optional[str] = Field(None, max_length=200, description="Institución o servicio de referencia si aplica")
-    diagnosticos: Optional[List[Dict[str, Any]]] = Field(None, description="Lista de diagnósticos al egreso")
-    medico: Optional[str] = Field(None, max_length=100, description="Médico responsable del egreso")
+    condicion: Optional[str] = Field(None, max_length=100)
+    referencia: Optional[str] = Field(None, max_length=200)
+    diagnosticos: Optional[str] = None
+    medico: Optional[str] = Field(None, max_length=100)
+    lactancia_materna: Optional[bool] = None  # ← agregar
     model_config = ConfigDict(from_attributes=True)
 
 # ===================================================================
@@ -150,11 +151,6 @@ class CicloUpdate(BaseModel):
 # app/schemas/consultas.py
 
 class CicloConsultaUpdate(BaseModel):
-    """
-    Schema minimalista para actualizar ciclo clínico.
-    Solo incluye campos obligatorios de auditoría.
-    Cualquier otro campo se acepta dinámicamente vía extra="allow".
-    """
     # ========== SOLO CAMPOS OBLIGATORIOS ==========
     estado: EstadoCiclo = Field(..., description="Estado del ciclo clínico")
     
@@ -199,6 +195,7 @@ class CicloConsultaUpdate(BaseModel):
 # Schema base (común)
 # ===================================================================
 class ConsultaBase(BaseModel):
+    ultimo_estado: Optional[str] = None
     expediente: Optional[str] = Field(None, max_length=20)
     paciente_id: int = Field(..., gt=0)
     tipo_consulta: Optional[int] = Field(None, ge=1)
@@ -211,6 +208,9 @@ class ConsultaBase(BaseModel):
     ciclo: Optional[List[CicloUpdate]] = None  
     orden: Optional[int] = Field(None, ge=0)
     activo: bool = True
+    egreso: Optional[Dict[str, Any]] = None
+   
+    
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -235,10 +235,7 @@ class ConsultaCreate(BaseModel):
 
 
 class ConsultaUpdate(BaseModel):
-    """
-    Para actualizar una consulta.
-    El campo 'ciclo' aquí es UN SOLO objeto que se agregará al historial.
-    """
+    ultimo_estado: Optional[str] = None
     expediente: Optional[str] = None
     tipo_consulta: Optional[int] = None
     especialidad: Optional[str] = None
@@ -247,12 +244,13 @@ class ConsultaUpdate(BaseModel):
     fecha_consulta: Optional[date] = None
     hora_consulta: Optional[time] = None
     indicadores: Optional[Indicador] = None
-    ciclo: Optional[CicloUpdate] = None  
+    ciclo: Optional[CicloUpdate] = None
     orden: Optional[int] = None
     activo: Optional[bool] = None
-    model_config = ConfigDict(extra="ignore")
-    egreso: Optional[Egreso] = None
-    
+    egreso: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(extra="ignore")  # ← al final
+
     @field_validator("ciclo", mode="before")
     @classmethod
     def no_aceptar_listas(cls, v):
@@ -277,8 +275,9 @@ class ConsultaUpdateCiclo(BaseModel):
 
 class ConsultaOut(ConsultaBase):
     id: int 
+    ultimo_estado: Optional[str] = None 
     paciente: Optional[PacienteConsultaBase] = None
-    ultimo_estado: Optional[str] = None  
+     
     @field_validator('ciclo', mode='before')
     @classmethod
     def convertir_ciclo_a_lista(cls, v):
@@ -310,6 +309,7 @@ class ConsultasModel(BaseModel):
     indicadores: Optional[Indicador] = None
     orden: Optional[int] = None
     activo: bool = True
+    egreso: Optional[Dict[str, Any]] = None
     paciente: Optional[PacientesNombre] = None
     
 
@@ -342,7 +342,7 @@ class RegistroConsultaOut(BaseModel):
     ciclo: List[CicloClinico]
     orden: int
     activo: Optional[bool] = None
-    egreso: Optional[Egreso] = None
+    egreso: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(from_attributes=True)
 

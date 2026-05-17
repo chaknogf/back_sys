@@ -276,23 +276,9 @@ class ConsultaUpdateCiclo(BaseModel):
         return v
 
 class ConsultaOut(ConsultaBase):
-    expediente: Optional[str] = Field(None, max_length=20)
-    paciente_id: int = Field(..., gt=0)
-    tipo_consulta: Optional[int] = Field(None, ge=1)
-    especialidad: Optional[str] = Field(None, max_length=50)
-    servicio: Optional[str] = Field(None, max_length=50)
-    documento: Optional[str] = Field(None, max_length=20)
-    fecha_consulta: Optional[date] = None
-    hora_consulta: Optional[time] = None
-    indicadores: Optional[Indicador] = None
-    ciclo: Optional[List[CicloUpdate]] = None  
-    orden: Optional[int] = Field(None, ge=0)
-    activo: bool = True
-    id: int = Field(..., description="ID único de la consulta")
+    id: int 
     paciente: Optional[PacienteConsultaBase] = None
-    ultimo_estado: Optional[str] = None  # ✅ Solo el estado del último ciclo
-    
-
+    ultimo_estado: Optional[str] = None  
     @field_validator('ciclo', mode='before')
     @classmethod
     def convertir_ciclo_a_lista(cls, v):
@@ -306,16 +292,13 @@ class ConsultaOut(ConsultaBase):
             return v
         return []
 
-    @model_validator(mode='after')
-    def extraer_ultimo_estado(self):
-        if self.ciclo and len(self.ciclo) > 0:
-            self.ultimo_estado = self.ciclo[-1].estado
-        return self
+    # ← model_validator extraer_ultimo_estado eliminado
 
     model_config = ConfigDict(from_attributes=True)
     
 class ConsultasModel(BaseModel):
     id: int
+    ultimo_estado: Optional[str] = None 
     expediente: Optional[str] = None
     paciente_id: int
     tipo_consulta: Optional[int] = None
@@ -328,21 +311,7 @@ class ConsultasModel(BaseModel):
     orden: Optional[int] = None
     activo: bool = True
     paciente: Optional[PacientesNombre] = None
-    ultimo_estado: Optional[str] = None
-
-    @model_validator(mode='before')
-    @classmethod
-    def extraer_ultimo_estado(cls, data):
-        ciclo = getattr(data, 'ciclo', None) or []
-        if isinstance(ciclo, dict):
-            ciclo = [ciclo]
-        if ciclo: 
-            ultimo = ciclo[-1]
-            data.__dict__['ultimo_estado'] = (
-                ultimo.get('estado') if isinstance(ultimo, dict) 
-                else getattr(ultimo, 'estado', None)
-            )
-        return data
+    
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -353,26 +322,7 @@ class ConsultaBusqueda(BaseModel):
     documento: Optional[str] = None
     indicadores: Optional[Indicador] = None
     paciente: Optional[PacienteSchema] = None
-    ultimo_estado: Optional[str] = None
-
-    @model_validator(mode='before')
-    @classmethod
-    def extraer_ultimo_estado(cls, data):
-        ciclo = getattr(data, 'ciclo', None) or []
-        if isinstance(ciclo, dict):
-            ciclo = [ciclo]
-        ultimo_estado = None
-        if ciclo:
-            ultimo = ciclo[-1]
-            if isinstance(ultimo, dict):
-                ultimo_estado = ultimo.get('estado')
-            else:
-                ultimo_estado = getattr(ultimo, 'estado', None)
-        if isinstance(data, dict):
-            data['ultimo_estado'] = ultimo_estado
-        else:
-            setattr(data, 'ultimo_estado', ultimo_estado)
-        return data
+    ultimo_estado: Optional[str] = None  # ← directo de la columna, sin validator
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -1,4 +1,4 @@
-# app/models/consultas.py → solo cambia __table_args__
+# app/models/consultas.py
 from sqlalchemy import BigInteger, Boolean, Column, Integer, String, Date, Text, Time, ForeignKey, Index, text, desc
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -22,19 +22,17 @@ class ConsultaModel(Base):
     orden = Column(Integer, nullable=True)
     activo = Column(Boolean, default=True)
     egreso = Column(JSONB, nullable=True)
-    
+    ultimo_estado = Column(String(50), nullable=True, index=True)  # ← NUEVO
+
     paciente = relationship("PacienteModel", back_populates="consultas")
     ciclos = relationship("CiclosConsulta", back_populates="consulta")
-    laboratorios = relationship("Laboratorios",back_populates="consulta")
+    laboratorios = relationship("Laboratorios", back_populates="consulta")
     rayos_x = relationship("RayosX", back_populates="consulta")
-    
+
     __table_args__ = (
-        # Índice compuesto para filtros frecuentes y ordenamiento
         Index("idx_consulta_paciente_tipo_fecha", "paciente_id", "tipo_consulta", "fecha_consulta"),
-        Index("idx_consulta_fecha_desc", text("fecha_consulta DESC")),  # Para orden descendente
+        Index("idx_consulta_fecha_desc", text("fecha_consulta DESC")),
         Index("idx_consulta_tipo_especialidad", "tipo_consulta", "especialidad"),
         Index("idx_consulta_servicio_documento", "servicio", "documento"),
+        Index("idx_consulta_ultimo_estado", "ultimo_estado"),  # ← NUEVO
     )
-
-
- 

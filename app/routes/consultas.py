@@ -4,7 +4,7 @@ Router de consultas médicas - Búsqueda avanzada, creación inteligente y CRUD 
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import String, cast, desc, func, text, or_
+from sqlalchemy import String, cast, desc, func, text, or_, String, and_, case
 from sqlalchemy.orm.attributes import flag_modified
 from typing import Optional, List
 from datetime import datetime, date, time
@@ -26,9 +26,29 @@ from sqlalchemy.orm import joinedload
 router = APIRouter(prefix="/consultas", tags=["Consultas Médicas"])
 
 
+
+# =============================================================================
+# Funciones
+# =============================================================================
+# Función helper para no repetir lógica
+def _agregar_ciclo(consulta: ConsultaModel, nuevo_ciclo: dict, current_user: UserModel):
+    """Agrega un ciclo al historial y actualiza ultimo_estado en la columna."""
+    nuevo_ciclo["registro"] = datetime.now().isoformat()
+    nuevo_ciclo["usuario"] = current_user.username
+    nuevo_ciclo.setdefault("estado", "actualizado")
+
+    historial = consulta.ciclo or []
+    if not isinstance(historial, list):
+        historial = []
+
+    consulta.ciclo = historial + [nuevo_ciclo]
+    consulta.ultimo_estado = nuevo_ciclo["estado"]  # ← ACTUALIZAR COLUMNA
+    flag_modified(consulta, "ciclo")
 # =============================================================================
 # BUSCAR CONSULTAS (TODAS)
 # =============================================================================
+
+
 
 @router.get("/", response_model=ConsultaListResponse)
 def buscar_consultas_activas(
@@ -44,11 +64,12 @@ def buscar_consultas_activas(
     especialidad: Optional[str] = None,
     fecha: Optional[date] = None,
     activo: bool = Query(True, description="Filtrar solo consultas activas"),
+    archivo: bool = Query(True, description="Excluye consultas cuyo último estado de ciclo sea 'archivo'"),
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     current_user: UserModel = Depends(get_current_user)
-     ): 
+):
     query = (
         db.query(ConsultaModel)
         .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
@@ -57,6 +78,17 @@ def buscar_consultas_activas(
     query = query.filter(ConsultaModel.activo.is_(activo))
 
     # ======================
+    # Filtro de ARCHIVO (último estado del ciclo JSONB)
+    # ======================
+    if not archivo:
+        query = query.filter(
+            or_(
+                ConsultaModel.ultimo_estado.is_(None),
+                ConsultaModel.ultimo_estado != "archivo"
+            )
+        )
+    # archivo=True → no se agrega ningún filtro, lista todo
+    # ======================
     # Filtros de CONSULTA
     # ======================
     if paciente_id is not None:
@@ -64,7 +96,7 @@ def buscar_consultas_activas(
 
     if tipo_consulta is not None:
         query = query.filter(ConsultaModel.tipo_consulta == tipo_consulta)
-        
+
     if documento is not None:
         query = query.filter(ConsultaModel.documento == documento)
 
@@ -132,7 +164,7 @@ def buscar_consultas_activas(
         total=total,
         consultas=resultados
     )
-    
+
 
 @router.get("/buscarpaciente", response_model=List[PacienteSimple])
 def buscar_pacientes(
@@ -223,7 +255,7 @@ def obtener_consulta(
     if not consulta:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
     return consulta
-
+ 
 
 
 # =============================================================================
@@ -308,22 +340,8 @@ def actualizar_consulta(
     # 6. AGREGAR nuevo registro al historial del ciclo
     # ======================
     if hasattr(update_data, 'ciclo') and update_data.ciclo is not None:
-        # Obtener historial actual (o crear lista vacía)
-        ciclo_historial = consulta.ciclo or []
-        if not isinstance(ciclo_historial, list):
-            ciclo_historial = []
-        
-        # Crear nuevo registro con auditoría automática
         nuevo_ciclo = update_data.ciclo.model_dump(exclude_none=True, mode='json')
-        
-        # SIEMPRE agregar campos de auditoría
-        nuevo_ciclo["estado"] = nuevo_ciclo.get("estado", "actualizado")
-        nuevo_ciclo["registro"] = datetime.now().isoformat()
-        nuevo_ciclo["usuario"] = current_user.username
-        
-        # 🔥 CRÍTICO: Crear nueva lista para que SQLAlchemy detecte el cambio
-        consulta.ciclo = ciclo_historial + [nuevo_ciclo]
-        flag_modified(consulta, "ciclo")
+        _agregar_ciclo(consulta, nuevo_ciclo, current_user)  # ← reemplaza bloque anterior
     
     # ======================
     # 7. Recalcular orden si es necesario
@@ -382,11 +400,7 @@ def actualizar_consulta(
     consulta_in: ConsultaUpdate,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
-  ):
-    """
-    Endpoint específico para agregar un nuevo registro al ciclo clínico.
-    También permite actualizar otros campos de la consulta simultáneamente.
-    """
+):
     consulta = db.get(ConsultaModel, consulta_id)
     if not consulta:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
@@ -398,85 +412,41 @@ def actualizar_consulta(
 
     # ======== Agregar nuevo ciclo ========
     if consulta_in.ciclo:
-        # 🔥 Excluir None al serializar
         nuevo_ciclo = consulta_in.ciclo.model_dump(exclude_none=True)
-        
-        # ✅ Agregar auditoría 
-        nuevo_ciclo["registro"] = datetime.utcnow().isoformat()
-        nuevo_ciclo["usuario"] = current_user.username
-        
-        # ✅ Garantizar que 'estado' existe
-        if "estado" not in nuevo_ciclo:
-            nuevo_ciclo["estado"] = "actualizado"
-
-        # ✅ Obtener historial actual
-        historial = consulta.ciclo or []
-        
-        # 🔥 CRÍTICO: Crear una NUEVA lista para que SQLAlchemy detecte el cambio
-        consulta.ciclo = historial + [nuevo_ciclo]
-        
-        # 🔥 Notificar a SQLAlchemy del cambio
-        flag_modified(consulta, "ciclo")
+        _agregar_ciclo(consulta, nuevo_ciclo, current_user)  # ← solo esto, nada más
 
     try:
         db.commit()
         db.refresh(consulta)
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al actualizar ciclo: {str(e)}"
-        )
-    
-    return consulta
+        raise HTTPException(status_code=500, detail=f"Error al actualizar ciclo: {str(e)}")
 
+    return consulta
 
 # app/routes/consultas.py
 
 @router.put("/{consulta_id}/ciclo", response_model=ConsultaOut)
 def agregar_ciclo_a_consulta(
     consulta_id: int,
-    ciclo_data: CicloConsultaUpdate,  # 👈 Este ES el ciclo, no tiene campo .ciclo
+    ciclo_data: CicloConsultaUpdate,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    """
-    Endpoint específico para agregar un nuevo registro al ciclo clínico.
-    """
     consulta = db.get(ConsultaModel, consulta_id)
     if not consulta:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
 
-    # 🔥 ciclo_data YA ES el ciclo, convertir directamente a dict
-    nuevo_ciclo = ciclo_data.model_dump(
-        exclude_none=True,  # ✅ Excluir campos None
-        exclude_unset=True,  # ✅ Excluir campos no enviados
-        mode='json'
-    )
-    
-    # ✅ Agregar auditoría automática
-    nuevo_ciclo["registro"] = datetime.utcnow().isoformat()
-    nuevo_ciclo["usuario"] = current_user.username
-
-    # ✅ Obtener historial actual
-    historial = consulta.ciclo or []
-    
-    # 🔥 CRÍTICO: Crear una NUEVA lista para que SQLAlchemy detecte el cambio
-    consulta.ciclo = historial + [nuevo_ciclo]
-    
-    # 🔥 Notificar a SQLAlchemy del cambio
-    flag_modified(consulta, "ciclo")
+    nuevo_ciclo = ciclo_data.model_dump(exclude_none=True, exclude_unset=True, mode='json')
+    _agregar_ciclo(consulta, nuevo_ciclo, current_user)  # ← solo esto, nada más
 
     try:
         db.commit()
         db.refresh(consulta)
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al actualizar ciclo: {str(e)}"
-        )
-    
+        raise HTTPException(status_code=500, detail=f"Error al actualizar ciclo: {str(e)}")
+
     return consulta
 
 # =============================================================================
@@ -588,7 +558,8 @@ def registrar_consulta(
         hora_consulta=datetime.now().time(),
         indicadores=indicadores_completos,
         ciclo=ciclo_historial,
-        orden=ultimo_orden + 1
+        orden=ultimo_orden + 1,
+        ultimo_estado="admision",  # ← copia el estado del ciclo_inicial
     )
 
     db.add(nueva_consulta)

@@ -389,7 +389,7 @@ def actualizar_consulta(
         )
     
     return consulta
-
+ 
 
 # =============================================================================
 # AGREGAR CICLO A CONSULTA (PUT - Endpoint específico)
@@ -405,26 +405,34 @@ def actualizar_consulta(
     if not consulta:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
 
+    ESTADO_ARCHIVADO = "archivo"
+    esta_archivado = consulta.ultimo_estado == ESTADO_ARCHIVADO
+
     # ======== Actualizar campos simples ========
+    campos_excluidos = {"ciclo", "ultimo_estado", "activo"} if esta_archivado else {"ciclo"}
+
     for field, value in consulta_in.model_dump(exclude_unset=True).items():
-        if field != "ciclo":
+        if field not in campos_excluidos:
             setattr(consulta, field, value)
+
+    # Si está archivado, forzar que ultimo_estado y activo no cambien
+    if esta_archivado:
+        consulta.ultimo_estado = ESTADO_ARCHIVADO
+        consulta.activo = False  # o el valor que corresponda al estado archivado
 
     # ======== Agregar nuevo ciclo ========
     if consulta_in.ciclo:
         nuevo_ciclo = consulta_in.ciclo.model_dump(exclude_none=True)
-        _agregar_ciclo(consulta, nuevo_ciclo, current_user)  # ← solo esto, nada más
+        _agregar_ciclo(consulta, nuevo_ciclo, current_user)  # los ciclos siempre se pueden agregar
 
     try:
         db.commit()
         db.refresh(consulta)
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al actualizar ciclo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al actualizar consulta: {str(e)}")
 
     return consulta
-
-# app/routes/consultas.py
 
 @router.put("/{consulta_id}/ciclo", response_model=ConsultaOut)
 def agregar_ciclo_a_consulta(

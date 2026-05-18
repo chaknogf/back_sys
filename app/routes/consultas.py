@@ -281,12 +281,18 @@ def actualizar_consulta(
     consulta = db.get(ConsultaModel, consulta_id)
     if not consulta:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
+    ESTADO_ARCHIVADO = "archivo"
+    esta_archivado = consulta.ultimo_estado == ESTADO_ARCHIVADO
     
     # ======================
     # 2. Obtener datos a actualizar
     # ======================
     datos = update_data.model_dump(exclude_unset=True, exclude={'ciclo'})
-    
+
+    if esta_archivado:
+        datos.pop('ultimo_estado', None)
+        datos.pop('activo', None)
+        
     # ======================
     # 3. Validar paciente si se está cambiando
     # ======================
@@ -341,8 +347,8 @@ def actualizar_consulta(
     # ======================
     if hasattr(update_data, 'ciclo') and update_data.ciclo is not None:
         nuevo_ciclo = update_data.ciclo.model_dump(exclude_none=True, mode='json')
-        _agregar_ciclo(consulta, nuevo_ciclo, current_user)  # ← reemplaza bloque anterior
-    
+        _agregar_ciclo(consulta, nuevo_ciclo, current_user)
+
     # ======================
     # 7. Recalcular orden si es necesario
     # ======================
@@ -374,9 +380,15 @@ def actualizar_consulta(
     # ======================
     for key, value in datos.items():
         setattr(consulta, key, value)
+
+    # ======================
+    # 9. Proteger ultimo_estado si está archivado (SIEMPRE al final, antes del commit)
+    # ======================
+    if esta_archivado:
+        consulta.ultimo_estado = ESTADO_ARCHIVADO
     
     # ======================
-    # 9. Guardar cambios
+    # 10. Guardar cambios
     # ======================
     try:
         db.commit()
@@ -391,71 +403,6 @@ def actualizar_consulta(
     return consulta
  
 
-# =============================================================================
-# AGREGAR CICLO A CONSULTA (PUT - Endpoint específico)
-# =============================================================================
-@router.put("/{consulta_id}", response_model=ConsultaOut)
-def actualizar_consulta(
-    consulta_id: int,
-    consulta_in: ConsultaUpdate,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
-):
-    consulta = db.get(ConsultaModel, consulta_id)
-    if not consulta:
-        raise HTTPException(status_code=404, detail="Consulta no encontrada")
-
-    ESTADO_ARCHIVADO = "archivo"
-    esta_archivado = consulta.ultimo_estado == ESTADO_ARCHIVADO
-
-    # ======== Actualizar campos simples ========
-    campos_excluidos = {"ciclo", "ultimo_estado", "activo"} if esta_archivado else {"ciclo"}
-
-    for field, value in consulta_in.model_dump(exclude_unset=True).items():
-        if field not in campos_excluidos:
-            setattr(consulta, field, value)
-
-    # Si está archivado, forzar que ultimo_estado y activo no cambien
-    if esta_archivado:
-        consulta.ultimo_estado = ESTADO_ARCHIVADO
-        consulta.activo = False  # o el valor que corresponda al estado archivado
-
-    # ======== Agregar nuevo ciclo ========
-    if consulta_in.ciclo:
-        nuevo_ciclo = consulta_in.ciclo.model_dump(exclude_none=True)
-        _agregar_ciclo(consulta, nuevo_ciclo, current_user)  # los ciclos siempre se pueden agregar
-
-    try:
-        db.commit()
-        db.refresh(consulta)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al actualizar consulta: {str(e)}")
-
-    return consulta
-
-@router.put("/{consulta_id}/ciclo", response_model=ConsultaOut)
-def agregar_ciclo_a_consulta(
-    consulta_id: int,
-    ciclo_data: CicloConsultaUpdate,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
-):
-    consulta = db.get(ConsultaModel, consulta_id)
-    if not consulta:
-        raise HTTPException(status_code=404, detail="Consulta no encontrada")
-
-    nuevo_ciclo = ciclo_data.model_dump(exclude_none=True, exclude_unset=True, mode='json')
-    _agregar_ciclo(consulta, nuevo_ciclo, current_user)  # ← solo esto, nada más
-
-    try:
-        db.commit()
-        db.refresh(consulta)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al actualizar ciclo: {str(e)}")
-
-    return consulta
 
 # =============================================================================
 # REGISTRO DE CONSULTA - ENDPOINT SIMPLIFICADO

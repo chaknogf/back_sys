@@ -75,11 +75,18 @@ def citas_por_especialidad(
     db: Session = Depends(get_db)
 ):
     fecha_inicio = date.today() + timedelta(days=1)
+
     razon = CitaModel.datos_extra['razon_consulta'].astext
+
+    dia_semana = func.trim(
+        func.to_char(CitaModel.fecha_cita, 'Day')
+    ).label("dia_semana")
+
     resultados = (
         db.query(
             CitaModel.fecha_cita,
             razon.label("razon_consulta"),
+            dia_semana,
             func.count(CitaModel.id).label("total")
         )
         .filter(
@@ -88,14 +95,37 @@ def citas_por_especialidad(
         )
         .group_by(
             CitaModel.fecha_cita,
-            razon
+            razon,
+            dia_semana
         )
         .order_by(
             CitaModel.fecha_cita.asc()
         )
         .all()
     )
-    return resultados
+
+    # traducir días
+    resultados_formateados = []
+
+    for r in resultados:
+        resultados_formateados.append({
+            "fecha_cita": r.fecha_cita,
+            "razon_consulta": r.razon_consulta,
+            "dia_semana": DIAS_ES.get(r.dia_semana, r.dia_semana),
+            "total": r.total
+        })
+
+    return resultados_formateados
+
+DIAS_ES = {
+    "Monday": "Lunes",
+    "Tuesday": "Martes",
+    "Wednesday": "Miércoles",
+    "Thursday": "Jueves",
+    "Friday": "Viernes",
+    "Saturday": "Sábado",
+    "Sunday": "Domingo",
+}
 
 @router.get("/{cita_id}", response_model=CitaResponse)
 def obtener_cita(

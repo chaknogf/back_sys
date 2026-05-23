@@ -194,8 +194,16 @@ def obtener_paciente(
                 m["accion"] = "ACTUALIZADO"
             if not m.get("usuario"):
                 m["usuario"] = "sistema"
-            if isinstance(m.get("registro"), str) is False:
-                m["registro"] = str(m["registro"])
+            registro = m.get("registro")
+
+        if registro is None:
+            m["registro"] = datetime.now(timezone.utc).isoformat()
+
+        elif isinstance(registro, datetime):
+            m["registro"] = registro.isoformat()
+
+        elif not isinstance(registro, str):
+            m["registro"] = str(registro)
 
     return paciente
 

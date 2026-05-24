@@ -68,6 +68,34 @@ def listar_citas(
         query = query.filter(CitaModel.fecha_cita == fecha_cita)
     return query.order_by(CitaModel.expediente.asc()).offset(skip).limit(limit).all()
 
+@router.get("/paciente/{paciente_id}", response_model=List[CitaResponse])
+def obtener_citas_por_paciente(
+    paciente_id: int,
+    fecha_desde: Optional[date] = None,
+    fecha_hasta: Optional[date] = None,
+    especialidad: Optional[str] = None,
+    limit: int = 200,
+    skip: int = 0,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    query = db.query(CitaModel).filter(CitaModel.paciente_id == paciente_id)
+
+    if fecha_desde is not None:
+        query = query.filter(CitaModel.fecha_cita == fecha_desde)
+    if fecha_hasta is not None:
+        query = query.filter(CitaModel.fecha_cita == fecha_hasta)
+    if especialidad is not None:
+        query = query.filter(CitaModel.especialidad == especialidad)
+
+    citas = query.order_by(CitaModel.fecha_cita.asc()).offset(skip).limit(limit).all()
+
+    if not citas:
+        raise HTTPException(status_code=404, detail="No se encontraron citas para este paciente")
+
+    return citas
+
+
 @router.get("/disponibles", response_model=List[CitasPorFechaRazon])
 def citas_por_especialidad(
     especialidad: str,

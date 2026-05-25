@@ -31,9 +31,9 @@ def crear_prestamo(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-
     nuevo_prestamo = Prestamo(
-        **data.model_dump()
+        **data.model_dump(),
+        usuario_entrega=current_user.username   # ← automático desde el token
     )
 
     db.add(nuevo_prestamo)
@@ -51,30 +51,18 @@ def crear_prestamo(
 def listar_prestamos(
     activo: Optional[bool] = Query(None),
     id_paciente: Optional[int] = Query(None),
-
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-
     query = db.query(Prestamo)
 
     if activo is not None:
-        query = query.filter(
-            Prestamo.activo == activo
-        )
+        query = query.filter(Prestamo.activo == activo)
 
     if id_paciente:
-        query = query.filter(
-            Prestamo.id_paciente == id_paciente
-        )
+        query = query.filter(Prestamo.id_paciente == id_paciente)
 
-    prestamos = (
-        query
-        .order_by(desc(Prestamo.fecha_prestamo))
-        .all()
-    )
-
-    return prestamos
+    return query.order_by(desc(Prestamo.fecha_prestamo)).all()
 
 
 # =========================================================
@@ -87,18 +75,10 @@ def obtener_prestamo(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-
-    prestamo = (
-        db.query(Prestamo)
-        .filter(Prestamo.id == prestamo_id)
-        .first()
-    )
+    prestamo = db.query(Prestamo).filter(Prestamo.id == prestamo_id).first()
 
     if not prestamo:
-        raise HTTPException(
-            status_code=404,
-            detail="Préstamo no encontrado"
-        )
+        raise HTTPException(status_code=404, detail="Préstamo no encontrado")
 
     return prestamo
 
@@ -111,27 +91,23 @@ def obtener_prestamo(
 def actualizar_prestamo(
     prestamo_id: int,
     data: PrestamoUpdate,
-
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-
-    prestamo = (
-        db.query(Prestamo)
-        .filter(Prestamo.id == prestamo_id)
-        .first()
-    )
+    prestamo = db.query(Prestamo).filter(Prestamo.id == prestamo_id).first()
 
     if not prestamo:
-        raise HTTPException(
-            status_code=404,
-            detail="Préstamo no encontrado"
-        )
+        raise HTTPException(status_code=404, detail="Préstamo no encontrado")
 
     update_data = data.model_dump(exclude_unset=True)
 
     for key, value in update_data.items():
         setattr(prestamo, key, value)
+
+    # Si se está registrando la devolución (fecha_devolucion llega en el PUT),
+    # asignar automáticamente quién recibe
+    if "fecha_devolucion" in update_data and update_data["fecha_devolucion"] is not None:
+        prestamo.usuario_recibe = current_user.username  # ← automático desde el token
 
     db.commit()
     db.refresh(prestamo)
@@ -149,23 +125,13 @@ def eliminar_prestamo(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-
-    prestamo = (
-        db.query(Prestamo)
-        .filter(Prestamo.id == prestamo_id)
-        .first()
-    )
+    prestamo = db.query(Prestamo).filter(Prestamo.id == prestamo_id).first()
 
     if not prestamo:
-        raise HTTPException(
-            status_code=404,
-            detail="Préstamo no encontrado"
-        )
+        raise HTTPException(status_code=404, detail="Préstamo no encontrado")
 
     prestamo.activo = False
 
     db.commit()
 
-    return {
-        "detail": "Préstamo desactivado correctamente"
-    }
+    return {"detail": "Préstamo desactivado correctamente"}

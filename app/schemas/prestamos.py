@@ -1,3 +1,5 @@
+# app/schemas/prestamos.py
+
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
@@ -14,18 +16,18 @@ class PrestamoBase(BaseModel):
     fecha_prestamo: Optional[datetime] = None
     fecha_limite: Optional[datetime] = None
     fecha_devolucion: Optional[datetime] = None
-    usuario_entrega: Optional[str] = None
-    usuario_recibe: Optional[str] = None
     solicitante: str
     motivo: Optional[str] = None
     tipo_documento: Optional[str] = "EXPEDIENTE"
     activo: Optional[bool] = True
     ubicacion: Optional[str] = None
     nota: Optional[str] = None
+    # usuario_entrega y usuario_recibe se asignan en el backend,
+    # no se exponen en Create ni Update
 
 
 # =========================
-# CREATE
+# CREATE — el frontend NO envía usuarios
 # =========================
 
 class PrestamoCreate(PrestamoBase):
@@ -33,7 +35,7 @@ class PrestamoCreate(PrestamoBase):
 
 
 # =========================
-# UPDATE
+# UPDATE — el frontend NO envía usuario_recibe
 # =========================
 
 class PrestamoUpdate(BaseModel):
@@ -41,9 +43,7 @@ class PrestamoUpdate(BaseModel):
     expediente: Optional[str] = None
     fecha_prestamo: Optional[datetime] = None
     fecha_limite: Optional[datetime] = None
-    fecha_devolucion: Optional[datetime] = None
-    usuario_entrega: Optional[str] = None
-    usuario_recibe: Optional[str] = None
+    fecha_devolucion: Optional[datetime] = None   # al enviarla → asigna usuario_recibe
     solicitante: Optional[str] = None
     motivo: Optional[str] = None
     tipo_documento: Optional[str] = None
@@ -53,11 +53,13 @@ class PrestamoUpdate(BaseModel):
 
 
 # =========================
-# LISTAR / RESPONSE
+# RESPONSE — sí devuelve ambos usuarios (solo lectura)
 # =========================
 
 class Prestamo(PrestamoBase):
     id: int
+    usuario_entrega: Optional[str] = None   # asignado por el backend al crear
+    usuario_recibe: Optional[str] = None    # asignado por el backend al devolver
     created_at: datetime
     updated_at: datetime
 

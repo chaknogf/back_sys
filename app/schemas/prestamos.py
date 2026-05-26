@@ -1,7 +1,7 @@
 # app/schemas/prestamos.py
 
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -62,5 +62,12 @@ class Prestamo(PrestamoBase):
     usuario_recibe: Optional[str] = None    # asignado por el backend al devolver
     created_at: datetime
     updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+    
+    
+class PrestamoListResponse(BaseModel):
+    total: int
+    items: List[Prestamo]
 
     model_config = ConfigDict(from_attributes=True)

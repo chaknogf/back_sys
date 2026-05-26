@@ -8,7 +8,7 @@ from app.database.db import get_db
 from app.database.security import get_current_user
 from app.models.user import UserModel
 from app.models.prestamos import Prestamo
-from app.models.pacientes import Paciente  # ← asegúrate que exista este import
+from app.models.pacientes import PacienteModel  # ← asegúrate que exista este import
 from app.schemas.prestamos import (
     PrestamoCreate,
     PrestamoUpdate,
@@ -62,7 +62,7 @@ def listar_prestamos(
     current_user: UserModel = Depends(get_current_user)
 ):
     query = db.query(Prestamo).join(
-        Paciente, Prestamo.id_paciente == Paciente.id, isouter=True
+        PacienteModel, Prestamo.id_paciente == PacienteModel.id, isouter=True
     )
 
     # Filtro por estado activo
@@ -86,10 +86,10 @@ def listar_prestamos(
         termino = f"%{nombre_paciente}%"
         query = query.filter(
             or_(
-                Paciente.primer_nombre.ilike(termino),
-                Paciente.segundo_nombre.ilike(termino),
-                Paciente.primer_apellido.ilike(termino),
-                Paciente.segundo_apellido.ilike(termino),
+                PacienteModel.primer_nombre.ilike(termino),
+                PacienteModel.segundo_nombre.ilike(termino),
+                PacienteModel.primer_apellido.ilike(termino),
+                PacienteModel.segundo_apellido.ilike(termino),
             )
         )
 

@@ -155,7 +155,7 @@ def buscar_consultas_activas(
     resultados = (
         query
         .distinct()
-        .order_by(ConsultaModel.fecha_consulta.desc())
+        .order_by(ConsultaModel.id.desc())
         .limit(limit).offset(skip)
         .all()
     )

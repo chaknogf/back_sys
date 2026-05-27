@@ -134,11 +134,18 @@ def actualizar_constancia(
 
 @router.delete("/{constancia_id}")
 def eliminar_constancia(
-    constancia_id: int, db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)):
+    constancia_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
     constancia = db.get(ConstanciaNacimientoModel, constancia_id)
     if not constancia:
         raise HTTPException(status_code=404, detail="Constancia no encontrada")
+
+    # Eliminar registros dependientes primero
+    db.query(ConstanciaNacimientoHistorialModel)\
+      .filter(ConstanciaNacimientoHistorialModel.constancia_id == constancia_id)\
+      .delete()
 
     db.delete(constancia)
     db.commit()

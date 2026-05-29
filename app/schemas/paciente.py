@@ -88,6 +88,7 @@ class Referencia(BaseModel):
     expediente: Optional[str] = None
     idpersona: Optional[str] = None
     responsable: Optional[bool] = None
+    acompanante: Optional[bool] = None
 
     @field_validator("telefono", mode="before")
     @classmethod
@@ -353,6 +354,7 @@ class PacienteConsultaBase(BaseModel):
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     contacto: Optional[Contacto] = None
+    referencias: Optional[List[Referencia]] = None
     # datos_extra: Optional[Dict[str, Any]] = None
     estado: Optional[str] = Field("V", pattern=r"^(V|F|I|A)$", description="V=Vivo, F=Fallecido, I=Inactivo, A=Activo")
     # metadatos: Optional[List[MetadataEvento]] = None

@@ -110,86 +110,38 @@ class CicloUpdate(BaseModel):
     estado: EstadoCiclo = "actualizado"
     especialidad: Optional[str] = None
     servicio: Optional[str] = None
-    # ========== VALIDADORES ==========
+
     @field_validator('estado', mode='before')
     @classmethod
     def normalizar_estado(cls, v):
-        """Normaliza estados a minúsculas"""
         return v.lower() if isinstance(v, str) else v
-    
-    @model_validator(mode='after')
-    def limpiar_campos_vacios(self):
-        """
-        Elimina cualquier campo que sea None, dict vacío, lista vacía o string vacío.
-        """
-        # Obtener todos los campos del modelo (definidos + extra)
-        campos_a_eliminar = []
-        
-        for field_name, field_value in self.__dict__.items():
-            # Verificar si el campo está vacío
-            if field_value is None:
-                campos_a_eliminar.append(field_name)
-            elif isinstance(field_value, dict) and not field_value:
-                campos_a_eliminar.append(field_name)
-            elif isinstance(field_value, list) and not field_value:
-                campos_a_eliminar.append(field_name)
-            elif isinstance(field_value, str) and not field_value.strip():
-                campos_a_eliminar.append(field_name)
-        
-        # Eliminar campos vacíos
-        for field_name in campos_a_eliminar:
-            delattr(self, field_name)
-        
-        return self
-    
+
+    # ✅ Reemplazar el model_validator problemático por este
+    def model_dump_clean(self, **kwargs) -> dict:
+        """Devuelve solo campos con valores reales (no None, no vacíos)."""
+        data = super().model_dump(exclude_none=True, **kwargs)
+        return {k: v for k, v in data.items() if v != '' and v != {} and v != []}
+
     model_config = ConfigDict(
-        extra="allow",  # ✅ Acepta cualquier campo adicional
+        extra="allow",
         from_attributes=True
     )
 
 
-# app/schemas/consultas.py
 
 class CicloConsultaUpdate(BaseModel):
-    # ========== SOLO CAMPOS OBLIGATORIOS ==========
     estado: EstadoCiclo = Field(..., description="Estado del ciclo clínico")
-    
-    # ========== VALIDADORES ==========
+
     @field_validator('estado', mode='before')
     @classmethod
     def normalizar_estado(cls, v):
-        """Normaliza estados a minúsculas"""
         return v.lower() if isinstance(v, str) else v
-    
-    @model_validator(mode='after')
-    def limpiar_campos_vacios(self):
-        """
-        Elimina cualquier campo que sea None, dict vacío, lista vacía o string vacío.
-        """
-        # Obtener todos los campos del modelo (definidos + extra)
-        campos_a_eliminar = []
-        
-        for field_name, field_value in self.__dict__.items():
-            # Verificar si el campo está vacío
-            if field_value is None:
-                campos_a_eliminar.append(field_name)
-            elif isinstance(field_value, dict) and not field_value:
-                campos_a_eliminar.append(field_name)
-            elif isinstance(field_value, list) and not field_value:
-                campos_a_eliminar.append(field_name)
-            elif isinstance(field_value, str) and not field_value.strip():
-                campos_a_eliminar.append(field_name)
-        
-        # Eliminar campos vacíos
-        for field_name in campos_a_eliminar:
-            delattr(self, field_name)
-        
-        return self
-    
-    model_config = ConfigDict(
-        extra="allow",  # ✅ Acepta cualquier campo adicional
-        from_attributes=True
-    )
+
+    def model_dump_clean(self, **kwargs) -> dict:
+        data = super().model_dump(exclude_none=True, **kwargs)
+        return {k: v for k, v in data.items() if v != '' and v != {} and v != []}
+
+    model_config = ConfigDict(extra="allow", from_attributes=True)
        
 # ===================================================================
 # Schema base (común)

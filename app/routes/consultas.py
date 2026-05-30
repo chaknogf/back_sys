@@ -31,19 +31,15 @@ router = APIRouter(prefix="/consultas", tags=["Consultas Médicas"])
 # Funciones
 # =============================================================================
 # Función helper para no repetir lógica
-def _agregar_ciclo(consulta: ConsultaModel, nuevo_ciclo: dict, current_user: UserModel):
-    """Agrega un ciclo al historial y actualiza ultimo_estado en la columna."""
-    nuevo_ciclo["registro"] = datetime.now().isoformat()
-    nuevo_ciclo["usuario"] = current_user.username
-    nuevo_ciclo.setdefault("estado", "actualizado")
+def _agregar_ciclo(consulta, nuevo_ciclo, current_user):
+    nuevo_ciclo["registro"] = datetime.now().isoformat()  
+    nuevo_ciclo["usuario"] = current_user.username         
+    nuevo_ciclo.setdefault("estado", "actualizado")       
 
     historial = consulta.ciclo or []
-    if not isinstance(historial, list):
-        historial = []
-
     consulta.ciclo = historial + [nuevo_ciclo]
-    consulta.ultimo_estado = nuevo_ciclo["estado"]  # ← ACTUALIZAR COLUMNA
-    flag_modified(consulta, "ciclo")
+    consulta.ultimo_estado = nuevo_ciclo["estado"]
+    flag_modified(consulta, "ciclo")                       
 # =============================================================================
 # BUSCAR CONSULTAS (TODAS)
 # =============================================================================
@@ -345,8 +341,8 @@ def actualizar_consulta(
     # ======================
     # 6. AGREGAR nuevo registro al historial del ciclo
     # ======================
-    if hasattr(update_data, 'ciclo') and update_data.ciclo is not None:
-        nuevo_ciclo = update_data.ciclo.model_dump(exclude_none=True, mode='json')
+    if update_data.ciclo is not None:
+        nuevo_ciclo = update_data.ciclo.model_dump_clean(mode='json')
         _agregar_ciclo(consulta, nuevo_ciclo, current_user)
 
     # ======================
@@ -391,6 +387,8 @@ def actualizar_consulta(
     # 10. Guardar cambios
     # ======================
     try:
+        print(">>> ciclo recibido:", update_data.ciclo)
+        print(">>> historial actual:", consulta.ciclo)
         db.commit()
         db.refresh(consulta)
     except Exception as e:

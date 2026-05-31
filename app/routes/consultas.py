@@ -58,6 +58,7 @@ def buscar_consultas_activas(
     segundo_apellido: Optional[str] = None,
     tipo_consulta: Optional[int] = None,
     especialidad: Optional[str] = None,
+    servicio: Optional[str] = None,
     fecha: Optional[date] = None,
     ultimo_estado: Optional[str] = None,
     activo: bool = Query(True, description="Filtrar solo consultas activas"),
@@ -102,6 +103,9 @@ def buscar_consultas_activas(
 
     if especialidad:
         query = query.filter(ConsultaModel.especialidad == especialidad)
+
+    if servicio:
+        query = query.filter(ConsultaModel.servicio == servicio)
 
     if fecha:
         inicio = datetime.combine(fecha, time.min)

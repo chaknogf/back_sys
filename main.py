@@ -19,6 +19,7 @@ from app.routes.citas import router as citas
 from app.routes.total import router as total
 from app.routes.ciclos import router as ciclos
 from app.routes.prestamos import router as prestamos
+from app.routes.procedimientos import router as procedimientos
 
 from app.routes.renap import router as renap
 from sqlalchemy import text
@@ -105,7 +106,7 @@ app.include_router(paises)
 app.include_router(renap)
 app.include_router(total)
 app.include_router(prestamos)
-
+app.include_router(procedimientos)
 
 
 

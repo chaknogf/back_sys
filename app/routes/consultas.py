@@ -59,6 +59,7 @@ def buscar_consultas_activas(
     tipo_consulta: Optional[int] = None,
     especialidad: Optional[str] = None,
     fecha: Optional[date] = None,
+    ultimo_estado: Optional[str] = None,
     activo: bool = Query(True, description="Filtrar solo consultas activas"),
     archivo: bool = Query(True, description="Excluye consultas cuyo último estado de ciclo sea 'archivo'"),
     db: Session = Depends(get_db),
@@ -87,6 +88,9 @@ def buscar_consultas_activas(
     # ======================
     # Filtros de CONSULTA
     # ======================
+    if ultimo_estado is not None:
+        query = query.filter(ConsultaModel.ultimo_estado == ultimo_estado)
+
     if paciente_id is not None:
         query = query.filter(ConsultaModel.paciente_id == paciente_id)
 

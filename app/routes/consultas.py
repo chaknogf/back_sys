@@ -32,14 +32,20 @@ router = APIRouter(prefix="/consultas", tags=["Consultas Médicas"])
 # =============================================================================
 # Función helper para no repetir lógica
 def _agregar_ciclo(consulta, nuevo_ciclo, current_user):
-    nuevo_ciclo["registro"] = datetime.now().isoformat()  
-    nuevo_ciclo["usuario"] = current_user.username         
-    nuevo_ciclo.setdefault("estado", "actualizado")       
+    nuevo_ciclo["registro"] = datetime.now().isoformat()
+    nuevo_ciclo["usuario"] = current_user.username
+    nuevo_ciclo.setdefault("estado", "actualizado")
 
-    historial = consulta.ciclo or []
+    # ← Normalizar ciclo aunque sea dict vacío o None
+    historial = consulta.ciclo
+    if not historial or isinstance(historial, dict):
+        historial = []
+    elif not isinstance(historial, list):
+        historial = []
+
     consulta.ciclo = historial + [nuevo_ciclo]
     consulta.ultimo_estado = nuevo_ciclo["estado"]
-    flag_modified(consulta, "ciclo")                       
+    flag_modified(consulta, "ciclo")                     
 # =============================================================================
 # BUSCAR CONSULTAS (TODAS)
 # =============================================================================

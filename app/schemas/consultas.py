@@ -345,6 +345,7 @@ class ConsultaHistoriaResumidaOut(ConsultaBaseOut):
     especialidad: Optional[str] = None
     fecha_consulta: Optional[date] = None
     hora_consulta: Optional[time] = None
+    ultimo_estado: Optional[str] = None
     
 
     model_config = ConfigDict(from_attributes=True)

@@ -45,25 +45,55 @@ def crear_constancia(
 def listar_constancias(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
-    id_usuario: Optional[int] = None,
-    id_constancia: Optional[int] = None,
-    nombre_madre: Optional[str] = None,
-    fecha: Optional[date] = None,
-    documento: Optional[str] = None,
-    limit: int = 100, offset: int = 0
-    ):
+    id_usuario:     Optional[int]  = None,
+    id_constancia:  Optional[int]  = None,
+    nombre_madre:   Optional[str]  = None,
+    fecha:          Optional[date] = None,
+    documento:      Optional[str]  = None,
+    limit:  int = 100,
+    offset: int = 0,
+):
     query = db.query(ConstanciaNacimientoModel)
+
     if id_usuario is not None:
         query = query.filter(ConstanciaNacimientoModel.registrador_id == id_usuario)
+
     if id_constancia is not None:
         query = query.filter(ConstanciaNacimientoModel.id == id_constancia)
-    if nombre_madre is not None:
-        query = query.filter(ConstanciaNacimientoModel.nombre_madre.ilike(f"%{nombre_madre}%"))
+
+    # ✅ Ignora strings vacíos que manda Angular cuando el input está limpio
+    if nombre_madre and nombre_madre.strip():
+        query = query.filter(
+            ConstanciaNacimientoModel.nombre_madre.ilike(f"%{nombre_madre.strip()}%")
+        )
+
     if fecha is not None:
         query = query.filter(ConstanciaNacimientoModel.fecha_registro == fecha)
-    if documento is not None:
-        query = query.filter(ConstanciaNacimientoModel.documento == documento)
-    constancias = query.order_by(desc(ConstanciaNacimientoModel.id)).offset(offset).limit(limit).all()
+
+    if documento and documento.strip():
+        query = query.filter(
+            ConstanciaNacimientoModel.documento == documento.strip()
+        )
+
+    constancias = (
+        query
+        .order_by(desc(ConstanciaNacimientoModel.id))
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    # ── Debug temporal: quitar en producción ──────────────────────────────
+    print("Filtros recibidos:", {
+        "id_usuario": id_usuario,
+        "id_constancia": id_constancia,
+        "nombre_madre": repr(nombre_madre),
+        "fecha": fecha,
+        "documento": repr(documento),
+    })
+    print("SQL generado:", str(query.statement.compile(compile_kwargs={"literal_binds": True})))
+    # ─────────────────────────────────────────────────────────────────────
+
     return constancias
 
 @router.get("/historial/{constancia_id}",

@@ -50,14 +50,15 @@ class PacienteModel(Base):
 
     @validates("nombre")
     def actualizar_nombre_completo(self, key: str, nombre_dict: dict) -> dict:
-        partes = [
-            nombre_dict.get("primer_nombre"),
-            nombre_dict.get("segundo_nombre"),
-            nombre_dict.get("otro_nombre"),
-            nombre_dict.get("primer_apellido"),
-            nombre_dict.get("segundo_apellido"),
-            nombre_dict.get("apellido_casada")
-        ]
-        nombre_limpio = " ".join(p.strip() for p in partes if p and p.strip())
-        self.nombre_completo = nombre_limpio.upper() if nombre_limpio else None
+        campos = ["primer_nombre", "segundo_nombre", "otro_nombre",
+                "primer_apellido", "segundo_apellido", "apellido_casada"]
+        
+        # Normalizar cada campo del JSONB
+        for campo in campos:
+            if nombre_dict.get(campo):
+                nombre_dict[campo] = nombre_dict[campo].strip().title()
+        
+        partes = [nombre_dict.get(c) for c in campos]
+        nombre_limpio = " ".join(p for p in partes if p)
+        self.nombre_completo = nombre_limpio if nombre_limpio else None
         return nombre_dict

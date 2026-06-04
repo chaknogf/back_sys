@@ -29,10 +29,13 @@ DATABASE_URL = f"postgresql+psycopg2://{POSTGRES_USER}:{quote_plus(POSTGRES_PASS
 # ======================
 engine = create_engine(
     DATABASE_URL,
-    echo=False,  # echo=True solo en desarrollo
+    echo=False,
     pool_pre_ping=True,
     pool_recycle=300,
-    connect_args={"connect_timeout": 10}
+    connect_args={
+        "connect_timeout": 10,
+        "options": "-c client_encoding=UTF8"
+    }
 )
 
 # Test de conexión al iniciar

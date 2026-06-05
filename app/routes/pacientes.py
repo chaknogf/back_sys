@@ -4,7 +4,7 @@ Router de pacientes - CORREGIDO
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, cast, String, text, or_
+from sqlalchemy import and_, func, desc, cast, String, text, or_, literal
 from sqlalchemy.exc import IntegrityError
 from typing import Optional, List
 from datetime import date, datetime, time, timezone
@@ -18,6 +18,7 @@ from app.schemas.paciente import (
 from app.utils.expediente import generar_expediente
 from app.database.security import get_current_user
 from app.models.user import UserModel
+import unicodedata
 
 
 router = APIRouter(prefix="/pacientes", tags=["Pacientes"])
@@ -53,6 +54,25 @@ def normalizar_metadatos(paciente):
             m["usuario"] = "sistema"
         if m.get("registro") and not isinstance(m["registro"], str):
             m["registro"] = m["registro"].isoformat()
+            
+def quitar_tildes(texto: str) -> str:
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    ).lower()
+            
+# ─── columna nombre_completo normalizada ──────────────────────────────────────
+# aprovecha la columna Text que ya existe en el modelo
+nombre_completo_col = func.unaccent(func.lower(PacienteModel.nombre_completo))
+
+
+def filtro_nombre_campo(campo: str, valor: str):
+    columna = func.unaccent(
+        func.lower(
+            func.jsonb_extract_path_text(PacienteModel.nombre, campo)
+        )
+    )
+    return columna.ilike(f"%{quitar_tildes(valor)}%")
 
 # =============================================================================
 # BÚSQUEDA AVANZADA - CORREGIDA
@@ -80,65 +100,69 @@ def buscar_pacientes(
     Búsqueda de pacientes con filtros opcionales
     Si no se envían filtros, devuelve todos los pacientes (paginados)
     """
-    
-    # Empezar con query base
     query = db.query(PacienteModel).order_by(desc(PacienteModel.id))
-    
-    # Filtro por defecto: excluir inactivos
     query = query.filter(PacienteModel.estado != "I")
-    # Solo aplicar filtros si se proporcionan
+
+        # ─── nombre_completo_json (igual que antes) ───────────────────────────────────
+    nombre_completo_json = func.unaccent(
+        func.concat_ws(
+            ' ',
+            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_nombre'), ''),
+            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_nombre'), ''),
+            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'otro_nombre'), ''),
+            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_apellido'), ''),
+            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_apellido'), ''),
+            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'apellido_casada'), '')
+        )
+    )
+
+    # ─── filtro q ─────────────────────────────────────────────────────────────────
     if q:
-        q_clean = q.strip().upper()
+        palabras = [quitar_tildes(p) for p in q.split() if p.strip()]
+
+        filtros_nombre = [
+            # usa nombre_completo directo, no JSONB
+            nombre_completo_col.ilike(f"%{palabra}%")
+            for palabra in palabras
+        ]
+
         query = query.filter(
             or_(
-                # Búsqueda en CUI
-                cast(PacienteModel.cui, String).ilike(f"%{q_clean}%"),
-                # Búsqueda en expediente
-                PacienteModel.expediente.ilike(f"%{q_clean}%"),
-                # Búsqueda en nombre_completo (columna calculada)
-                PacienteModel.nombre_completo.ilike(f"%{q_clean}%"),
-                # O búsqueda en JSONB de nombre
-                func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_nombre').ilike(f"%{q_clean}%"),
-                func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_nombre').ilike(f"%{q_clean}%"),
-                func.jsonb_extract_path_text(PacienteModel.nombre, 'otro_nombre').ilike(f"%{q_clean}%"),
-                func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_apellido').ilike(f"%{q_clean}%"),
-                func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_apellido').ilike(f"%{q_clean}%"),
-                func.jsonb_extract_path_text(PacienteModel.nombre, 'apellido_casada').ilike(f"%{q_clean}%")
+                cast(PacienteModel.cui, String).ilike(f"%{q.strip()}%"),
+                PacienteModel.expediente.ilike(f"%{q.strip()}%"),
+                and_(*filtros_nombre)
             )
         )
+    
 
+    # ─── filtros individuales ─────────────────────────────────────────────────────
+    if nombre:
+        palabras = [quitar_tildes(p) for p in nombre.split() if p.strip()]
+        filtros = [nombre_completo_col.ilike(f"%{p}%") for p in palabras]
+        query = query.filter(and_(*filtros))
+
+    if primer_nombre:
+        query = query.filter(filtro_nombre_campo('primer_nombre', primer_nombre))
+
+    if segundo_nombre:
+        query = query.filter(filtro_nombre_campo('segundo_nombre', segundo_nombre))
+
+    if primer_apellido:
+        query = query.filter(filtro_nombre_campo('primer_apellido', primer_apellido))
+
+    if segundo_apellido:
+        query = query.filter(filtro_nombre_campo('segundo_apellido', segundo_apellido))
     if cui:
         if cui.isdigit():
             query = query.filter(PacienteModel.cui == int(cui))
         else:
-            # Si no es numérico, buscar como string
             query = query.filter(cast(PacienteModel.cui, String).ilike(f"%{cui}%"))
 
     if expediente:
         query = query.filter(PacienteModel.expediente == expediente)
-
-    if nombre:
-        nombre_clean = nombre.strip().upper()
-        query = query.filter(
-            or_(
-                PacienteModel.nombre_completo.ilike(f"%{nombre_clean}%"),
-                func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_nombre').ilike(f"%{nombre_clean}%"),
-                func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_nombre').ilike(f"%{nombre_clean}%"),
-                func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_apellido').ilike(f"%{nombre_clean}%"),
-                func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_apellido').ilike(f"%{nombre_clean}%")
-            )
-        )
-    if primer_nombre:
-        query = query.filter(func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_nombre').ilike(f"%{primer_nombre.strip().upper()}%"))
-    if segundo_nombre:
-        query = query.filter(func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_nombre').ilike(f"%{segundo_nombre.strip().upper()}%"))
-    if primer_apellido:
-        query = query.filter(func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_apellido').ilike(f"%{primer_apellido.strip().upper()}%"))
-    if segundo_apellido:
-        query = query.filter(func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_apellido').ilike(f"%{segundo_apellido.strip().upper()}%"))
-    
     if id:
         query = query.filter(PacienteModel.id == id)
+
     if sexo:
         query = query.filter(PacienteModel.sexo == sexo.upper())
 
@@ -149,26 +173,16 @@ def buscar_pacientes(
         try:
             query = query.filter(PacienteModel.fecha_nacimiento == fecha_nac)
         except:
-            pass  # Ignorar si el formato es inválido
+            pass
 
-    # Contar total ANTES de paginar
     total = query.count()
-    
-    # Aplicar paginación
     pacientes = query.offset(skip).limit(limit).all()
+    
+    # debug temporal
+    print(f"DEBUG total={total}, pacientes={len(pacientes)}")
+    print(f"DEBUG tipo pacientes[0]={type(pacientes[0]) if pacientes else 'vacío'}")
 
-    for p in pacientes:
-        if p.metadatos:
-            for m in p.metadatos:
-                if not m.get("accion"):
-                    m["accion"] = "ACTUALIZADO"
-                if not m.get("usuario"):
-                    m["usuario"] = "sistema"
-
-    return PacienteListResponse(
-        total=total,
-        pacientes=pacientes
-    )
+    return PacienteListResponse(total=total, pacientes=pacientes)
 
 
 # =============================================================================

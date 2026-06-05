@@ -1,6 +1,6 @@
 # app/schemas/citas.py
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import date, datetime
 from typing import Optional, Dict, Any
 from app.schemas.paciente import PacientesNombre
@@ -43,3 +43,8 @@ class CitaResponse(CitaBase):
 
     class Config:
         from_attributes = True
+        
+class CitaListResponse(BaseModel):
+    total: int
+    citas: list[CitaResponse]
+    model_config = ConfigDict(from_attributes=True)

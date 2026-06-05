@@ -8,7 +8,7 @@ from datetime import datetime, date, time, timedelta
 from app.database.db import get_db
 from app.models.user import UserModel
 from app.models.citas import CitaModel
-from app.schemas.citas import CitaCreate, CitaUpdate, CitaResponse, CitaBase, CitasPorFechaRazon
+from app.schemas.citas import CitaCreate, CitaListResponse, CitaUpdate, CitaResponse, CitaBase, CitasPorFechaRazon
 from app.database.security import get_current_user
 
 router = APIRouter(
@@ -41,10 +41,10 @@ def crear_cita(
     return nueva_cita
 
 
-@router.get("/", response_model=List[CitaResponse])
+@router.get("/", response_model=CitaListResponse)
 def listar_citas(
     id: Optional[int] = None,
-    expediente: Optional[str] = None,
+    expediente: Optional[str] = None, 
     paciente_id: Optional[int] = None,
     especialidad: Optional[str] = None,
     fecha_cita: Optional[date] = None,
@@ -66,7 +66,9 @@ def listar_citas(
     if fecha_cita is not None:
 
         query = query.filter(CitaModel.fecha_cita == fecha_cita)
-    return query.order_by(CitaModel.expediente.asc()).offset(skip).limit(limit).all()
+    total = query.count()
+    citas = query.order_by(CitaModel.expediente.asc()).offset(skip).limit(limit).all()
+    return CitaListResponse(total=total, citas=citas)
 
 @router.get("/paciente/{paciente_id}", response_model=List[CitaResponse])
 def obtener_citas_por_paciente(

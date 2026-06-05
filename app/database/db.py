@@ -53,7 +53,7 @@ Base = declarative_base()
 # ======================
 # DEPENDENCIA FASTAPI
 # ======================
-def get_db() -> Session:
+def get_db() -> Session: # type: ignore
     """
     Dependencia de FastAPI para inyectar sesión de BD.
     Uso: db: Session = Depends(get_db)

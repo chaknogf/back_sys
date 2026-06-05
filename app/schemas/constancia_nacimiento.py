@@ -1,9 +1,9 @@
 # app/schema/constancia_nacimiento.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Dict, Any
 from datetime import date, datetime
 from app.schemas.paciente import PacienteNacimientoConstancia
-from app.schemas.medicos import MedicoBase
+from app.schemas.medicos import MedicoOut
 
 
 class ConstanciaNacimientoBase(BaseModel):
@@ -69,11 +69,16 @@ class ConstanciaNacimientoResponse(ConstanciaNacimientoBase):
     paciente: Optional[PacienteNacimientoConstancia] = None
     # Si en el futuro serializas la madre también, agrega:
     madre: Optional[PacienteNacimientoConstancia] = None 
-    medico: Optional[MedicoBase] = None
+    medico: Optional[MedicoOut] = None
 
     class Config:
         from_attributes = True
 
+class ConstanciaNacimientoListResponse(BaseModel):
+    total: int
+    constancias: list[ConstanciaNacimientoResponse]
+    model_config = ConfigDict(from_attributes=True)
+    
 
 class ConstanciaNacimientoHistorialResponse(BaseModel):
     id: int

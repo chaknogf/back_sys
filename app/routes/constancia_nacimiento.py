@@ -1,8 +1,9 @@
 from datetime import date
 from typing import Optional
+from app.models.pacientes import PacienteModel
 from app.utils.expediente import generar_constancia_nacimiento as generar_cn
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import inspect, desc
+from sqlalchemy import inspect, desc, or_
 from sqlalchemy.orm import Session
 from datetime import date, datetime
 from decimal import Decimal
@@ -14,6 +15,7 @@ from app.models.constancia_nacimiento_historial import ConstanciaNacimientoHisto
 from app.schemas.constancia_nacimiento import (
     ConstanciaNacimientoCreate,
     ConstanciaNacimientoHistorialResponse,
+    ConstanciaNacimientoListResponse,
     ConstanciaNacimientoUpdate,
     ConstanciaNacimientoResponse
 )
@@ -41,7 +43,7 @@ def crear_constancia(
     db.refresh(nueva)
     return nueva
 
-@router.get("/", response_model=list[ConstanciaNacimientoResponse])
+@router.get("/", response_model=ConstanciaNacimientoListResponse)
 def listar_constancias(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
@@ -50,7 +52,8 @@ def listar_constancias(
     nombre_madre:   Optional[str]  = None,
     fecha:          Optional[date] = None,
     documento:      Optional[str]  = None,
-    limit:  int = 100,
+    expediente:      Optional[str]  = None,
+    limit:  int = 10,
     offset: int = 0,
 ):
     query = db.query(ConstanciaNacimientoModel)
@@ -74,7 +77,19 @@ def listar_constancias(
         query = query.filter(
             ConstanciaNacimientoModel.documento == documento.strip()
         )
-
+    if expediente and expediente.strip():
+        exp = expediente.strip()
+        query = query.filter(
+            or_(
+                ConstanciaNacimientoModel.paciente.has(
+                    PacienteModel.expediente == exp
+                ),
+                ConstanciaNacimientoModel.madre.has(
+                    PacienteModel.expediente == exp
+                )
+            )
+    )
+    total = query.count()
     constancias = (
         query
         .order_by(desc(ConstanciaNacimientoModel.id))
@@ -84,17 +99,17 @@ def listar_constancias(
     )
 
     # ── Debug temporal: quitar en producción ──────────────────────────────
-    print("Filtros recibidos:", {
-        "id_usuario": id_usuario,
-        "id_constancia": id_constancia,
-        "nombre_madre": repr(nombre_madre),
-        "fecha": fecha,
-        "documento": repr(documento),
-    })
-    print("SQL generado:", str(query.statement.compile(compile_kwargs={"literal_binds": True})))
+    # print("Filtros recibidos:", {
+    #     "id_usuario": id_usuario,
+    #     "id_constancia": id_constancia,
+    #     "nombre_madre": repr(nombre_madre),
+    #     "fecha": fecha,
+    #     "documento": repr(documento),
+    # })
+    # print("SQL generado:", str(query.statement.compile(compile_kwargs={"literal_binds": True})))
     # ─────────────────────────────────────────────────────────────────────
 
-    return constancias
+    return ConstanciaNacimientoListResponse(constancias=constancias, total=total)
 
 @router.get("/historial/{constancia_id}",
             response_model=list[ConstanciaNacimientoHistorialResponse])

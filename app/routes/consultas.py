@@ -595,3 +595,66 @@ def buscar_consultas_activas(
     )
 
     return resultados
+
+# =============================================================================
+# DESACTIVAR CONSULTA (Soft Delete)
+# =============================================================================
+@router.delete("/{consulta_id}", response_model=ConsultaOut)
+def desactivar_consulta(
+    consulta_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Desactiva una consulta (soft delete).
+    
+    - Marca la consulta como inactiva (activo=False)
+    - Agrega un registro al ciclo con estado 'archivo'
+    - No elimina el registro de la base de datos
+    - No se puede desactivar una consulta ya archivada
+    """
+
+    # ======================
+    # 1. Verificar que la consulta existe
+    # ======================
+    consulta = db.get(ConsultaModel, consulta_id)
+    if not consulta:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+
+    # ======================
+    # 2. Verificar que no está ya archivada
+    # ======================
+    if consulta.ultimo_estado == "archivo":
+        raise HTTPException(
+            status_code=400,
+            detail="La consulta ya se encuentra borrada"
+        )
+
+    # ======================
+    # 3. Agregar ciclo de archivo
+    # ======================
+    _agregar_ciclo(
+        consulta,
+        {"estado": "borrado"},
+        current_user
+    )
+
+    # ======================
+    # 4. Marcar como inactiva
+    # ======================
+    consulta.activo = False
+
+    # ======================
+    # 5. Guardar cambios
+    # ======================
+    try:
+        db.commit()
+        db.refresh(consulta)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al archivar la consulta: {str(e)}"
+        )
+
+    return consulta

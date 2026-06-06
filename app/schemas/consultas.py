@@ -54,7 +54,7 @@ EstadoCiclo = Literal[
     "recepcion",      # En recepción
     "actualizado",    # Registro actualizado
     "reprogramado",   # Consulta reprogramada
-    "descartado"      # Consulta descartada/cancelada
+    "descartado",      # Consulta descartada/cancelada
     "borrado"         # Borrado inactivo
 ]
 

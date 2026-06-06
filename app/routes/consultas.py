@@ -11,6 +11,9 @@ from datetime import datetime, date, time
 
 from app.database.db import get_db
 from app.models.consultas import ConsultaModel
+from app.models.ciclos_consultas import CiclosConsulta
+from app.models.laboratorios import Laboratorios
+from app.models.rayos_x import RayosX
 from app.models.pacientes import PacienteModel
 from app.schemas.paciente import PacienteSimple
 from app.schemas.consultas import (
@@ -681,9 +684,19 @@ def eliminar_consulta(
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
 
     # ======================
-    # 2. Eliminar
+    # 2. Eliminar registros relacionados (FK RESTRICT)
     # ======================
     try:
+        db.query(CiclosConsulta).filter(
+            CiclosConsulta.consulta_id == consulta_id
+        ).delete(synchronize_session=False)
+        db.query(Laboratorios).filter(
+            Laboratorios.consulta_id == consulta_id
+        ).delete(synchronize_session=False)
+        db.query(RayosX).filter(
+            RayosX.consulta_id == consulta_id
+        ).delete(synchronize_session=False)
+
         db.delete(consulta)
         db.commit()
     except Exception as e:

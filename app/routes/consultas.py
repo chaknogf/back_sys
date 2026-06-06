@@ -658,3 +658,39 @@ def desactivar_consulta(
         )
 
     return consulta
+
+# =============================================================================
+# ELIMINAR CONSULTA (Hard Delete)
+# =============================================================================
+@router.delete("/{consulta_id}/eliminar", response_model=dict)
+def eliminar_consulta(
+    consulta_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Elimina permanentemente una consulta de la base de datos.
+    Esta acción es irreversible.
+    """
+
+    # ======================
+    # 1. Verificar que la consulta existe
+    # ======================
+    consulta = db.get(ConsultaModel, consulta_id)
+    if not consulta:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+
+    # ======================
+    # 2. Eliminar
+    # ======================
+    try:
+        db.delete(consulta)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al eliminar la consulta: {str(e)}"
+        )
+
+    return {"detail": f"Consulta {consulta_id} eliminada permanentemente"}

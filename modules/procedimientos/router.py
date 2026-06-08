@@ -275,25 +275,19 @@ def crear_procedimiento_medico(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    catalogo = None
     if datos.id_procedimiento:
-        existe = (
-            db.query(ProcedimientoModel)
-            .filter(
-                ProcedimientoModel.id == datos.id_procedimiento
-            )
-            .first()
-        )
-
-        if not existe:
-            raise HTTPException(
-                status_code=404,
-                detail="Procedimiento no encontrado"
-            )
+        catalogo = db.get(ProcedimientoModel, datos.id_procedimiento)
+        if not catalogo:
+            raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
 
     nuevo = ProceMedicoModel(
-        **datos.model_dump(exclude={'created_by'}),
+        **datos.model_dump(exclude={'created_by', 'anestesia'}),
         created_by=current_user.username[:10] if current_user.username else None
     )
+
+    if catalogo:
+        nuevo.anestesia = catalogo.anestesia * nuevo.cantidad
 
     db.add(nuevo)
     db.commit()
@@ -321,25 +315,30 @@ def actualizar_procedimiento_medico(
             detail="Procedimiento médico no encontrado"
         )
 
-    if datos.id_procedimiento:
-        existe = (
+    proc_id = datos.id_procedimiento or procedimiento.id_procedimiento
+    catalogo = None
+    if proc_id:
+        catalogo = (
             db.query(ProcedimientoModel)
             .filter(
-                ProcedimientoModel.id == datos.id_procedimiento
+                ProcedimientoModel.id == proc_id
             )
             .first()
         )
 
-        if not existe:
+        if not catalogo:
             raise HTTPException(
                 status_code=404,
                 detail="Procedimiento no encontrado"
             )
 
     for campo, valor in datos.model_dump(
-        exclude_unset=True
+        exclude_unset=True, exclude={'anestesia'}
     ).items():
         setattr(procedimiento, campo, valor)
+
+    if catalogo:
+        procedimiento.anestesia = catalogo.anestesia * procedimiento.cantidad
 
     db.commit()
     db.refresh(procedimiento)

@@ -1,0 +1,47 @@
+# modules/citas/schemas.py
+
+from pydantic import BaseModel, ConfigDict
+from datetime import date, datetime
+from typing import Optional, Dict, Any
+from modules.pacientes.schemas import PacientesNombre
+
+
+class CitaBase(BaseModel):
+    fecha_registro: Optional[date] = None
+    expediente: Optional[str] = None
+    paciente_id: Optional[int] = None
+    especialidad: Optional[str] = None
+    fecha_cita: Optional[date] = None
+    datos_extra: Optional[Dict[str, Any]] = None
+   
+
+class CitaCreate(CitaBase):
+    pass
+
+
+class CitaUpdate(BaseModel):
+    paciente_id: Optional[int] = None
+    expediente: Optional[str] = None
+    especialidad: Optional[str] = None
+    fecha_cita: Optional[date] = None
+    datos_extra: Optional[Dict[str, Any]] = None
+
+
+class CitasPorFechaRazon(BaseModel):
+    fecha_cita: date
+    razon_consulta: Optional[str]
+    dia_semana: Optional[str]
+    total: int
+
+class CitaResponse(CitaBase):
+    id: int
+    created_by: str
+    paciente: PacientesNombre
+   
+    class Config:
+        from_attributes = True
+        
+class CitaListResponse(BaseModel):
+    total: int
+    citas: list[CitaResponse]
+    model_config = ConfigDict(from_attributes=True)

@@ -1,0 +1,59 @@
+from sqlalchemy import Column, Integer, String, Date, Text, Index, text
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.mutable import MutableList
+from sqlalchemy.orm import relationship, validates
+from core.database import Base
+
+
+class PacienteModel(Base):
+    __tablename__ = "pacientes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cui = Column(Integer, unique=True, nullable=True, index=True)
+    expediente = Column(String(20), unique=True, nullable=True, index=True)
+    pasaporte = Column(String(20), unique=True, nullable=True)
+    nombre = Column(JSONB, nullable=False)
+    sexo = Column(String(1), nullable=True)
+    fecha_nacimiento = Column(Date, nullable=True)
+    contacto = Column(JSONB, nullable=True)
+    referencias = Column(JSONB, nullable=True)
+    datos_extra = Column(JSONB, nullable=True)
+    estado = Column(String(2), server_default="A", nullable=False)
+    metadatos = Column(MutableList.as_mutable(JSONB), default=list)
+    nombre_completo = Column(Text, nullable=True)
+
+    __table_args__ = (
+        Index("uq_cui_not_null", "cui", unique=True,
+              postgresql_where=text("cui IS NOT NULL")),
+        Index("uq_expediente_not_null", "expediente", unique=True,
+              postgresql_where=text("expediente IS NOT NULL AND expediente <> ''")),
+        Index("idx_paciente_estado", "estado"),
+    )
+
+    consultas = relationship("ConsultaModel", back_populates="paciente", cascade="all, delete-orphan")
+    constancias_nacimiento = relationship(
+        "ConstanciaNacimientoModel",
+        foreign_keys="ConstanciaNacimientoModel.paciente_id",
+        back_populates="paciente"
+    )
+
+    constancias_como_madre = relationship(
+        "ConstanciaNacimientoModel",
+        foreign_keys="ConstanciaNacimientoModel.madre_id",
+        back_populates="madre"
+    )
+    citas = relationship("CitaModel", back_populates="paciente")
+
+    @validates("nombre")
+    def actualizar_nombre_completo(self, key: str, nombre_dict: dict) -> dict:
+        campos = ["primer_nombre", "segundo_nombre", "otro_nombre",
+                "primer_apellido", "segundo_apellido", "apellido_casada"]
+
+        for campo in campos:
+            if nombre_dict.get(campo):
+                nombre_dict[campo] = nombre_dict[campo].strip().title()
+
+        partes = [nombre_dict.get(c) for c in campos]
+        nombre_limpio = " ".join(p for p in partes if p)
+        self.nombre_completo = nombre_limpio if nombre_limpio else None
+        return nombre_dict

@@ -1,0 +1,39 @@
+# modules/consultas/models.py
+from sqlalchemy import BigInteger, Boolean, Column, Integer, String, Date, Text, Time, ForeignKey, Index, text, desc
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
+from core.database import Base
+
+
+class ConsultaModel(Base):
+    __tablename__ = "consultas"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    expediente = Column(String(20), nullable=True, index=True)
+    paciente_id = Column(Integer, ForeignKey("pacientes.id", ondelete="CASCADE"), nullable=False, index=True)
+    tipo_consulta = Column(Integer, nullable=False, index=True)
+    especialidad = Column(String(50), nullable=False)
+    servicio = Column(String(50), nullable=False)
+    documento = Column(String(20), nullable=False)
+    fecha_consulta = Column(Date, nullable=False, index=True)
+    hora_consulta = Column(Time, nullable=False)
+    indicadores = Column(JSONB, nullable=True)
+    ciclo = Column(JSONB, nullable=True)
+    orden = Column(Integer, nullable=True)
+    activo = Column(Boolean, default=True)
+    egreso = Column(JSONB, nullable=True)
+    ultimo_estado = Column(String(50), nullable=True, index=True)
+
+    paciente = relationship("PacienteModel", back_populates="consultas")
+    ciclos = relationship("CiclosConsulta", back_populates="consulta")
+    laboratorios = relationship("Laboratorios", back_populates="consulta")
+    rayos_x = relationship("RayosX", back_populates="consulta")
+    eventos = relationship("EventoConsultaModel", back_populates="consulta")
+
+    __table_args__ = (
+        Index("idx_consulta_paciente_tipo_fecha", "paciente_id", "tipo_consulta", "fecha_consulta"),
+        Index("idx_consulta_fecha_desc", text("fecha_consulta DESC")),
+        Index("idx_consulta_tipo_especialidad", "tipo_consulta", "especialidad"),
+        Index("idx_consulta_servicio_documento", "servicio", "documento"),
+        Index("idx_consulta_ultimo_estado", "ultimo_estado"),
+    )

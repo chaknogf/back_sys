@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, text
 from typing import List, Optional
 from datetime import datetime, date, time, timedelta
 from core.database import get_db
@@ -239,6 +239,84 @@ def listar_procedimientos_medicos(
         total=total,
         procedimientos=procedimientos
     )
+
+
+@router.get("/reporte")
+def reporte_proce_medicos(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+    desde: Optional[date] = Query(None, description="Fecha inicio"),
+    hasta: Optional[date] = Query(None, description="Fecha fin"),
+    especialidad: Optional[str] = Query(None),
+    lugar_servicio: Optional[str] = Query(None),
+    sexo: Optional[str] = Query(None, pattern="^[MF]$"),
+):
+    filtros = []
+    params = {}
+
+    if desde:
+        filtros.append("pm.fecha >= :desde")
+        params["desde"] = desde
+    if hasta:
+        filtros.append("pm.fecha <= :hasta")
+        params["hasta"] = hasta
+    if especialidad:
+        filtros.append("pm.especialidad = :especialidad")
+        params["especialidad"] = especialidad
+    if lugar_servicio:
+        filtros.append("pm.lugar_servicio = :lugar_servicio")
+        params["lugar_servicio"] = lugar_servicio
+    if sexo:
+        filtros.append("pm.sexo = :sexo")
+        params["sexo"] = sexo
+
+    where_sql = " AND ".join(filtros) if filtros else "TRUE"
+
+    rows = db.execute(text(f"""
+        SELECT
+            pm.especialidad,
+            pm.lugar_servicio,
+            pm.sexo,
+            COALESCE(SUM(pm.cantidad), 0) AS total_cantidad,
+            COALESCE(SUM(pm.anestesia), 0) AS total_anestesia,
+            COUNT(*) AS total_registros
+        FROM proce_medicos pm
+        LEFT JOIN procedimientos p ON p.id = pm.id_procedimiento
+        WHERE {where_sql}
+        GROUP BY pm.especialidad, pm.lugar_servicio, pm.sexo
+        ORDER BY pm.especialidad, pm.lugar_servicio, pm.sexo
+    """), params).fetchall()
+
+    grupos = []
+    gran_total_cantidad = 0
+    gran_total_anestesia = 0
+    gran_total_registros = 0
+
+    for r in rows:
+        m = r._mapping
+        cant = int(m["total_cantidad"])
+        anest = int(m["total_anestesia"])
+        regs = int(m["total_registros"])
+        gran_total_cantidad += cant
+        gran_total_anestesia += anest
+        gran_total_registros += regs
+        grupos.append({
+            "especialidad": m["especialidad"],
+            "lugar_servicio": m["lugar_servicio"],
+            "sexo": m["sexo"],
+            "total_cantidad": cant,
+            "total_anestesia": anest,
+            "total_registros": regs,
+        })
+
+    return {
+        "grupos": grupos,
+        "totales": {
+            "total_cantidad": gran_total_cantidad,
+            "total_anestesia": gran_total_anestesia,
+            "total_registros": gran_total_registros,
+        },
+    }
 
 
 @router.get("/{id}", response_model=ProceMedicoResponse)

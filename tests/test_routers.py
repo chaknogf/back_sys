@@ -1,3 +1,4 @@
+import pytest
 from datetime import date, datetime, time
 from core.database import SessionLocal
 from modules.pacientes.models import PacienteModel
@@ -549,6 +550,112 @@ class TestConstanciasNacimiento:
 
 
 # =====================================================================
+# MADRE-HIJO (RECIÉN NACIDO DESDE MADRE)
+# =====================================================================
+class TestMadreHijo:
+    MADRE_ID = None
+    _fecha_nac = None
+
+    @classmethod
+    def _fecha(cls) -> str:
+        if cls._fecha_nac is None:
+            cls._fecha_nac = date.today().isoformat()
+        return cls._fecha_nac
+
+    def test_create_mother_for_hijo(self, client, auth_headers):
+        import time as _time
+        suffix = str(int(_time.time() * 1000000))[-6:]
+        r = client.post(
+            "/pacientes/",
+            headers=auth_headers,
+            json={
+                "nombre": {
+                    "primer_nombre": "Maria",
+                    "segundo_nombre": f"Madre{suffix}",
+                    "primer_apellido": "Test",
+                    "segundo_apellido": suffix,
+                },
+                "sexo": "F",
+                "fecha_nacimiento": "1990-05-20",
+                "contacto": {"telefonos": "12345678"},
+            },
+        )
+        assert r.status_code == 201
+        data = r.json()
+        TestMadreHijo.MADRE_ID = data["id"]
+        created_ids["pacientes"].append(data["id"])
+
+    def test_create_hijo_success(self, client, auth_headers):
+        if not TestMadreHijo.MADRE_ID:
+            pytest.skip("No mother created")
+        r = client.post(
+            f"/pacientes/madre-hijo/{TestMadreHijo.MADRE_ID}",
+            headers=auth_headers,
+            json={
+                "sexo": "M",
+                "fecha_nacimiento": TestMadreHijo._fecha(),
+                "datos_extra": {
+                    "peso_nacimiento": "3.5",
+                    "edad_gestacional": "39",
+                    "tipo_parto": "EUTOCICO",
+                    "gemelo": None,
+                },
+                "estado": "V",
+            },
+        )
+        assert r.status_code == 201
+        data = r.json()
+        assert data["sexo"] == "M"
+        assert data["nombre"]["primer_nombre"] == "Hijo De"
+        created_ids["pacientes"].append(data["id"])
+
+    def test_create_duplicate_hijo_returns_409(self, client, auth_headers):
+        if not TestMadreHijo.MADRE_ID:
+            pytest.skip("No mother created")
+        r = client.post(
+            f"/pacientes/madre-hijo/{TestMadreHijo.MADRE_ID}",
+            headers=auth_headers,
+            json={
+                "sexo": "M",
+                "fecha_nacimiento": TestMadreHijo._fecha(),
+                "datos_extra": {
+                    "peso_nacimiento": "3.5",
+                    "edad_gestacional": "39",
+                    "tipo_parto": "EUTOCICO",
+                    "gemelo": None,
+                },
+                "estado": "V",
+            },
+        )
+        assert r.status_code == 409
+        assert "ya existe" in r.json()["detail"].lower()
+
+    def test_create_twins_bypass_duplicate(self, client, auth_headers):
+        if not TestMadreHijo.MADRE_ID:
+            pytest.skip("No mother created")
+        r = client.post(
+            f"/pacientes/madre-hijo/{TestMadreHijo.MADRE_ID}",
+            headers=auth_headers,
+            json={
+                "sexo": "F",
+                "fecha_nacimiento": TestMadreHijo._fecha(),
+                "datos_extra": {
+                    "peso_nacimiento": "2.8",
+                    "edad_gestacional": "39",
+                    "tipo_parto": "EUTOCICO",
+                    "gemelo": "Gemelo 2",
+                },
+                "estado": "V",
+            },
+        )
+        assert r.status_code == 201
+        data = r.json()
+        assert data["sexo"] == "F"
+        assert data["nombre"]["primer_nombre"] == "Hija De"
+        created_ids["pacientes"].append(data["id"])
+
+
+# =====================================================================
 # NACIMIENTOS LEGACY
 # =====================================================================
 class TestNacimientosLegacy:
@@ -557,4 +664,4 @@ class TestNacimientosLegacy:
         assert r.status_code == 200
 
 
-import pytest  # noqa: E402 (needed for skip in class methods)
+

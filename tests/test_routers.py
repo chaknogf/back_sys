@@ -659,6 +659,25 @@ class TestMadreHijo:
         assert r.status_code == 409
         assert "ya existe" in r.json()["detail"].lower()
 
+    def test_list_neonatales_returns_hijo(self, client, auth_headers):
+        if not TestMadreHijo.MADRE_ID:
+            pytest.skip("No mother created")
+        r = client.get("/pacientes/neonatales", headers=auth_headers)
+        assert r.status_code == 200
+        data = r.json()
+        assert "total" in data
+        assert "pacientes" in data
+        assert data["total"] > 0
+
+    def test_list_neonatales_filter_sexo(self, client, auth_headers):
+        if not TestMadreHijo.MADRE_ID:
+            pytest.skip("No mother created")
+        r = client.get("/pacientes/neonatales?sexo=F", headers=auth_headers)
+        assert r.status_code == 200
+        data = r.json()
+        for p in data["pacientes"]:
+            assert p["sexo"] == "F"
+
     def test_create_twins_bypass_duplicate(self, client, auth_headers):
         if not TestMadreHijo.MADRE_ID:
             pytest.skip("No mother created")

@@ -55,6 +55,65 @@ def filtro_nombre_campo(campo: str, valor: str):
     return columna.ilike(f"%{quitar_tildes(valor)}%")
 
 
+def buscar_neonatales(db: Session, filters: dict, skip: int = 0, limit: int = 50):
+    query = db.query(PacienteModel).order_by(desc(PacienteModel.id))
+    query = query.filter(PacienteModel.estado != "I")
+    query = query.filter(
+        func.jsonb_extract_path_text(PacienteModel.datos_extra, 'neonatales', 'extrahositalario') == 'false'
+    )
+
+    nombre_completo_json = func.unaccent(
+        func.concat_ws(
+            ' ',
+            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_nombre'), ''),
+            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_nombre'), ''),
+            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'otro_nombre'), ''),
+            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_apellido'), ''),
+            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_apellido'), ''),
+            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'apellido_casada'), '')
+        )
+    )
+
+    nombre = filters.get("nombre")
+    if nombre:
+        palabras = [quitar_tildes(p) for p in nombre.split() if p.strip()]
+        filtros = [nombre_completo_col.ilike(f"%{p}%") for p in palabras]
+        query = query.filter(and_(*filtros))
+
+    expediente = filters.get("expediente")
+    if expediente:
+        query = query.filter(PacienteModel.expediente == expediente)
+
+    pid = filters.get("id_paciente")
+    if pid:
+        query = query.filter(PacienteModel.id == pid)
+
+    sexo = filters.get("sexo")
+    if sexo:
+        query = query.filter(PacienteModel.sexo == sexo.upper())
+
+    estado = filters.get("estado")
+    if estado:
+        query = query.filter(PacienteModel.estado == estado.upper())
+
+    fecha_nac = filters.get("fecha_nacimiento")
+    if fecha_nac:
+        try:
+            query = query.filter(PacienteModel.fecha_nacimiento == fecha_nac)
+        except:
+            pass
+
+    exp_madre = filters.get("expediente_madre")
+    if exp_madre:
+        query = query.filter(
+            func.jsonb_extract_path_text(PacienteModel.datos_extra, 'neonatales', 'expediente_madre') == exp_madre
+        )
+
+    total = query.count()
+    pacientes = query.offset(skip).limit(limit).all()
+    return PacienteListResponse(total=total, pacientes=pacientes)
+
+
 def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50):
     query = db.query(PacienteModel).order_by(desc(PacienteModel.id))
     query = query.filter(PacienteModel.estado != "I")

@@ -14,7 +14,7 @@ from .schemas import (
     PacienteCreate, PacienteOut, PacienteUpdate, PacienteContacto,
     PacienteListResponse
 )
-from .service import buscar_pacientes, obtener_paciente, crear_paciente, agregar_evento, normalizar_metadatos
+from .service import buscar_pacientes, buscar_neonatales, obtener_paciente, crear_paciente, agregar_evento, normalizar_metadatos
 
 
 router = APIRouter(prefix="/pacientes", tags=["Pacientes"])
@@ -47,6 +47,29 @@ def buscar_pacientes_endpoint(
         "fecha_nac": fecha_nac
     }.items() if v is not None}
     return buscar_pacientes(db, filters, skip, limit)
+
+
+@router.get("/neonatales", response_model=PacienteListResponse)
+def listar_neonatales(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    id_paciente: Optional[int] = Query(None),
+    expediente: Optional[str] = Query(None),
+    expediente_madre: Optional[str] = Query(None),
+    fecha_nacimiento: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    nombre: Optional[str] = Query(None),
+    sexo: Optional[str] = Query(None),
+    estado: Optional[str] = Query(None),
+):
+    filters = {k: v for k, v in {
+        "id_paciente": id_paciente, "expediente": expediente,
+        "expediente_madre": expediente_madre,
+        "fecha_nacimiento": fecha_nacimiento, "nombre": nombre,
+        "sexo": sexo, "estado": estado,
+    }.items() if v is not None}
+    return buscar_neonatales(db, filters, skip, limit)
 
 
 @router.get("/{paciente_id}", response_model=PacienteOut)

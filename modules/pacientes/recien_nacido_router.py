@@ -108,6 +108,24 @@ def crear_paciente_desde_madre(
         responsable=True
     )
 
+    gemelo = payload.datos_extra.gemelo if payload.datos_extra else None
+    if not gemelo:
+        nombre_dict = nombre_hijo.model_dump()
+        for campo in ["primer_nombre", "segundo_nombre", "otro_nombre",
+                      "primer_apellido", "segundo_apellido", "apellido_casada"]:
+            if nombre_dict.get(campo):
+                nombre_dict[campo] = nombre_dict[campo].strip().title()
+        existente = db.query(PacienteModel).filter(
+            PacienteModel.nombre == nombre_dict,
+            PacienteModel.sexo == payload.sexo,
+            PacienteModel.fecha_nacimiento == payload.fecha_nacimiento
+        ).first()
+        if existente:
+            raise HTTPException(
+                status_code=409,
+                detail="Ya existe un paciente registrado con los mismos datos de la madre, sexo y fecha de nacimiento"
+            )
+
     nuevo = PacienteModel(
         nombre=nombre_hijo.model_dump(),
         sexo=payload.sexo,

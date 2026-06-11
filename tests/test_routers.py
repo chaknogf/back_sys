@@ -159,14 +159,24 @@ class TestMedicos:
 # PACIENTES
 # =====================================================================
 class TestPacientes:
+    _suffix = None
+
+    @classmethod
+    def _sufijo(cls):
+        if cls._suffix is None:
+            import time
+            cls._suffix = str(int(time.time() * 1000000))[-6:]
+        return cls._suffix
+
     def test_create_paciente(self, client, auth_headers):
+        s = self._sufijo()
         r = client.post(
             "/pacientes/",
             headers=auth_headers,
             json={
                 "nombre": {
                     "primer_nombre": "Juan",
-                    "segundo_nombre": "Carlos",
+                    "segundo_nombre": s,
                     "primer_apellido": "Perez",
                     "segundo_apellido": "Test",
                 },
@@ -178,6 +188,25 @@ class TestPacientes:
         data = r.json()
         created_ids["pacientes"].append(data["id"])
 
+    def test_create_paciente_duplicate_returns_409(self, client, auth_headers):
+        s = self._sufijo()
+        r = client.post(
+            "/pacientes/",
+            headers=auth_headers,
+            json={
+                "nombre": {
+                    "primer_nombre": "Juan",
+                    "segundo_nombre": s,
+                    "primer_apellido": "Perez",
+                    "segundo_apellido": "Test",
+                },
+                "sexo": "M",
+                "fecha_nacimiento": "1990-01-15",
+            },
+        )
+        assert r.status_code == 409
+        assert "ya existe" in r.json()["detail"].lower()
+
     def test_list_pacientes(self, client, auth_headers):
         r = client.get("/pacientes/", headers=auth_headers)
         assert r.status_code == 200
@@ -187,7 +216,7 @@ class TestPacientes:
 
     def test_search_paciente_by_name(self, client, auth_headers):
         r = client.get(
-            "/pacientes/?nombre=Juan Carlos", headers=auth_headers
+            "/pacientes/?nombre=Juan", headers=auth_headers
         )
         assert r.status_code == 200
         data = r.json()

@@ -154,6 +154,23 @@ def crear_paciente(db: Session, paciente_in: PacienteCreate, auto_expediente: bo
     for field in ("cui", "expediente", "pasaporte"):
         if not data.get(field) or str(data.get(field)).strip() == "":
             data[field] = None
+
+    nombre_dict = paciente_in.nombre.model_dump()
+    for campo in ["primer_nombre", "segundo_nombre", "otro_nombre",
+                  "primer_apellido", "segundo_apellido", "apellido_casada"]:
+        if nombre_dict.get(campo):
+            nombre_dict[campo] = nombre_dict[campo].strip().title()
+    existente = db.query(PacienteModel).filter(
+        PacienteModel.nombre == nombre_dict,
+        PacienteModel.sexo == paciente_in.sexo,
+        PacienteModel.fecha_nacimiento == paciente_in.fecha_nacimiento
+    ).first()
+    if existente:
+        raise HTTPException(
+            status_code=409,
+            detail="Ya existe un paciente registrado con el mismo nombre, sexo y fecha de nacimiento"
+        )
+
     if auto_expediente and not data.get("expediente"):
         data["expediente"] = generar_expediente(db)
     try:

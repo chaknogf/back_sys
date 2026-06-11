@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, and_, text
+from sqlalchemy import func, and_, or_, text
 from typing import List, Optional
 from datetime import datetime, date, time, timedelta
 from core.database import get_db
@@ -66,9 +66,11 @@ def crear_procedimiento(
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    unique_filters = [ProcedimientoModel.nombre == datos.nombre]
+    if datos.abreviatura is not None:
+        unique_filters.append(ProcedimientoModel.abreviatura == datos.abreviatura)
     existing = db.query(ProcedimientoModel).filter(
-        (ProcedimientoModel.nombre == datos.nombre) |
-        (ProcedimientoModel.abreviatura == datos.abreviatura)
+        or_(*unique_filters)
     ).first()
     
     if existing:
@@ -106,13 +108,16 @@ def actualizar_procedimiento(
             detail="Procedimiento no encontrado"
         )
     
-    if datos.nombre or datos.abreviatura:
+    conflict_filters = []
+    if datos.nombre is not None:
+        conflict_filters.append(ProcedimientoModel.nombre == datos.nombre)
+    if datos.abreviatura is not None:
+        conflict_filters.append(ProcedimientoModel.abreviatura == datos.abreviatura)
+    if conflict_filters:
         conflict = db.query(ProcedimientoModel).filter(
             ProcedimientoModel.id != id,
-            (ProcedimientoModel.nombre == datos.nombre) |
-            (ProcedimientoModel.abreviatura == datos.abreviatura)
+            or_(*conflict_filters)
         ).first()
-        
         if conflict:
             raise HTTPException(
                 status_code=400,
@@ -207,7 +212,7 @@ def listar_procedimientos_medicos(
             ProceMedicoModel.fecha <= fecha_fin
         )
 
-    elif mes and anio:
+    if mes and anio:
         fecha_inicio_mes = date(anio, mes, 1)
 
         if mes == 12:
@@ -359,13 +364,16 @@ def crear_procedimiento_medico(
         if not catalogo:
             raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
 
+    data = datos.model_dump(exclude={'created_by'})
+    if catalogo:
+        data.pop('anestesia', None)
     nuevo = ProceMedicoModel(
-        **datos.model_dump(exclude={'created_by', 'anestesia'}),
+        **data,
         created_by=current_user.username[:10] if current_user.username else None
     )
 
     if catalogo:
-        nuevo.anestesia = catalogo.anestesia * nuevo.cantidad
+        nuevo.anestesia = (catalogo.anestesia or 0) * nuevo.cantidad
 
     db.add(nuevo)
     db.commit()

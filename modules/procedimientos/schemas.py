@@ -36,7 +36,7 @@ class ProceMedicoBase(BaseModel):
     id_procedimiento: Optional[int] = None
     especialidad: Optional[str] = None
     cantidad: int = Field(1, ge=1)
-    responsable: Optional[str] = None
+    responsable: Optional[str] = Field(None, max_length=20)
     anestesia: Optional[int] = Field(0, ge=0)
     created_by: Optional[str] = Field(None, max_length=10)
     
@@ -57,7 +57,7 @@ class ProceMedicoUpdate(BaseModel):
     id_procedimiento: Optional[int] = None
     especialidad: Optional[str] = None
     cantidad: Optional[int] = Field(None, ge=1)
-    responsable: Optional[str] = None
+    responsable: Optional[str] = Field(None, max_length=20)
     anestesia: Optional[int] = Field(None, ge=0)
     created_by: Optional[str] = Field(None, max_length=10)
     

@@ -28,6 +28,7 @@ from modules.prestamos.router import router as prestamos_router
 from modules.procedimientos.router import router as procedimientos_router
 from modules.eventos.router import router as eventos_router
 from modules.estadisticas.router import router as estadisticas_router
+from modules.audit_log.router import router as audit_log_router
 
 app = FastAPI(
     title="Hospital General Tipo I de Tecpán - Sistema FAH",
@@ -100,6 +101,7 @@ app.include_router(prestamos_router)
 app.include_router(procedimientos_router)
 app.include_router(eventos_router)
 app.include_router(estadisticas_router)
+app.include_router(audit_log_router)
 
 
 @app.get("/", include_in_schema=False)

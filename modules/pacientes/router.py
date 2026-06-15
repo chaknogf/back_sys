@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from core.database import get_db
 from core.security import get_current_user
 from modules.users.models import UserModel
+from modules.audit_log.service import registrar_acceso
 from modules.expediente.service import generar_expediente
 from .models import PacienteModel
 from .schemas import (
@@ -46,7 +47,9 @@ def buscar_pacientes_endpoint(
         "segundo_apellido": segundo_apellido, "sexo": sexo, "estado": estado,
         "fecha_nac": fecha_nac
     }.items() if v is not None}
-    return buscar_pacientes(db, filters, skip, limit)
+    resultado = buscar_pacientes(db, filters, skip, limit)
+    registrar_acceso(db, current_user.username, "pacientes", "/pacientes/")
+    return resultado
 
 
 @router.get("/neonatales", response_model=PacienteListResponse)
@@ -69,7 +72,9 @@ def listar_neonatales(
         "fecha_nacimiento": fecha_nacimiento, "nombre": nombre,
         "sexo": sexo, "estado": estado,
     }.items() if v is not None}
-    return buscar_neonatales(db, filters, skip, limit)
+    resultado = buscar_neonatales(db, filters, skip, limit)
+    registrar_acceso(db, current_user.username, "pacientes", "/pacientes/neonatales")
+    return resultado
 
 
 @router.get("/{paciente_id}", response_model=PacienteOut)
@@ -78,7 +83,9 @@ def obtener_paciente_endpoint(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    return obtener_paciente(db, paciente_id)
+    resultado = obtener_paciente(db, paciente_id)
+    registrar_acceso(db, current_user.username, "pacientes", f"/pacientes/{paciente_id}", registro_id=paciente_id)
+    return resultado
 
 
 @router.post("/", response_model=PacienteOut, status_code=201)
@@ -195,11 +202,15 @@ def eliminar_paciente_permanente(
 
 
 @router.get("/debug/count")
-def debug_count(db: Session = Depends(get_db)):
+def debug_count(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
     total = db.query(PacienteModel).count()
     activos = db.query(PacienteModel).filter(PacienteModel.estado == "A").count()
     inactivos = db.query(PacienteModel).filter(PacienteModel.estado == "I").count()
     ejemplos = db.query(PacienteModel).limit(3).all()
+    registrar_acceso(db, current_user.username, "pacientes", "/pacientes/debug/count")
     return {
         "total": total,
         "activos": activos,
@@ -230,4 +241,5 @@ def expediente_endpoint(
     if not paciente:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
 
+    registrar_acceso(db, current_user.username, "pacientes", f"/pacientes/expediente/{expediente}", registro_id=paciente.id)
     return paciente

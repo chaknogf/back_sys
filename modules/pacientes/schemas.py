@@ -262,14 +262,10 @@ class PacientesResumen(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def extraer_defuncion(cls, data):
-        if hasattr(data, "__dict__"):
-            raw = data.__dict__.copy()
-            if "datos_extra" in raw and raw["datos_extra"]:
-                raw["defuncion"] = raw["datos_extra"].get("defuncion")
-            return raw
         if isinstance(data, dict):
             if "datos_extra" in data and data["datos_extra"]:
                 data["defuncion"] = data["datos_extra"].get("defuncion")
+            return data
         return data
 
     model_config = ConfigDict(
@@ -376,14 +372,10 @@ class PacientesNombre(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def extraer_defuncion(cls, data):
-        if hasattr(data, "__dict__"):
-            raw = data.__dict__.copy()
-            if "datos_extra" in raw and raw["datos_extra"]:
-                raw["defuncion"] = raw["datos_extra"].get("defuncion")
-            return raw
         if isinstance(data, dict):
             if "datos_extra" in data and data["datos_extra"]:
                 data["defuncion"] = data["datos_extra"].get("defuncion")
+            return data
         return data
 
     model_config = ConfigDict(
@@ -394,24 +386,20 @@ class PacientesNombre(BaseModel):
 
 class PacienteContacto(BaseModel):
     id: int
-    nombre: Nombre
-    sexo: str
-    fecha_nacimiento: date
+    nombre: Optional[Nombre] = None
+    sexo: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
     expediente: Optional[str] = Field(None, max_length=20)
-    contacto: Contacto
+    contacto: Optional[Contacto] = None
     defuncion: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
     def extraer_defuncion(cls, data):
-        if hasattr(data, "__dict__"):
-            raw = data.__dict__.copy()
-            if "datos_extra" in raw and raw["datos_extra"]:
-                raw["defuncion"] = raw["datos_extra"].get("defuncion")
-            return raw
         if isinstance(data, dict):
             if "datos_extra" in data and data["datos_extra"]:
                 data["defuncion"] = data["datos_extra"].get("defuncion")
+            return data
         return data
 
     model_config = ConfigDict(

@@ -8,6 +8,7 @@ from datetime import datetime, date, time
 from core.database import get_db
 from core.security import get_current_user
 from modules.users.models import UserModel
+from modules.audit_log.service import registrar_acceso
 from modules.pacientes.models import PacienteModel
 from modules.pacientes.schemas import PacienteSimple
 from .schemas import (
@@ -50,7 +51,7 @@ def buscar_consultas_activas(
     limit: int = Query(50, ge=1, le=200),
     current_user: UserModel = Depends(get_current_user)
 ):
-    return service_buscar_consultas(
+    resultado = service_buscar_consultas(
         db=db,
         paciente_id=paciente_id,
         expediente=expediente,
@@ -70,6 +71,8 @@ def buscar_consultas_activas(
         skip=skip,
         limit=limit,
     )
+    registrar_acceso(db, current_user.username, "consultas", "/consultas/")
+    return resultado
 
 
 @router.get("/buscarpaciente", response_model=List[PacienteSimple])
@@ -137,7 +140,9 @@ def buscar_pacientes(
         .all()
     )
 
-    return [PacienteSimple.from_orm(p) for p in pacientes]
+    resultado = [PacienteSimple.from_orm(p) for p in pacientes]
+    registrar_acceso(db, current_user.username, "pacientes", "/consultas/buscarpaciente")
+    return resultado
 
 
 @router.get("/{consulta_id}", response_model=ConsultaOut)
@@ -146,7 +151,9 @@ def obtener_consulta(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    return service_obtener_consulta(consulta_id, db)
+    resultado = service_obtener_consulta(consulta_id, db)
+    registrar_acceso(db, current_user.username, "consultas", f"/consultas/{consulta_id}", registro_id=consulta_id)
+    return resultado
 
 
 @router.patch("/sincronizar-indicadores")
@@ -212,6 +219,7 @@ def buscar_consultas_por_paciente(
         .all()
     )
 
+    registrar_acceso(db, current_user.username, "consultas", f"/consultas/pacienteId/{paciente_id}", registro_id=paciente_id)
     return resultados
 
 

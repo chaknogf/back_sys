@@ -164,7 +164,8 @@ def merge_pacientes(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    if principal_id not in ids:
+    ids_unicos = list(set(ids))
+    if principal_id not in ids_unicos:
         raise HTTPException(
             status_code=400,
             detail="El ID del paciente principal debe estar incluido en la lista de IDs"
@@ -172,13 +173,13 @@ def merge_pacientes(
 
     pacientes = (
         db.query(PacienteModel)
-        .filter(PacienteModel.id.in_(ids))
+        .filter(PacienteModel.id.in_(ids_unicos))
         .all()
     )
 
-    if len(pacientes) != len(ids):
+    if len(pacientes) != len(ids_unicos):
         ids_encontrados = {p.id for p in pacientes}
-        ids_faltantes = set(ids) - ids_encontrados
+        ids_faltantes = set(ids_unicos) - ids_encontrados
         raise HTTPException(
             status_code=404,
             detail=f"No se encontraron los siguientes IDs: {list(ids_faltantes)}"
@@ -272,7 +273,7 @@ def merge_pacientes(
             "paciente_principal": principal.id,
             "pacientes_fusionados": [p.id for p in duplicados],
             "total_fusionados": len(duplicados),
-            "campos_alternativos": principal.datos_extra.get("campos_alternativos_merge", {}) if principal.datos_extra else {},
+            "campos_alternativos": principal.datos_extra.get("merge", {}) if principal.datos_extra else {},
             "telefonos_fusionados": principal.contacto.get("telefonos", []) if principal.contacto else [],
             "referencias_totales": len(principal.referencias) if principal.referencias else 0,
             "estado": "merge_completado",

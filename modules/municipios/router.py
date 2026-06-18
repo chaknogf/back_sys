@@ -15,8 +15,11 @@ router = APIRouter(prefix="/municipios", tags=["Ubicación"])
 
 @router.get("/", response_model=MunicipioListResponse)
 def listar_municipios(
-    q: Optional[str] = Query(None, description="Búsqueda por municipio o departamento"),
-    departamento: Optional[str] = Query(None, description="Filtrar por departamento"),
+    q: Optional[str] = Query(None, description="Búsqueda general por municipio o departamento"),
+    codigo: Optional[str] = Query(None, description="Filtrar por código exacto (ej: 0101)"),
+    municipio: Optional[str] = Query(None, description="Filtrar por nombre de municipio"),
+    departamento: Optional[str] = Query(None, description="Filtrar por nombre de departamento"),
+    vecindad: Optional[str] = Query(None, description="Filtrar por vecindad o aldea"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db)
@@ -25,8 +28,20 @@ def listar_municipios(
         MunicipiosModel.departamento, MunicipiosModel.municipio
     )
 
+    if codigo:
+        query = query.filter(MunicipiosModel.codigo == codigo)
     if departamento:
-        query = query.filter(MunicipiosModel.departamento.ilike(f"%{departamento}%"))
+        query = query.filter(
+            func.unaccent(MunicipiosModel.departamento).ilike(func.unaccent(f"%{departamento}%"))
+        )
+    if municipio:
+        query = query.filter(
+            func.unaccent(MunicipiosModel.municipio).ilike(func.unaccent(f"%{municipio}%"))
+        )
+    if vecindad:
+        query = query.filter(
+            func.unaccent(MunicipiosModel.vecindad).ilike(func.unaccent(f"%{vecindad}%"))
+        )
     if q:
         query = query.filter(
             func.unaccent(MunicipiosModel.municipio).ilike(func.unaccent(f"%{q}%"))

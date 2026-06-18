@@ -31,14 +31,17 @@ router = APIRouter(
 
 @router.get("/catalogo", response_model=list[ProcedimientoOut])
 def listar_procedimientos(
+    abreviatura: Optional[str] = Query(None, description="Filtrar por abreviatura exacta"),
+    nombre: Optional[str] = Query(None, description="Filtrar por nombre (búsqueda parcial)"),
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
     ):
-    return (
-        db.query(ProcedimientoModel)
-        .order_by(ProcedimientoModel.nombre)
-        .all()
-    )
+    query = db.query(ProcedimientoModel)
+    if abreviatura:
+        query = query.filter(ProcedimientoModel.abreviatura == abreviatura)
+    if nombre:
+        query = query.filter(ProcedimientoModel.nombre.ilike(f"%{nombre}%"))
+    return query.order_by(ProcedimientoModel.nombre).all()
     
 @router.get("/catalogo/{id}", response_model=ProcedimientoOut)
 def obtener_procedimiento(

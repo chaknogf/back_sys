@@ -56,7 +56,8 @@ _PACIENTE_SELECT = """
     p.nombre->>'segundo_apellido' AS paciente_nombre_segundo_apellido,
     p.nombre->>'apellido_casada' AS paciente_nombre_apellido_casada,
     p.sexo AS paciente_sexo,
-    p.fecha_nacimiento AS paciente_fecha_nacimiento
+    p.fecha_nacimiento AS paciente_fecha_nacimiento,
+    p.estado AS paciente_estado
 """
 
 _MADRE_SELECT = """
@@ -93,6 +94,7 @@ def _row_to_out(row: dict) -> dict:
             "nombre": nombre,
             "sexo": row.get("paciente_sexo"),
             "fecha_nacimiento": row.get("paciente_fecha_nacimiento"),
+            "estado": row.get("paciente_estado"),
         }
 
     return {
@@ -133,7 +135,7 @@ def peso_lb_onz_a_gramos(peso: str | None) -> Decimal | None:
                 onz = Decimal(m.group(2))
             else:
                 return None
-    return (lb * Decimal("453.592") + onz * Decimal("28.3495")).quantize(Decimal("1"))
+    return ((lb + onz / Decimal("16")) / Decimal("2.2") * Decimal("1000")).quantize(Decimal("1"))
 
 
 def clasificacion_nacimiento(pg: Decimal | None) -> str | None:

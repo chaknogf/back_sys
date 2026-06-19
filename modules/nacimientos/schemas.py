@@ -40,6 +40,7 @@ class PacienteResumen(BaseModel):
     nombre: Optional[dict] = None
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
+    estado: Optional[str] = None
 
 
 class NacimientoOut(NacimientoBase):

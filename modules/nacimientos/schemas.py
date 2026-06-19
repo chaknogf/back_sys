@@ -1,19 +1,22 @@
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, Dict, Any
+from pydantic import BaseModel, ConfigDict, field_serializer
+from typing import Optional
 from datetime import date, time, datetime
-
-from modules.pacientes.schemas import Nombre, Neonatales
 
 
 class NacimientoBase(BaseModel):
     paciente_id: Optional[int] = None
     madre_id: Optional[int] = None
 
-    expediente: Optional[str] = Field(None, max_length=20)
-    nombre_completo: Optional[str] = Field(None, max_length=300)
-    sexo: Optional[str] = Field(None, max_length=1)
-    fecha_nacimiento: Optional[date] = None
 
+class NacimientoCreate(NacimientoBase):
+    pass
+
+
+class NacimientoUpdate(BaseModel):
+    madre_id: Optional[int] = None
+
+
+class NeonatalesInfo(BaseModel):
     peso_nacimiento: Optional[str] = None
     edad_gestacional: Optional[str] = None
     tipo_parto: Optional[str] = None
@@ -22,28 +25,31 @@ class NacimientoBase(BaseModel):
     hora_nacimiento: Optional[time] = None
     extrahospitalario: Optional[bool] = False
 
-    registrador_id: Optional[int] = None
-    datos_extra: Optional[Dict[str, Any]] = None
+    @field_serializer('hora_nacimiento')
+    def serialize_hora(self, hora: Optional[time], _info):
+        if hora is None:
+            return None
+        return hora.strftime('%H:%M:%S')
 
 
-class NacimientoCreate(NacimientoBase):
-    pass
-
-
-class NacimientoUpdate(BaseModel):
-    peso_nacimiento: Optional[str] = None
-    edad_gestacional: Optional[str] = None
-    tipo_parto: Optional[str] = None
-    clase_parto: Optional[str] = None
-    gemelo: Optional[str] = None
-    hora_nacimiento: Optional[time] = None
-    extrahospitalario: Optional[bool] = None
+class PacienteResumen(BaseModel):
+    id: int
+    expediente: Optional[str] = None
+    nombre_completo: Optional[str] = None
+    sexo: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
 
 
 class NacimientoOut(NacimientoBase):
     id: int
+    registrador_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
+    peso_gramos: Optional[float] = None
+    clasificacion_nacimiento: Optional[str] = None
+    trabajo_parto: Optional[str] = None
+    neonatales: Optional[NeonatalesInfo] = None
+    paciente: Optional[PacienteResumen] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -7,6 +7,7 @@ from modules.users.models import UserModel
 from modules.expediente.service import generar_expediente, generar_constancia_nacimiento
 from modules.constancias_nacimiento.models import ConstanciaNacimientoModel
 from modules.nacimientos.models import NacimientoModel
+from modules.nacimientos.service import _computar as _computar_nacimiento
 from .models import PacienteModel
 from .schemas import PacienteOut, PacienteCreateDerivado, Nombre, Referencia
 from .service import agregar_evento
@@ -165,21 +166,14 @@ def crear_paciente_desde_madre(
     db.add(constancia)
 
     neonatales = payload.datos_extra.model_dump() if payload.datos_extra else {}
+    computado = _computar_nacimiento(neonatales)
     nacimiento = NacimientoModel(
         paciente_id=nuevo.id,
         madre_id=madre.id,
-        expediente=nuevo.expediente,
-        nombre_completo=nuevo.nombre_completo or nombre_madre_str,
-        sexo=payload.sexo,
-        fecha_nacimiento=payload.fecha_nacimiento,
-        peso_nacimiento=neonatales.get("peso_nacimiento"),
-        edad_gestacional=neonatales.get("edad_gestacional"),
-        tipo_parto=neonatales.get("tipo_parto"),
-        clase_parto=neonatales.get("clase_parto"),
-        gemelo=neonatales.get("gemelo"),
-        hora_nacimiento=neonatales.get("hora_nacimiento"),
-        extrahospitalario=neonatales.get("extrahositalario", False),
         registrador_id=current_user.id,
+        peso_gramos=computado["peso_gramos"],
+        clasificacion_nacimiento=computado["clasificacion_nacimiento"],
+        trabajo_parto=computado["trabajo_parto"],
     )
     db.add(nacimiento)
     db.commit()

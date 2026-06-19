@@ -1,5 +1,7 @@
 import json
+import re
 from datetime import date
+from decimal import Decimal
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, text
@@ -18,16 +20,162 @@ def _fetchall(db: Session, sql: str, params: dict | None = None) -> list[dict]:
     return [dict(r) for r in db.execute(text(sql), params or {}).mappings().all()]
 
 
+_NACIMIENTO_COLS = """
+    n.id, n.paciente_id, n.madre_id, n.registrador_id,
+    n.created_at, n.updated_at,
+    n.peso_gramos, n.clasificacion_nacimiento, n.trabajo_parto
+"""
+
+_PACIENTE_JOIN = """
+    LEFT JOIN pacientes p ON p.id = n.paciente_id
+"""
+
+_NEONATALES_SELECT = """
+    p.datos_extra->'neonatales'->>'peso_nacimiento' AS neonatales_peso_nacimiento,
+    p.datos_extra->'neonatales'->>'edad_gestacional' AS neonatales_edad_gestacional,
+    p.datos_extra->'neonatales'->>'tipo_parto' AS neonatales_tipo_parto,
+    p.datos_extra->'neonatales'->>'clase_parto' AS neonatales_clase_parto,
+    p.datos_extra->'neonatales'->>'gemelo' AS neonatales_gemelo,
+    p.datos_extra->'neonatales'->>'hora_nacimiento' AS neonatales_hora_nacimiento,
+    p.datos_extra->'neonatales'->>'extrahositalario' AS neonatales_extrahospitalario
+"""
+
+_PACIENTE_SELECT = """
+    p.id AS paciente_id_ref,
+    p.expediente AS paciente_expediente,
+    p.nombre_completo AS paciente_nombre_completo,
+    p.sexo AS paciente_sexo,
+    p.fecha_nacimiento AS paciente_fecha_nacimiento
+"""
+
+
+def _row_to_out(row: dict) -> dict:
+    neonatales = {}
+    for k in ("peso_nacimiento", "edad_gestacional", "tipo_parto", "clase_parto", "gemelo"):
+        v = row.get(f"neonatales_{k}")
+        if v is not None:
+            neonatales[k] = v
+    hora = row.get("neonatales_hora_nacimiento")
+    if hora is not None:
+        neonatales["hora_nacimiento"] = hora
+    extra = row.get("neonatales_extrahospitalario")
+    if extra is not None:
+        neonatales["extrahospitalario"] = str(extra).lower() in ("true", "1", "yes")
+
+    paciente = None
+    if row.get("paciente_id_ref"):
+        paciente = {
+            "id": row["paciente_id_ref"],
+            "expediente": row.get("paciente_expediente"),
+            "nombre_completo": row.get("paciente_nombre_completo"),
+            "sexo": row.get("paciente_sexo"),
+            "fecha_nacimiento": row.get("paciente_fecha_nacimiento"),
+        }
+
+    return {
+        "id": row["id"],
+        "paciente_id": row.get("paciente_id"),
+        "madre_id": row.get("madre_id"),
+        "registrador_id": row.get("registrador_id"),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+        "peso_gramos": float(row["peso_gramos"]) if row.get("peso_gramos") is not None else None,
+        "clasificacion_nacimiento": row.get("clasificacion_nacimiento"),
+        "trabajo_parto": row.get("trabajo_parto"),
+        "neonatales": neonatales or None,
+        "paciente": paciente,
+    }
+
+
+def peso_lb_onz_a_gramos(peso: str | None) -> Decimal | None:
+    if not peso:
+        return None
+    peso_clean = peso.strip().upper()
+    lb = Decimal(0)
+    onz = Decimal(0)
+
+    m = re.match(r'^(\d+)\s*(?:LIBRAS|LB)\s+(\d+)\s*(?:ONZAS|ONZ)\s*$', peso_clean)
+    if m:
+        lb = Decimal(m.group(1))
+        onz = Decimal(m.group(2))
+    else:
+        m = re.match(r'^(\d+)\s*(?:LIBRAS|LB)\s*$', peso_clean)
+        if m:
+            lb = Decimal(m.group(1))
+        else:
+            m = re.match(r'^(\d{1,3})\.(\d{1,2})$', peso_clean)
+            if m:
+                lb = Decimal(m.group(1))
+                onz = Decimal(m.group(2))
+            else:
+                return None
+    return (lb * Decimal("453.592") + onz * Decimal("28.3495")).quantize(Decimal("1"))
+
+
+def clasificacion_nacimiento(pg: Decimal | None) -> str | None:
+    if pg is None:
+        return None
+    if pg < 1000:
+        return "EBP"
+    if pg < 1500:
+        return "MBP"
+    if pg < 2500:
+        return "BP"
+    return "PN"
+
+
+def trabajo_parto(eg: str | None) -> str | None:
+    if not eg:
+        return None
+    try:
+        semanas = Decimal(str(eg).strip())
+    except Exception:
+        return "no especificado"
+    if semanas > 41:
+        return "Prolongado"
+    if semanas < 37:
+        return "Prematuro"
+    return "a Termino"
+
+
+def _computar(neonatales: dict) -> dict:
+    pg = peso_lb_onz_a_gramos(neonatales.get("peso_nacimiento"))
+    return {
+        "peso_gramos": pg,
+        "clasificacion_nacimiento": clasificacion_nacimiento(pg),
+        "trabajo_parto": trabajo_parto(neonatales.get("edad_gestacional")),
+    }
+
+
+def _insert_nacimiento(db: Session, paciente_id: int, madre_id: int | None,
+                       registrador_id: int | None, computado: dict) -> NacimientoModel:
+    nacimiento = NacimientoModel(
+        paciente_id=paciente_id,
+        madre_id=madre_id,
+        registrador_id=registrador_id,
+        peso_gramos=computado["peso_gramos"],
+        clasificacion_nacimiento=computado["clasificacion_nacimiento"],
+        trabajo_parto=computado["trabajo_parto"],
+    )
+    db.add(nacimiento)
+    db.commit()
+    db.refresh(nacimiento)
+    return nacimiento
+
+
 def crear_nacimiento_desde_paciente(
     paciente_id: int,
     registrador_id: int | None,
     db: Session
 ) -> dict:
-    paciente = _fetchone(db, "SELECT id, expediente, nombre_completo, sexo, fecha_nacimiento, datos_extra FROM pacientes WHERE id = :id", {"id": paciente_id})
-    if not paciente:
+    row = _fetchone(db, """
+        SELECT id, expediente, nombre_completo, sexo, fecha_nacimiento, datos_extra
+        FROM pacientes WHERE id = :id
+    """, {"id": paciente_id})
+    if not row:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
 
-    de = paciente.get("datos_extra") or {}
+    de = row.get("datos_extra") or {}
     if isinstance(de, str):
         de = json.loads(de)
     neonatales = de.get("neonatales") or {}
@@ -39,49 +187,26 @@ def crear_nacimiento_desde_paciente(
         raise HTTPException(status_code=400, detail="El paciente no fue registrado como hijo de una madre")
 
     madre_id = origen["paciente_id"]
-    madre = _fetchone(db, "SELECT nombre_completo FROM pacientes WHERE id = :id", {"id": madre_id})
-    madre_nombre = madre["nombre_completo"] if madre else "DESCONOCIDO"
 
     existente = _fetchone(db, "SELECT id FROM nacimientos WHERE paciente_id = :pid", {"pid": paciente_id})
     if existente:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ya existe un registro de nacimiento para este paciente")
 
-    extra = {"origen": origen}
-    if paciente.get("datos_extra") and isinstance(paciente["datos_extra"], dict):
-        extra["idpersona_madre"] = paciente["datos_extra"].get("idpersona_madre")
+    computado = _computar(neonatales)
+    nacimiento = _insert_nacimiento(db, paciente_id, madre_id, registrador_id, computado)
 
-    db.execute(text("""
-        INSERT INTO nacimientos
-            (paciente_id, madre_id, expediente, nombre_completo, sexo, fecha_nacimiento,
-             peso_nacimiento, edad_gestacional, tipo_parto, clase_parto, gemelo,
-             hora_nacimiento, extrahospitalario, registrador_id, datos_extra)
-        VALUES
-            (:pid, :mid, :exp, :nom, :sexo, :fecha,
-             :peso, :eg, :tp, :cl, :gem,
-             :hora, :extrahop, :rid, CAST(:extra AS jsonb))
-    """), {
-        "pid": paciente_id,
-        "mid": madre_id,
-        "exp": paciente.get("expediente") or None,
-        "nom": paciente.get("nombre_completo") or f"Hijo/a de {madre_nombre}",
-        "sexo": paciente.get("sexo"),
-        "fecha": str(paciente.get("fecha_nacimiento")) if paciente.get("fecha_nacimiento") else None,
-        "peso": neonatales.get("peso_nacimiento"),
-        "eg": neonatales.get("edad_gestacional"),
-        "tp": neonatales.get("tipo_parto"),
-        "cl": neonatales.get("clase_parto"),
-        "gem": neonatales.get("gemelo"),
-        "hora": str(neonatales.get("hora_nacimiento")) if neonatales.get("hora_nacimiento") else None,
-        "extrahop": neonatales.get("extrahositalario", False),
-        "rid": registrador_id,
-        "extra": json.dumps(extra),
-    })
-    db.commit()
-    nacimiento = _fetchone(db, "SELECT * FROM nacimientos WHERE paciente_id = :pid", {"pid": paciente_id})
-    return nacimiento
+    return _row_to_out(_fetchone(db, f"""
+        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}
+        FROM nacimientos n
+        {_PACIENTE_JOIN}
+        WHERE n.id = :id
+    """, {"id": nacimiento.id}))
 
 
-def crear_nacimiento(data: NacimientoCreate, db: Session) -> NacimientoModel:
+def crear_nacimiento(data: NacimientoCreate, db: Session) -> dict:
+    if not data.paciente_id:
+        raise HTTPException(status_code=400, detail="paciente_id es requerido")
+
     existente = db.query(NacimientoModel).filter(
         NacimientoModel.paciente_id == data.paciente_id
     ).first()
@@ -90,11 +215,39 @@ def crear_nacimiento(data: NacimientoCreate, db: Session) -> NacimientoModel:
             status_code=status.HTTP_409_CONFLICT,
             detail="Ya existe un registro de nacimiento para este paciente"
         )
-    nacimiento = NacimientoModel(**data.model_dump())
+
+    row = _fetchone(db, """
+        SELECT id, datos_extra FROM pacientes WHERE id = :id
+    """, {"id": data.paciente_id})
+    if not row:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+    de = row.get("datos_extra") or {}
+    if isinstance(de, str):
+        de = json.loads(de)
+    neonatales = de.get("neonatales") or {}
+    origen = de.get("origen") or {}
+    madre_id = data.madre_id or origen.get("paciente_id")
+
+    computado = _computar(neonatales)
+    nacimiento = NacimientoModel(
+        paciente_id=data.paciente_id,
+        madre_id=madre_id,
+        registrador_id=None,
+        peso_gramos=computado["peso_gramos"],
+        clasificacion_nacimiento=computado["clasificacion_nacimiento"],
+        trabajo_parto=computado["trabajo_parto"],
+    )
     db.add(nacimiento)
     db.commit()
     db.refresh(nacimiento)
-    return nacimiento
+
+    return _row_to_out(_fetchone(db, f"""
+        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}
+        FROM nacimientos n
+        {_PACIENTE_JOIN}
+        WHERE n.id = :id
+    """, {"id": nacimiento.id}))
 
 
 def listar_nacimientos(
@@ -106,48 +259,78 @@ def listar_nacimientos(
     fecha_hasta: Optional[date] = None,
     skip: int = 0,
     limit: int = 100,
-) -> tuple[list[NacimientoModel], int]:
-    query = db.query(NacimientoModel)
+) -> tuple[list[dict], int]:
+    where_clauses = []
+    params: dict = {}
 
     if q:
-        query = query.filter(
-            NacimientoModel.nombre_completo.ilike(f"%{q}%")
-        )
+        where_clauses.append("p.nombre_completo ILIKE :q")
+        params["q"] = f"%{q}%"
     if expediente:
-        query = query.filter(NacimientoModel.expediente == expediente)
+        where_clauses.append("p.expediente = :expediente")
+        params["expediente"] = expediente
     if sexo:
-        query = query.filter(NacimientoModel.sexo == sexo.upper())
+        where_clauses.append("p.sexo = :sexo")
+        params["sexo"] = sexo.upper()
     if fecha_desde:
-        query = query.filter(NacimientoModel.fecha_nacimiento >= fecha_desde)
+        where_clauses.append("p.fecha_nacimiento >= :fecha_desde")
+        params["fecha_desde"] = fecha_desde
     if fecha_hasta:
-        query = query.filter(NacimientoModel.fecha_nacimiento <= fecha_hasta)
+        where_clauses.append("p.fecha_nacimiento <= :fecha_hasta")
+        params["fecha_hasta"] = fecha_hasta
 
-    total = query.count()
-    nacimientos = query.order_by(desc(NacimientoModel.id)).offset(skip).limit(limit).all()
-    return nacimientos, total
+    where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
+
+    count_sql = f"""
+        SELECT COUNT(*) FROM nacimientos n
+        {_PACIENTE_JOIN}
+        WHERE {where_sql}
+    """
+    total = db.execute(text(count_sql), params).scalar()
+
+    data_sql = f"""
+        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}
+        FROM nacimientos n
+        {_PACIENTE_JOIN}
+        WHERE {where_sql}
+        ORDER BY n.id DESC
+        LIMIT :limit OFFSET :skip
+    """
+    params["limit"] = limit
+    params["skip"] = skip
+    rows = db.execute(text(data_sql), params).mappings().all()
+
+    return [_row_to_out(dict(r)) for r in rows], total
 
 
-def obtener_nacimiento(nacimiento_id: int, db: Session) -> NacimientoModel:
-    nacimiento = db.query(NacimientoModel).filter(NacimientoModel.id == nacimiento_id).first()
-    if not nacimiento:
+def obtener_nacimiento(nacimiento_id: int, db: Session) -> dict:
+    row = _fetchone(db, f"""
+        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}
+        FROM nacimientos n
+        {_PACIENTE_JOIN}
+        WHERE n.id = :id
+    """, {"id": nacimiento_id})
+    if not row:
         raise HTTPException(status_code=404, detail="Registro de nacimiento no encontrado")
-    return nacimiento
+    return _row_to_out(row)
 
 
 def actualizar_nacimiento(
     nacimiento_id: int,
     data: NacimientoUpdate,
     db: Session
-) -> NacimientoModel:
+) -> dict:
     nacimiento = db.query(NacimientoModel).filter(NacimientoModel.id == nacimiento_id).first()
     if not nacimiento:
         raise HTTPException(status_code=404, detail="Registro de nacimiento no encontrado")
-    update_data = data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(nacimiento, key, value)
+
+    if data.madre_id is not None:
+        nacimiento.madre_id = data.madre_id
+
     db.commit()
     db.refresh(nacimiento)
-    return nacimiento
+
+    return obtener_nacimiento(nacimiento_id, db)
 
 
 def eliminar_nacimiento(nacimiento_id: int, db: Session) -> None:
@@ -262,21 +445,18 @@ def referenciar_legacy(
         leg_exp = leg.get("expediente")
         leg_dpi = leg.get("dpi")
 
-        # 1) Find mother by expediente
         if leg_exp:
             madre = _fetchone(db,
                 "SELECT id, expediente, nombre_completo FROM pacientes WHERE expediente = :exp",
                 {"exp": str(leg_exp)}
             )
 
-        # 2) Find mother by DPI
         if not madre and leg_dpi:
             madre = _fetchone(db,
                 "SELECT id, expediente, nombre_completo FROM pacientes WHERE cui = :cui",
                 {"cui": leg_dpi}
             )
 
-        # 3) Find child directly (fallback: madre not found, search by sex+fecha+origen)
         hijo = None
         if madre:
             hijo = buscar_hijo(madre["id"], leg)
@@ -385,6 +565,22 @@ _TIPO_PARTO_MAP_STR = {1: "EUTOCICO", 2: "DISTOCICO", 3: "CESAREA", 4: "OTRO"}
 _CLASE_PARTO_MAP_STR = {1: "UNICO", 2: "GEMELAR", 3: "TRIPLE", 4: "MULTIPLE"}
 
 
+def _set_neonatales_en_paciente(db: Session, paciente_id: int, neonatales: dict):
+    row = _fetchone(db, "SELECT datos_extra FROM pacientes WHERE id = :id FOR UPDATE", {"id": paciente_id})
+    if not row:
+        return
+    de = row["datos_extra"]
+    if isinstance(de, str):
+        de = json.loads(de)
+    if not isinstance(de, dict):
+        de = {}
+    de["neonatales"] = {**(de.get("neonatales") or {}), **neonatales}
+    db.execute(
+        text("UPDATE pacientes SET datos_extra = CAST(:de AS jsonb) WHERE id = :id"),
+        {"de": json.dumps(de), "id": paciente_id}
+    )
+
+
 def importar_desde_legacy(
     db: Session,
     solo_con_madre: bool = True,
@@ -452,33 +648,37 @@ def importar_desde_legacy(
             clase_parto_str = _CLASE_PARTO_MAP_STR.get(leg.get("clase_parto"))
             peso_str = _peso_legacy_a_str(leg.get("lb"), leg.get("onz"))
 
+            neonatales = {}
+            if peso_str:
+                neonatales["peso_nacimiento"] = peso_str
+            if tipo_parto_str:
+                neonatales["tipo_parto"] = tipo_parto_str
+            if clase_parto_str:
+                neonatales["clase_parto"] = clase_parto_str
+            hora = leg.get("hora")
+            if hora:
+                neonatales["hora_nacimiento"] = str(hora)
+
             extra = {"legacy_id": leg_id, "legacy_doc": leg.get("doc"), "legacy_madre": leg.get("madre")}
 
-            db.execute(
-                text("""
-                    INSERT INTO nacimientos
-                        (paciente_id, madre_id, expediente, nombre_completo, sexo, fecha_nacimiento,
-                         peso_nacimiento, tipo_parto, clase_parto, hora_nacimiento, extrahospitalario,
-                         registrador_id, datos_extra)
-                    VALUES
-                        (:pid, :mid, :exp, :nom, :sexo, :fecha,
-                         :peso, :tipo, :clase, :hora, false,
-                         NULL, CAST(:extra AS jsonb))
-                """),
-                {
-                    "pid": hijo["id"] if hijo else None,
-                    "mid": madre_id,
-                    "exp": hijo.get("expediente") if hijo else None,
-                    "nom": hijo.get("nombre_completo") if hijo else (f"Hijo/a de {leg.get('madre')}" if leg.get("madre") else "N.N."),
-                    "sexo": leg_sexo,
-                    "fecha": str(leg_fecha) if leg_fecha else None,
-                    "peso": peso_str,
-                    "tipo": tipo_parto_str,
-                    "clase": clase_parto_str,
-                    "hora": str(leg.get("hora")) if leg.get("hora") else None,
-                    "extra": json.dumps(extra),
-                }
-            )
+            computado = _computar(neonatales)
+
+            if hijo:
+                _set_neonatales_en_paciente(db, hijo["id"], neonatales)
+                db.commit()
+
+            db.execute(text("""
+                INSERT INTO nacimientos
+                    (paciente_id, madre_id, registrador_id, peso_gramos, clasificacion_nacimiento, trabajo_parto)
+                VALUES
+                    (:pid, :mid, NULL, :pg, :clasif, :tp)
+            """), {
+                "pid": hijo["id"] if hijo else None,
+                "mid": madre_id,
+                "pg": computado["peso_gramos"],
+                "clasif": computado["clasificacion_nacimiento"],
+                "tp": computado["trabajo_parto"],
+            })
             db.commit()
             creados += 1
 

@@ -40,7 +40,7 @@ back_sys/
 │   ├── dependencies.py        # FastAPI DI re-exports
 │   ├── exceptions.py          # Global error handlers (422, 409, 500)
 │   └── mail.py                # FastAPI-Mail config
-├── modules/                   # 24 domain modules
+├── modules/                   # 25 domain modules
 │   ├── auth/                  # POST /auth/login, GET /auth/me
 │   ├── users/                 # Full user CRUD
 │   ├── pacientes/             # Patient CRUD, duplicates (trigram/soundex), merge, neonates
@@ -63,6 +63,7 @@ back_sys/
 │   ├── audit_log/             # Access audit logging
 │   ├── laboratorios/          # Lab tests (models only)
 │   ├── rayos_x/               # X-rays (models only)
+│   ├── sigsa3/                # SIGSA-3 consultation registry
 │   └── common/schemas.py      # Shared Pydantic schemas
 ├── app/                       # Legacy (being migrated to modules/)
 │   ├── models/                # 18 legacy model files
@@ -100,18 +101,19 @@ All routes under root path `/fah` (e.g., `https://host/fah/auth/login`).
 | Birth Certs | `/constancias-nacimiento` | `GET/POST`, `GET /{id}` |
 | Loans | `/prestamos` | `GET/POST`, `GET/PUT/DELETE /{id}` |
 | Municipalities | `/municipios` | `GET /` (filtros: `q`, `codigo`, `municipio`, `departamento`, `vecindad`), `GET /departamentos` |
-| Births | `/nacimientos` | `GET/POST`, `GET/PATCH/DELETE /{id}`, `/desde-paciente/{id}`, `/sincronizar` (unifica madre-hijo + legacy), `/referenciar-legacy` (cruza con `nacimientos_legacy`) |
+| Births | `/nacimientos` | `GET/POST`, `GET/PATCH/DELETE /{id}`, `/desde-paciente/{id}`, `/sincronizar` (unifica madre-hijo + legacy), `/referenciar-legacy` (cruza con `nacimientos_legacy`). **Sin datos redundantes:** expediente, sexo, fecha_nac, neonatales se obtienen vía JOIN con `pacientes`. Columnas computadas: `peso_gramos`, `clasificacion_nacimiento` (EBP/MBP/BP/PN), `trabajo_parto` (Prematuro/a Termino/Prolongado) |
 | Countries | `/paises` | `GET /`, `GET /select` |
 | RENAP | `/renap` | `GET /persona` |
 | Totals | `/totales` | `GET /` |
 | Statistics | `/estadisticas` | `/resumen`, `/consultas/por-dia`, `/por-especialidad`, `/pacientes/piramide`, `/procedimientos/top`, `/ocupacion`, `/reporte`, `/personal-salud` |
+| SIGSA-3 | `/sigsa3` | `GET/POST`, `GET/PUT/DELETE /{id}`, filtros: personal_salud, fecha, nombre, sexo, tipo_consulta, especialidad, cie10, q |
 | Audit | `/audit-log` | `GET /` |
 
 ## Database
 
 - **Name**: `hospital` (PostgreSQL)
 - **Extensions**: `pg_trgm`, `unaccent`
-- **Key tables**: `pacientes` (JSONB fields), `consultas`, `medicos`, `users`, `citas`, `ciclos_consulta`, `eventos_consulta`, `procedimientos`, `proce_medicos`, `constancia_nacimiento`, `prestamos`, `expediente_control`, `municipios`, `paises_iso`, `audit_log`, `laboratorios`, `rayos_x`, `encamamiento`, `nacimientos`, `nacimientos_legacy`
+- **Key tables**: `pacientes` (JSONB fields), `consultas`, `medicos`, `users`, `citas`, `ciclos_consulta`, `eventos_consulta`, `procedimientos`, `proce_medicos`, `constancia_nacimiento`, `prestamos`, `expediente_control`, `municipios`, `paises_iso`, `audit_log`, `laboratorios`, `rayos_x`, `encamamiento`, `nacimientos` (sin datos redundantes — solo `id`, `paciente_id`, `madre_id`, `registrador_id`, `peso_gramos`, `clasificacion_nacimiento`, `trabajo_parto`, timestamps), `nacimientos_legacy`, `sigsa3`
 - **Indexes**: GIN on JSONB, partial unique indexes, trigram GIN on `nombre_completo`
 - **Trigger**: `trg_set_nombre_completo` auto-generates full name from JSONB `nombre` before insert/update
 
@@ -224,14 +226,19 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Encamamiento | GET | `/encamamiento/{servicio_id}` | public | `EncamamientoOut` | By ID |
 | Encamamiento | PATCH | `/encamamiento/{servicio_id}` | public | `EncamamientoOut` | Update |
 | Encamamiento | DELETE | `/encamamiento/{servicio_id}` | public | 204 | Delete |
-| Nacimientos | POST | `/nacimientos/` | auth | `NacimientoOut` (201) | Create |
-| Nacimientos | POST | `/nacimientos/desde-paciente/{paciente_id}` | auth | `NacimientoOut` (201) | Desde paciente |
-| Nacimientos | GET | `/nacimientos/` | auth | `NacimientoListResponse` | List (6 filtros) |
-| Nacimientos | GET | `/nacimientos/{nacimiento_id}` | auth | `NacimientoOut` | By ID |
-| Nacimientos | PATCH | `/nacimientos/{nacimiento_id}` | auth | `NacimientoOut` | Update |
+| Nacimientos | POST | `/nacimientos/` | auth | `NacimientoOut` (201) | Create (solo requiere `paciente_id`) |
+| Nacimientos | POST | `/nacimientos/desde-paciente/{paciente_id}` | auth | `NacimientoOut` (201) | Desde paciente (lee neonatales de `pacientes.datos_extra`) |
+| Nacimientos | GET | `/nacimientos/` | auth | `NacimientoListResponse` | List (6 filtros, JOIN con pacientes) |
+| Nacimientos | GET | `/nacimientos/{nacimiento_id}` | auth | `NacimientoOut` | By ID (incluye `neonatales` + `paciente` del JOIN) |
+| Nacimientos | PATCH | `/nacimientos/{nacimiento_id}` | auth | `NacimientoOut` | Update (solo `madre_id`) |
 | Nacimientos | DELETE | `/nacimientos/{nacimiento_id}` | auth | 204 | Delete |
 | Nacimientos | POST | `/nacimientos/sincronizar` | auth | dict | Sincronizar madre-hijo + legacy |
 | Nacimientos | GET | `/nacimientos/referenciar-legacy` | auth | `LegacyReferenceResponse` | Referenciar legacy |
+| SIGSA-3 | GET | `/sigsa3/` | auth | `List[Sigsa3Out]` | List (9 filtros: personal_salud, fecha_consulta, historia_clinica, nombre, sexo, tipo_consulta, especialidad, cie10, q) |
+| SIGSA-3 | GET | `/sigsa3/{id}` | auth | `Sigsa3Out` | By ID |
+| SIGSA-3 | POST | `/sigsa3/` | auth | `Sigsa3Out` (201) | Create |
+| SIGSA-3 | PUT | `/sigsa3/{id}` | auth | `Sigsa3Out` | Update |
+| SIGSA-3 | DELETE | `/sigsa3/{id}` | auth | 204 | Delete |
 
 ## Auth Flow
 

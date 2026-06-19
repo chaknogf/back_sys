@@ -30,6 +30,10 @@ _PACIENTE_JOIN = """
     LEFT JOIN pacientes p ON p.id = n.paciente_id
 """
 
+_MADRE_JOIN = """
+    LEFT JOIN pacientes m ON m.id = n.madre_id
+"""
+
 _NEONATALES_SELECT = """
     p.datos_extra->'neonatales'->>'peso_nacimiento' AS neonatales_peso_nacimiento,
     p.datos_extra->'neonatales'->>'edad_gestacional' AS neonatales_edad_gestacional,
@@ -43,9 +47,20 @@ _NEONATALES_SELECT = """
 _PACIENTE_SELECT = """
     p.id AS paciente_id_ref,
     p.expediente AS paciente_expediente,
+    p.cui AS paciente_cui,
     p.nombre_completo AS paciente_nombre_completo,
+    p.nombre->>'primer_nombre' AS paciente_nombre_primer_nombre,
+    p.nombre->>'segundo_nombre' AS paciente_nombre_segundo_nombre,
+    p.nombre->>'otro_nombre' AS paciente_nombre_otro_nombre,
+    p.nombre->>'primer_apellido' AS paciente_nombre_primer_apellido,
+    p.nombre->>'segundo_apellido' AS paciente_nombre_segundo_apellido,
+    p.nombre->>'apellido_casada' AS paciente_nombre_apellido_casada,
     p.sexo AS paciente_sexo,
     p.fecha_nacimiento AS paciente_fecha_nacimiento
+"""
+
+_MADRE_SELECT = """
+    m.nombre_completo AS nombre_madre
 """
 
 
@@ -64,10 +79,18 @@ def _row_to_out(row: dict) -> dict:
 
     paciente = None
     if row.get("paciente_id_ref"):
+        nombre = {
+            k: row.get(f"paciente_nombre_{k}")
+            for k in ("primer_nombre", "segundo_nombre", "otro_nombre",
+                      "primer_apellido", "segundo_apellido", "apellido_casada")
+        }
+        nombre = {k: v for k, v in nombre.items() if v is not None} or None
         paciente = {
             "id": row["paciente_id_ref"],
             "expediente": row.get("paciente_expediente"),
+            "cui": row.get("paciente_cui"),
             "nombre_completo": row.get("paciente_nombre_completo"),
+            "nombre": nombre,
             "sexo": row.get("paciente_sexo"),
             "fecha_nacimiento": row.get("paciente_fecha_nacimiento"),
         }
@@ -84,6 +107,7 @@ def _row_to_out(row: dict) -> dict:
         "trabajo_parto": row.get("trabajo_parto"),
         "neonatales": neonatales or None,
         "paciente": paciente,
+        "nombre_madre": row.get("nombre_madre"),
     }
 
 
@@ -196,9 +220,10 @@ def crear_nacimiento_desde_paciente(
     nacimiento = _insert_nacimiento(db, paciente_id, madre_id, registrador_id, computado)
 
     return _row_to_out(_fetchone(db, f"""
-        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}
+        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}, {_MADRE_SELECT}
         FROM nacimientos n
         {_PACIENTE_JOIN}
+        {_MADRE_JOIN}
         WHERE n.id = :id
     """, {"id": nacimiento.id}))
 
@@ -243,9 +268,10 @@ def crear_nacimiento(data: NacimientoCreate, db: Session) -> dict:
     db.refresh(nacimiento)
 
     return _row_to_out(_fetchone(db, f"""
-        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}
+        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}, {_MADRE_SELECT}
         FROM nacimientos n
         {_PACIENTE_JOIN}
+        {_MADRE_JOIN}
         WHERE n.id = :id
     """, {"id": nacimiento.id}))
 
@@ -284,14 +310,16 @@ def listar_nacimientos(
     count_sql = f"""
         SELECT COUNT(*) FROM nacimientos n
         {_PACIENTE_JOIN}
+        {_MADRE_JOIN}
         WHERE {where_sql}
     """
     total = db.execute(text(count_sql), params).scalar()
 
     data_sql = f"""
-        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}
+        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}, {_MADRE_SELECT}
         FROM nacimientos n
         {_PACIENTE_JOIN}
+        {_MADRE_JOIN}
         WHERE {where_sql}
         ORDER BY n.id DESC
         LIMIT :limit OFFSET :skip
@@ -305,9 +333,10 @@ def listar_nacimientos(
 
 def obtener_nacimiento(nacimiento_id: int, db: Session) -> dict:
     row = _fetchone(db, f"""
-        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}
+        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}, {_MADRE_SELECT}
         FROM nacimientos n
         {_PACIENTE_JOIN}
+        {_MADRE_JOIN}
         WHERE n.id = :id
     """, {"id": nacimiento_id})
     if not row:

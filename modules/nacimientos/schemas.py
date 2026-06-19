@@ -35,7 +35,9 @@ class NeonatalesInfo(BaseModel):
 class PacienteResumen(BaseModel):
     id: int
     expediente: Optional[str] = None
+    cui: Optional[str] = None
     nombre_completo: Optional[str] = None
+    nombre: Optional[dict] = None
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
 
@@ -50,6 +52,7 @@ class NacimientoOut(NacimientoBase):
     trabajo_parto: Optional[str] = None
     neonatales: Optional[NeonatalesInfo] = None
     paciente: Optional[PacienteResumen] = None
+    nombre_madre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

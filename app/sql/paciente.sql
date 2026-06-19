@@ -46,7 +46,17 @@ CREATE INDEX idx_nombre_completo_trgm ON pacientes USING GIN (nombre_completo gi
 
 CREATE OR REPLACE FUNCTION actualizar_nombre_completo()
 RETURNS TRIGGER AS $$
+DECLARE
+  _casada TEXT;
 BEGIN
+  _casada := NEW.nombre->>'apellido_casada';
+  IF _casada IS NOT NULL AND _casada != '' THEN
+    IF NOT (_casada ILIKE 'de %') THEN
+      _casada := 'de ' || _casada;
+    END IF;
+  ELSE
+    _casada := '';
+  END IF;
   NEW.nombre_completo := regexp_replace(
     TRIM(
       COALESCE(NEW.nombre->>'primer_nombre', '') || ' ' ||
@@ -54,9 +64,9 @@ BEGIN
       COALESCE(NEW.nombre->>'otro_nombre', '') || ' ' ||
       COALESCE(NEW.nombre->>'primer_apellido', '') || ' ' ||
       COALESCE(NEW.nombre->>'segundo_apellido', '') || ' ' ||
-      COALESCE(NEW.nombre->>'apellido_casada', '')
+      _casada
     ),
-    '\s+', ' ', 'g'  -- reemplaza múltiples espacios por uno
+    '\s+', ' ', 'g'
   );
   RETURN NEW;
 END;

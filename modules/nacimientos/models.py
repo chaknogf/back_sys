@@ -1,5 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Time, Boolean, ForeignKey, TIMESTAMP, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, TIMESTAMP, text
 from sqlalchemy.orm import relationship
 from core.database import Base
 
@@ -15,19 +14,9 @@ class NacimientoModel(Base):
         Integer, ForeignKey("pacientes.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
-    expediente = Column(String(20))
-    nombre_completo = Column(String(300))
-    sexo = Column(String(1))
-    fecha_nacimiento = Column(Date)
-
-    peso_nacimiento = Column(String(20))
-    edad_gestacional = Column(String(20))
-    tipo_parto = Column(String(50))
-    clase_parto = Column(String(50))
-    gemelo = Column(String(20))
-    hora_nacimiento = Column(Time)
-    extrahospitalario = Column(Boolean, default=False)
-    datos_extra = Column(JSONB, default=dict)
+    peso_gramos = Column(Numeric)
+    clasificacion_nacimiento = Column(String(50))
+    trabajo_parto = Column(String(50))
 
     registrador_id = Column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True

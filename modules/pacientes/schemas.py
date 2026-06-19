@@ -39,9 +39,14 @@ class Nombre(BaseModel):
             self.otro_nombre,
             self.primer_apellido,
             self.segundo_apellido,
-            self.apellido_casada
         ]
-        return " ".join(p.strip() for p in partes if p and p.strip()).upper()
+        base = " ".join(p.strip() for p in partes if p and p.strip())
+        if self.apellido_casada:
+            casada = self.apellido_casada.strip()
+            if not casada.lower().startswith("de "):
+                casada = f"de {casada}"
+            base += f" {casada}"
+        return base.upper()
 
 
 class Contacto(BaseModel):

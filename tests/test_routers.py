@@ -10,6 +10,7 @@ from modules.prestamos.models import Prestamo
 from modules.procedimientos.models import Procedimiento, ProceMedico
 from modules.eventos.models import EventoConsultaModel
 from modules.constancias_nacimiento.models import ConstanciaNacimientoModel
+from modules.nacimientos.models import NacimientoModel
 from modules.laboratorios.models import Laboratorios
 from modules.rayos_x.models import RayosX
 from modules.users.models import UserModel
@@ -25,6 +26,7 @@ created_ids = {
     "procedimientos": [],
     "eventos": [],
     "constancias": [],
+    "nacimientos": [],
     "laboratorios": [],
     "rayos_x": [],
     "users": [],
@@ -47,6 +49,7 @@ def cleanup():
                 "procedimientos": Procedimiento,
                 "eventos": EventoConsultaModel,
                 "constancias": ConstanciaNacimientoModel,
+                "nacimientos": NacimientoModel,
                 "laboratorios": Laboratorios,
                 "rayos_x": RayosX,
                 "users": UserModel,
@@ -701,6 +704,99 @@ class TestMadreHijo:
         assert data["sexo"] == "F"
         assert data["nombre"]["primer_nombre"] == "Hija De"
         created_ids["pacientes"].append(data["id"])
+
+
+# =====================================================================
+# MADRE-HIJO → CONSTANCIA + NACIMIENTO
+# =====================================================================
+class TestMadreHijoCreaConstanciaYNacimiento:
+    MADRE_ID = None
+    HIJO_ID = None
+
+    def test_create_mother(self, client, auth_headers):
+        import time as _time
+        suffix = str(int(_time.time() * 1000000))[-6:]
+        r = client.post(
+            "/pacientes/",
+            headers=auth_headers,
+            json={
+                "nombre": {
+                    "primer_nombre": "Ana",
+                    "segundo_nombre": f"Madre{suffix}",
+                    "primer_apellido": "Prueba",
+                    "segundo_apellido": suffix,
+                },
+                "sexo": "F",
+                "fecha_nacimiento": "1992-08-15",
+                "contacto": {"telefonos": "87654321"},
+            },
+        )
+        assert r.status_code == 201
+        TestMadreHijoCreaConstanciaYNacimiento.MADRE_ID = r.json()["id"]
+        created_ids["pacientes"].append(r.json()["id"])
+
+    def test_create_hijo(self, client, auth_headers):
+        if not TestMadreHijoCreaConstanciaYNacimiento.MADRE_ID:
+            pytest.skip("No mother created")
+        r = client.post(
+            f"/pacientes/madre-hijo/{TestMadreHijoCreaConstanciaYNacimiento.MADRE_ID}",
+            headers=auth_headers,
+            json={
+                "sexo": "M",
+                "fecha_nacimiento": date.today().isoformat(),
+                "datos_extra": {
+                    "peso_nacimiento": "7 lb 8 onz",
+                    "edad_gestacional": "39",
+                    "tipo_parto": "Simple",
+                    "clase_parto": "Pes",
+                    "gemelo": None,
+                },
+                "estado": "V",
+            },
+        )
+        assert r.status_code == 201
+        TestMadreHijoCreaConstanciaYNacimiento.HIJO_ID = r.json()["id"]
+        created_ids["pacientes"].append(r.json()["id"])
+
+    def test_constancia_creada(self, client, auth_headers):
+        if not TestMadreHijoCreaConstanciaYNacimiento.HIJO_ID:
+            pytest.skip("No child created")
+        r = client.get(
+            "/constancias-nacimiento/",
+            headers=auth_headers,
+        )
+        assert r.status_code == 200
+        data = r.json()
+        constancias = data.get("constancias") or data
+        if isinstance(constancias, list):
+            hijos = [c for c in constancias if c.get("paciente_id") == TestMadreHijoCreaConstanciaYNacimiento.HIJO_ID]
+        elif isinstance(constancias, dict):
+            hijos = [c for c in constancias.get("results", []) if c.get("paciente_id") == TestMadreHijoCreaConstanciaYNacimiento.HIJO_ID]
+        else:
+            hijos = []
+        assert len(hijos) > 0, f"No se encontró constancia_nacimiento para paciente_id {TestMadreHijoCreaConstanciaYNacimiento.HIJO_ID}"
+        created_ids["constancias"].append(hijos[0]["id"])
+
+    def test_nacimiento_creado(self, client, auth_headers):
+        if not TestMadreHijoCreaConstanciaYNacimiento.HIJO_ID:
+            pytest.skip("No child created")
+        r = client.get(
+            f"/nacimientos/",
+            headers=auth_headers,
+        )
+        assert r.status_code == 200
+        data = r.json()
+        items = data.get("nacimientos") or data.get("results") or data
+        if isinstance(items, list):
+            hijos = [n for n in items if n.get("paciente_id") == TestMadreHijoCreaConstanciaYNacimiento.HIJO_ID]
+        else:
+            hijos = []
+        assert len(hijos) > 0, f"No se encontró nacimiento para paciente_id {TestMadreHijoCreaConstanciaYNacimiento.HIJO_ID}"
+        n = hijos[0]
+        assert n["peso_gramos"] is not None
+        assert n["clasificacion_nacimiento"] == "PN"
+        assert n["trabajo_parto"] == "a Termino"
+        created_ids["nacimientos"].append(n["id"])
 
 
 # =====================================================================

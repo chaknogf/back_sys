@@ -6,6 +6,7 @@ from typing import List, Optional
 from datetime import datetime, date, time, timedelta
 
 from modules.citas.models import CitaModel
+from modules.pacientes.models import PacienteModel
 from modules.citas.schemas import CitaCreate, CitaListResponse, CitaUpdate, CitaResponse, CitaBase, CitasPorFechaRazon
 
 
@@ -47,13 +48,15 @@ def listar_citas(
     limit: int = 200,
     skip: int = 0,
 ):
-    query = db.query(CitaModel)
+    query = db.query(CitaModel).outerjoin(
+        PacienteModel, CitaModel.paciente_id == PacienteModel.id
+    )
     if fecha_cita is None:
         fecha_cita = date.today()
     if id is not None:
         query = query.filter(CitaModel.id == id)
     if expediente is not None:
-        query = query.filter(CitaModel.expediente == expediente)
+        query = query.filter(PacienteModel.expediente == expediente)
     if paciente_id is not None:
         query = query.filter(CitaModel.paciente_id == paciente_id)
     if especialidad is not None:
@@ -61,7 +64,7 @@ def listar_citas(
     if fecha_cita is not None:
         query = query.filter(CitaModel.fecha_cita == fecha_cita)
     total = query.count()
-    citas = query.order_by(CitaModel.expediente.asc()).offset(skip).limit(limit).all()
+    citas = query.order_by(PacienteModel.expediente.asc().nullslast()).offset(skip).limit(limit).all()
     return CitaListResponse(total=total, citas=citas)
 
 

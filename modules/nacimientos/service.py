@@ -173,6 +173,37 @@ def _computar(neonatales: dict) -> dict:
     }
 
 
+def _recomputar_desde_origen(db: Session, nacimiento: NacimientoModel) -> bool:
+    if not nacimiento.paciente_id:
+        return False
+    row = _fetchone(db, """
+        SELECT datos_extra FROM pacientes WHERE id = :id
+    """, {"id": nacimiento.paciente_id})
+    if not row:
+        return False
+    de = row.get("datos_extra") or {}
+    if isinstance(de, str):
+        de = json.loads(de)
+    neonatales = de.get("neonatales") or {}
+    if not neonatales:
+        return False
+    computado = _computar(neonatales)
+    cambios = False
+    if computado["peso_gramos"] != nacimiento.peso_gramos:
+        nacimiento.peso_gramos = computado["peso_gramos"]
+        cambios = True
+    if computado["clasificacion_nacimiento"] != nacimiento.clasificacion_nacimiento:
+        nacimiento.clasificacion_nacimiento = computado["clasificacion_nacimiento"]
+        cambios = True
+    if computado["trabajo_parto"] != nacimiento.trabajo_parto:
+        nacimiento.trabajo_parto = computado["trabajo_parto"]
+        cambios = True
+    if cambios:
+        db.commit()
+        db.refresh(nacimiento)
+    return cambios
+
+
 def _insert_nacimiento(db: Session, paciente_id: int, madre_id: int | None,
                        registrador_id: int | None, computado: dict) -> NacimientoModel:
     nacimiento = NacimientoModel(
@@ -334,6 +365,10 @@ def listar_nacimientos(
 
 
 def obtener_nacimiento(nacimiento_id: int, db: Session) -> dict:
+    nacimiento = db.query(NacimientoModel).filter(NacimientoModel.id == nacimiento_id).first()
+    if not nacimiento:
+        raise HTTPException(status_code=404, detail="Registro de nacimiento no encontrado")
+    _recomputar_desde_origen(db, nacimiento)
     row = _fetchone(db, f"""
         SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}, {_MADRE_SELECT}
         FROM nacimientos n
@@ -341,8 +376,6 @@ def obtener_nacimiento(nacimiento_id: int, db: Session) -> dict:
         {_MADRE_JOIN}
         WHERE n.id = :id
     """, {"id": nacimiento_id})
-    if not row:
-        raise HTTPException(status_code=404, detail="Registro de nacimiento no encontrado")
     return _row_to_out(row)
 
 
@@ -358,8 +391,7 @@ def actualizar_nacimiento(
     if data.madre_id is not None:
         nacimiento.madre_id = data.madre_id
 
-    db.commit()
-    db.refresh(nacimiento)
+    _recomputar_desde_origen(db, nacimiento)
 
     return obtener_nacimiento(nacimiento_id, db)
 

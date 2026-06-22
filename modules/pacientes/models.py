@@ -53,7 +53,14 @@ class PacienteModel(Base):
             if nombre_dict.get(campo):
                 nombre_dict[campo] = nombre_dict[campo].strip().title()
 
-        partes = [nombre_dict.get(c) for c in campos]
-        nombre_limpio = " ".join(p for p in partes if p)
-        self.nombre_completo = nombre_limpio if nombre_limpio else None
+        partes = []
+        for c in campos:
+            v = nombre_dict.get(c)
+            if v:
+                if c == "apellido_casada":
+                    partes.append(f"de {v}")
+                else:
+                    partes.append(v)
+        nombre_limpio = " ".join(partes) if partes else None
+        self.nombre_completo = nombre_limpio
         return nombre_dict

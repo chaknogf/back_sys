@@ -331,6 +331,8 @@ def listar_nacimientos(
     sexo: Optional[str] = None,
     fecha_desde: Optional[date] = None,
     fecha_hasta: Optional[date] = None,
+    clasificacion: Optional[str] = None,
+    trabajo_parto: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
 ) -> tuple[list[dict], int]:
@@ -352,6 +354,12 @@ def listar_nacimientos(
     if fecha_hasta:
         where_clauses.append("p.fecha_nacimiento <= :fecha_hasta")
         params["fecha_hasta"] = fecha_hasta
+    if clasificacion:
+        where_clauses.append("n.clasificacion_nacimiento = :clasificacion")
+        params["clasificacion"] = clasificacion.upper()
+    if trabajo_parto:
+        where_clauses.append("n.trabajo_parto = :trabajo_parto")
+        params["trabajo_parto"] = trabajo_parto
 
     where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
 

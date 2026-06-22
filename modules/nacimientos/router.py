@@ -45,6 +45,8 @@ def listar_nacimientos(
     sexo: Optional[str] = Query(None, description="Filtrar por sexo (M/F)"),
     fecha_desde: Optional[date] = Query(None, description="Fecha nacimiento desde (YYYY-MM-DD)"),
     fecha_hasta: Optional[date] = Query(None, description="Fecha nacimiento hasta (YYYY-MM-DD)"),
+    clasificacion: Optional[str] = Query(None, description="Filtrar por clasificación (EBP/MBP/BP/PN)"),
+    trabajo_parto: Optional[str] = Query(None, description="Filtrar por trabajo de parto (Prematuro/a Termino/Prolongado)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -52,6 +54,7 @@ def listar_nacimientos(
     nacimientos, total = service_listar(
         db=db, q=q, expediente=expediente, sexo=sexo,
         fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+        clasificacion=clasificacion, trabajo_parto=trabajo_parto,
         skip=skip, limit=limit,
     )
     return NacimientoListResponse(total=total, nacimientos=nacimientos)

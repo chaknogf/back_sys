@@ -50,8 +50,9 @@ class PacienteModel(Base):
                 "primer_apellido", "segundo_apellido", "apellido_casada"]
 
         for campo in campos:
-            if nombre_dict.get(campo):
-                nombre_dict[campo] = nombre_dict[campo].strip().title()
+            v = nombre_dict.get(campo)
+            if v is not None:
+                nombre_dict[campo] = str(v).strip().title()
 
         partes = []
         for c in campos:

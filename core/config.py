@@ -19,9 +19,3 @@ MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
 MAIL_TLS = os.getenv("MAIL_TLS", "true").lower() == "true"
 MAIL_SSL = os.getenv("MAIL_SSL", "false").lower() == "true"
 
-# SIGSAS Database
-SIGSAS_USER = os.getenv("SIGSAS_USER", "postgres")
-SIGSAS_PASSWORD = os.getenv("SIGSAS_PASSWORD", "postgres")
-SIGSAS_DB = os.getenv("SIGSAS_DB", "sigsas")
-SIGSAS_HOST = os.getenv("SIGSAS_HOST", "localhost")
-SIGSAS_PORT = int(os.getenv("SIGSAS_PORT", "5432"))

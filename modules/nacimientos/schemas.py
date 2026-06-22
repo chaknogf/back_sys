@@ -1,5 +1,5 @@
-from pydantic import BaseModel, ConfigDict, field_serializer
-from typing import Optional
+from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
+from typing import Optional, Union
 from datetime import date, time, datetime
 
 
@@ -35,12 +35,19 @@ class NeonatalesInfo(BaseModel):
 class PacienteResumen(BaseModel):
     id: int
     expediente: Optional[str] = None
-    cui: Optional[str] = None
+    cui: Optional[Union[str, int]] = None
     nombre_completo: Optional[str] = None
     nombre: Optional[dict] = None
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     estado: Optional[str] = None
+
+    @field_validator("cui", mode="before")
+    @classmethod
+    def coerce_cui(cls, v):
+        if isinstance(v, int):
+            return str(v)
+        return v
 
 
 class NacimientoOut(NacimientoBase):
@@ -51,6 +58,7 @@ class NacimientoOut(NacimientoBase):
     peso_gramos: Optional[float] = None
     clasificacion_nacimiento: Optional[str] = None
     trabajo_parto: Optional[str] = None
+    id_legacy: Optional[int] = None
     neonatales: Optional[NeonatalesInfo] = None
     paciente: Optional[PacienteResumen] = None
     nombre_madre: Optional[str] = None

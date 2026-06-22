@@ -17,6 +17,7 @@ class NacimientoModel(Base):
     peso_gramos = Column(Numeric)
     clasificacion_nacimiento = Column(String(50))
     trabajo_parto = Column(String(50))
+    id_legacy = Column(Integer, nullable=True)
 
     registrador_id = Column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True

@@ -354,7 +354,7 @@ def listar_nacimientos(
         {_PACIENTE_JOIN}
         {_MADRE_JOIN}
         WHERE {where_sql}
-        ORDER BY n.id DESC
+        ORDER BY p.fecha_nacimiento DESC NULLS LAST, n.id DESC
         LIMIT :limit OFFSET :skip
     """
     params["limit"] = limit

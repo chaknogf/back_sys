@@ -12,7 +12,7 @@ from modules.pacientes.schemas import PacienteConsultaBase, PacientesNombre, Pac
 class Indicador(BaseModel):
     estudiante_publico: Optional[bool] = None
     empleado_publico: Optional[bool] = None
-    personal_hospital: Optional[str] = None
+    personal_hospital: Optional[Union[str, bool]] = None
     accidente_laboral: Optional[bool] = None
     discapacidad: Optional[bool] = None
     accidente_transito: Optional[bool] = None
@@ -22,6 +22,15 @@ class Indicador(BaseModel):
     embarazo: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("personal_hospital", mode="before")
+    @classmethod
+    def normalize_personal_hospital(cls, v):
+        if v is True:
+            return "S"
+        if v is False:
+            return "N"
+        return v
 
 
 # ===================================================================

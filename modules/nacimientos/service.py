@@ -78,6 +78,21 @@ def _row_to_out(row: dict) -> dict:
     if extra is not None:
         neonatales["extrahospitalario"] = str(extra).lower() in ("true", "1", "yes")
 
+    peso_gramos = None
+    clasificacion_nacimiento = None
+    trabajo_parto = None
+    if neonatales:
+        computado = _computar(neonatales)
+        peso_gramos = float(computado["peso_gramos"]) if computado["peso_gramos"] is not None else None
+        clasificacion_nacimiento = computado["clasificacion_nacimiento"]
+        trabajo_parto = computado["trabajo_parto"]
+    if peso_gramos is None:
+        peso_gramos = float(row["peso_gramos"]) if row.get("peso_gramos") is not None else None
+    if clasificacion_nacimiento is None:
+        clasificacion_nacimiento = row.get("clasificacion_nacimiento")
+    if trabajo_parto is None:
+        trabajo_parto = row.get("trabajo_parto")
+
     paciente = None
     if row.get("paciente_id_ref"):
         nombre = {
@@ -104,9 +119,9 @@ def _row_to_out(row: dict) -> dict:
         "registrador_id": row.get("registrador_id"),
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
-        "peso_gramos": float(row["peso_gramos"]) if row.get("peso_gramos") is not None else None,
-        "clasificacion_nacimiento": row.get("clasificacion_nacimiento"),
-        "trabajo_parto": row.get("trabajo_parto"),
+        "peso_gramos": peso_gramos,
+        "clasificacion_nacimiento": clasificacion_nacimiento,
+        "trabajo_parto": trabajo_parto,
         "neonatales": neonatales or None,
         "paciente": paciente,
         "nombre_madre": row.get("nombre_madre"),

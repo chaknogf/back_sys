@@ -70,10 +70,14 @@ class PersonaNormalizada(BaseModel):
             persona.TERCER_NOMBRE,
             persona.PRIMER_APELLIDO,
             persona.SEGUNDO_APELLIDO,
-            persona.APELLIDO_CASADA,
         ]
+        if persona.APELLIDO_CASADA:
+            apellido = persona.APELLIDO_CASADA.strip()
+            if not apellido.lower().startswith("de "):
+                apellido = f"de {apellido}"
+            nombre_parts.append(apellido)
         nombre_completo = " ".join(p for p in nombre_parts if p).strip()
-        
+
         return cls(
             cui=persona.CUI,
             nombre_completo=nombre_completo,

@@ -11,7 +11,7 @@ class PacienteModel(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     cui = Column(Integer, unique=True, nullable=True, index=True)
     expediente = Column(String(20), unique=True, nullable=True, index=True)
-    pasaporte = Column(String(20), unique=True, nullable=True)
+    pasaporte = Column(String(50), unique=True, nullable=True)
     nombre = Column(JSONB, nullable=False)
     sexo = Column(String(1), nullable=True)
     fecha_nacimiento = Column(Date, nullable=True)

@@ -4,7 +4,7 @@ from modules.pacientes.models import PacienteModel
 from modules.expediente.service import generar_constancia_nacimiento as generar_cn
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import inspect, desc, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import date, datetime
 from decimal import Decimal
 from core.database import get_db
@@ -56,7 +56,11 @@ def listar_constancias(
     limit:  int = 10,
     offset: int = 0,
 ):
-    query = db.query(ConstanciaNacimientoModel)
+    query = db.query(ConstanciaNacimientoModel).options(
+        joinedload(ConstanciaNacimientoModel.paciente),
+        joinedload(ConstanciaNacimientoModel.madre),
+        joinedload(ConstanciaNacimientoModel.medico),
+    )
 
     if id_usuario is not None:
         query = query.filter(ConstanciaNacimientoModel.registrador_id == id_usuario)

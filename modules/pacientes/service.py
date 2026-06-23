@@ -1,7 +1,7 @@
 import unicodedata
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 from sqlalchemy import and_, func, cast, String, or_, desc
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
@@ -56,7 +56,13 @@ def filtro_nombre_campo(campo: str, valor: str):
 
 
 def buscar_neonatales(db: Session, filters: dict, skip: int = 0, limit: int = 50):
-    query = db.query(PacienteModel).order_by(desc(PacienteModel.id))
+    _LIST_COLS = [
+        PacienteModel.id, PacienteModel.cui, PacienteModel.expediente,
+        PacienteModel.pasaporte, PacienteModel.nombre, PacienteModel.nombre_completo,
+        PacienteModel.sexo, PacienteModel.fecha_nacimiento, PacienteModel.estado,
+        PacienteModel.datos_extra,
+    ]
+    query = db.query(PacienteModel).options(load_only(*_LIST_COLS)).order_by(desc(PacienteModel.id))
     query = query.filter(PacienteModel.estado != "I")
     query = query.filter(
         func.jsonb_extract_path_text(PacienteModel.datos_extra, 'neonatales', 'extrahositalario') == 'false'
@@ -114,8 +120,31 @@ def buscar_neonatales(db: Session, filters: dict, skip: int = 0, limit: int = 50
     return PacienteListResponse(total=total, pacientes=pacientes)
 
 
+def buscar_personal_hospital(db: Session, skip: int = 0, limit: int = 50):
+    _LIST_COLS = [
+        PacienteModel.id, PacienteModel.cui, PacienteModel.expediente,
+        PacienteModel.pasaporte, PacienteModel.nombre, PacienteModel.nombre_completo,
+        PacienteModel.sexo, PacienteModel.fecha_nacimiento, PacienteModel.estado,
+        PacienteModel.datos_extra,
+    ]
+    query = db.query(PacienteModel).options(load_only(*_LIST_COLS)).order_by(desc(PacienteModel.id))
+    query = query.filter(PacienteModel.estado != "I")
+    query = query.filter(
+        func.jsonb_extract_path_text(PacienteModel.datos_extra, 'socioeconomicos', 'personal_hospital') == 'S'
+    )
+    total = query.count()
+    pacientes = query.offset(skip).limit(limit).all()
+    return PacienteListResponse(total=total, pacientes=pacientes)
+
+
 def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50):
-    query = db.query(PacienteModel).order_by(desc(PacienteModel.id))
+    _LIST_COLS = [
+        PacienteModel.id, PacienteModel.cui, PacienteModel.expediente,
+        PacienteModel.pasaporte, PacienteModel.nombre, PacienteModel.nombre_completo,
+        PacienteModel.sexo, PacienteModel.fecha_nacimiento, PacienteModel.estado,
+        PacienteModel.datos_extra,
+    ]
+    query = db.query(PacienteModel).options(load_only(*_LIST_COLS)).order_by(desc(PacienteModel.id))
     query = query.filter(PacienteModel.estado != "I")
 
     nombre_completo_json = func.unaccent(

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import String, cast, desc, func, text, or_, and_, case
 from sqlalchemy.orm.attributes import flag_modified
 from typing import Optional, List
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timedelta
 
 from modules.pacientes.models import PacienteModel
 from modules.consultas.models import ConsultaModel
@@ -135,6 +135,87 @@ def buscar_consultas_activas(
         query
         .distinct()
         .order_by(ConsultaModel.id.desc())
+        .limit(limit).offset(skip)
+        .all()
+    )
+
+    return ConsultaListResponse(
+        total=total,
+        consultas=resultados
+    )
+
+
+def reingresos_consulta_tipo3(
+    db: Session,
+    skip: int = 0,
+    limit: int = 50,
+):
+    desde = date.today() - timedelta(days=15)
+    hasta = date.today()
+
+    rn_subq = (
+        db.query(
+            ConsultaModel.id,
+            func.row_number().over(
+                partition_by=ConsultaModel.paciente_id,
+                order_by=ConsultaModel.fecha_consulta.asc()
+            ).label('rn')
+        )
+        .filter(
+            ConsultaModel.tipo_consulta == 3,
+            ConsultaModel.activo.is_(True),
+            ConsultaModel.fecha_consulta.between(desde, hasta)
+        )
+        .subquery()
+    )
+
+    query = (
+        db.query(ConsultaModel)
+        .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
+        .join(rn_subq, ConsultaModel.id == rn_subq.c.id)
+        .filter(rn_subq.c.rn > 1)
+    )
+
+    total = query.count()
+    resultados = (
+        query
+        .distinct()
+        .order_by(ConsultaModel.fecha_consulta.desc())
+        .limit(limit).offset(skip)
+        .all()
+    )
+
+    return ConsultaListResponse(
+        total=total,
+        consultas=resultados
+    )
+
+
+def consultas_activas_mayores_30_dias(
+    db: Session,
+    skip: int = 0,
+    limit: int = 50,
+):
+    corte = date.today() - timedelta(days=30)
+    query = (
+        db.query(ConsultaModel)
+        .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
+        .filter(
+            ConsultaModel.tipo_consulta == 2,
+            ConsultaModel.activo.is_(True),
+            or_(
+                ConsultaModel.ultimo_estado.is_(None),
+                ConsultaModel.ultimo_estado != "archivo"
+            ),
+            ConsultaModel.fecha_consulta <= corte
+        )
+    )
+
+    total = query.count()
+    resultados = (
+        query
+        .distinct()
+        .order_by(ConsultaModel.fecha_consulta.asc())
         .limit(limit).offset(skip)
         .all()
     )

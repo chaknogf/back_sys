@@ -131,7 +131,7 @@ class Neonatales(BaseModel):
 class PacienteBase(BaseModel):
     cui: Optional[int] = None
     expediente: Optional[str] = Field(None, max_length=20)
-    pasaporte: Optional[str] = Field(None, max_length=20)
+    pasaporte: Optional[str] = Field(None, max_length=50)
 
     nombre: Nombre
     sexo: Optional[str] = None
@@ -324,7 +324,7 @@ class PacienteConsultaBase(BaseModel):
     id: int
     cui: Optional[int] = None
     expediente: Optional[str] = Field(None, max_length=20)
-    pasaporte: Optional[str] = Field(None, max_length=20)
+    pasaporte: Optional[str] = Field(None, max_length=50)
     nombre: Nombre
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
@@ -343,7 +343,7 @@ class PacienteNacimientoConstancia(BaseModel):
     id: int
     cui: Optional[int] = None
     expediente: Optional[str] = Field(None, max_length=20)
-    pasaporte: Optional[str] = Field(None, max_length=20)
+    pasaporte: Optional[str] = Field(None, max_length=50)
     nombre: Nombre
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None

@@ -15,7 +15,7 @@ from .schemas import (
     PacienteCreate, PacienteOut, PacienteUpdate, PacienteContacto,
     PacienteListResponse
 )
-from .service import buscar_pacientes, buscar_neonatales, obtener_paciente, crear_paciente, agregar_evento, normalizar_metadatos
+from .service import buscar_pacientes, buscar_neonatales, buscar_personal_hospital, obtener_paciente, crear_paciente, agregar_evento, normalizar_metadatos
 
 
 router = APIRouter(prefix="/pacientes", tags=["Pacientes"])
@@ -74,6 +74,18 @@ def listar_neonatales(
     }.items() if v is not None}
     resultado = buscar_neonatales(db, filters, skip, limit)
     registrar_acceso(db, current_user.username, "pacientes", "/pacientes/neonatales")
+    return resultado
+
+
+@router.get("/personal-hospital", response_model=PacienteListResponse)
+def listar_personal_hospital(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=1000),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    resultado = buscar_personal_hospital(db, skip, limit)
+    registrar_acceso(db, current_user.username, "pacientes", "/pacientes/personal-hospital")
     return resultado
 
 

@@ -28,6 +28,9 @@ class PacienteModel(Base):
         Index("uq_expediente_not_null", "expediente", unique=True,
               postgresql_where=text("expediente IS NOT NULL AND expediente <> ''")),
         Index("idx_paciente_estado", "estado"),
+        Index("idx_paciente_nombre_trgm", "nombre_completo",
+              postgresql_using="gin",
+              postgresql_ops={"nombre_completo": "gin_trgm_ops"}),
     )
 
     consultas = relationship("ConsultaModel", back_populates="paciente", cascade="all, delete-orphan")

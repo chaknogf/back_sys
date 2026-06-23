@@ -1,6 +1,6 @@
 # modules/consultas/service.py
 from fastapi import Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import String, cast, desc, func, text, or_, and_, case
 from sqlalchemy.orm.attributes import flag_modified
 from typing import Optional, List
@@ -58,6 +58,7 @@ def buscar_consultas_activas(
     query = (
         db.query(ConsultaModel)
         .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
+        .options(joinedload(ConsultaModel.paciente))
     )
 
     query = query.filter(ConsultaModel.activo.is_(activo))
@@ -133,7 +134,6 @@ def buscar_consultas_activas(
     total = query.count()
     resultados = (
         query
-        .distinct()
         .order_by(ConsultaModel.id.desc())
         .limit(limit).offset(skip)
         .all()
@@ -172,6 +172,7 @@ def reingresos_consulta_tipo3(
     query = (
         db.query(ConsultaModel)
         .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
+        .options(joinedload(ConsultaModel.paciente))
         .join(rn_subq, ConsultaModel.id == rn_subq.c.id)
         .filter(rn_subq.c.rn > 1)
     )
@@ -179,7 +180,6 @@ def reingresos_consulta_tipo3(
     total = query.count()
     resultados = (
         query
-        .distinct()
         .order_by(ConsultaModel.fecha_consulta.desc())
         .limit(limit).offset(skip)
         .all()
@@ -200,6 +200,7 @@ def consultas_activas_mayores_30_dias(
     query = (
         db.query(ConsultaModel)
         .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
+        .options(joinedload(ConsultaModel.paciente))
         .filter(
             ConsultaModel.tipo_consulta == 2,
             ConsultaModel.activo.is_(True),
@@ -214,7 +215,6 @@ def consultas_activas_mayores_30_dias(
     total = query.count()
     resultados = (
         query
-        .distinct()
         .order_by(ConsultaModel.fecha_consulta.asc())
         .limit(limit).offset(skip)
         .all()

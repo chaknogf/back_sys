@@ -324,6 +324,17 @@ def crear_nacimiento(data: NacimientoCreate, db: Session) -> dict:
     """, {"id": nacimiento.id}))
 
 
+_PACIENTE_SELECT_LIGHT = """
+    p.id AS paciente_id_ref,
+    p.expediente AS paciente_expediente,
+    p.cui AS paciente_cui,
+    p.nombre_completo AS paciente_nombre_completo,
+    p.sexo AS paciente_sexo,
+    p.fecha_nacimiento AS paciente_fecha_nacimiento,
+    p.estado AS paciente_estado
+"""
+
+
 def listar_nacimientos(
     db: Session,
     q: Optional[str] = None,
@@ -366,16 +377,14 @@ def listar_nacimientos(
     count_sql = f"""
         SELECT COUNT(*) FROM nacimientos n
         {_PACIENTE_JOIN}
-        {_MADRE_JOIN}
         WHERE {where_sql}
     """
     total = db.execute(text(count_sql), params).scalar()
 
     data_sql = f"""
-        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}, {_MADRE_SELECT}
+        SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT_LIGHT}, {_NEONATALES_SELECT}
         FROM nacimientos n
         {_PACIENTE_JOIN}
-        {_MADRE_JOIN}
         WHERE {where_sql}
         ORDER BY p.fecha_nacimiento DESC NULLS LAST, n.id DESC
         LIMIT :limit OFFSET :skip

@@ -430,7 +430,7 @@ def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
 
     rows_clasificacion_parto = db.execute(text("""
         SELECT
-            p.datos_extra#>'{neonatales,tipo_parto}' AS clasificacion_parto,
+            n.clasificacion_nacimiento AS clasificacion_parto,
             p.estado,
             p.sexo,
             COUNT(*) AS total
@@ -439,7 +439,7 @@ def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
         WHERE p.fecha_nacimiento BETWEEN :desde AND :hasta
           AND p.sexo IN ('M', 'F')
           AND p.estado IN ('V', 'F')
-        GROUP BY p.datos_extra#>'{neonatales,tipo_parto}', p.estado, p.sexo
+        GROUP BY n.clasificacion_nacimiento, p.estado, p.sexo
         ORDER BY clasificacion_parto, p.estado, p.sexo
     """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
 

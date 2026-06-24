@@ -266,10 +266,20 @@ class PacientesResumen(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def extraer_defuncion(cls, data):
+    def extraer_defuncion_nombre(cls, data):
         if isinstance(data, dict):
             if "datos_extra" in data and data["datos_extra"]:
                 data["defuncion"] = data["datos_extra"].get("defuncion")
+            if not data.get("nombre_completo") and data.get("nombre"):
+                nombre_obj = data["nombre"]
+                if isinstance(nombre_obj, dict):
+                    try:
+                        nombre_instance = Nombre(**nombre_obj)
+                        data["nombre_completo"] = nombre_instance.completo
+                    except Exception:
+                        pass
+                elif hasattr(nombre_obj, "completo"):
+                    data["nombre_completo"] = nombre_obj.completo
             return data
         return data
 
@@ -368,6 +378,7 @@ class PacienteNacimientoConstancia(BaseModel):
 class PacientesNombre(BaseModel):
     id: int
     nombre: Nombre
+    nombre_completo: Optional[str] = None
     expediente: Optional[str] = Field(None, max_length=20)
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
@@ -376,10 +387,20 @@ class PacientesNombre(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def extraer_defuncion(cls, data):
+    def extraer_defuncion_nombre(cls, data):
         if isinstance(data, dict):
             if "datos_extra" in data and data["datos_extra"]:
                 data["defuncion"] = data["datos_extra"].get("defuncion")
+            if not data.get("nombre_completo") and data.get("nombre"):
+                nombre_obj = data["nombre"]
+                if isinstance(nombre_obj, dict):
+                    try:
+                        nombre_instance = Nombre(**nombre_obj)
+                        data["nombre_completo"] = nombre_instance.completo
+                    except Exception:
+                        pass
+                elif hasattr(nombre_obj, "completo"):
+                    data["nombre_completo"] = nombre_obj.completo
             return data
         return data
 
@@ -392,6 +413,7 @@ class PacientesNombre(BaseModel):
 class PacienteContacto(BaseModel):
     id: int
     nombre: Optional[Nombre] = None
+    nombre_completo: Optional[str] = None
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     expediente: Optional[str] = Field(None, max_length=20)
@@ -400,10 +422,20 @@ class PacienteContacto(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def extraer_defuncion(cls, data):
+    def extraer_defuncion_nombre(cls, data):
         if isinstance(data, dict):
             if "datos_extra" in data and data["datos_extra"]:
                 data["defuncion"] = data["datos_extra"].get("defuncion")
+            if not data.get("nombre_completo") and data.get("nombre"):
+                nombre_obj = data["nombre"]
+                if isinstance(nombre_obj, dict):
+                    try:
+                        nombre_instance = Nombre(**nombre_obj)
+                        data["nombre_completo"] = nombre_instance.completo
+                    except Exception:
+                        pass
+                elif hasattr(nombre_obj, "completo"):
+                    data["nombre_completo"] = nombre_obj.completo
             return data
         return data
 

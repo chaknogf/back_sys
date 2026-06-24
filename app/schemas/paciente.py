@@ -273,30 +273,40 @@ class PacientesResumen(BaseModel):
     fecha_nacimiento: Optional[date] = None
     estado: Optional[str] = None
     defuncion: Optional[str] = None
-    
+
     @model_validator(mode="before")
     @classmethod
-    def extraer_defuncion(cls, data):
-        # Si viene como ORM
+    def extraer_defuncion_nombre(cls, data):
         if hasattr(data, "__dict__"):
             raw = data.__dict__.copy()
             if "datos_extra" in raw and raw["datos_extra"]:
                 raw["defuncion"] = raw["datos_extra"].get("defuncion")
+            if not raw.get("nombre_completo") and raw.get("nombre"):
+                try:
+                    nombre_instance = Nombre(**raw["nombre"])
+                    raw["nombre_completo"] = nombre_instance.completo
+                except Exception:
+                    pass
             return raw
-        # Si ya es dict
         if isinstance(data, dict):
             if "datos_extra" in data and data["datos_extra"]:
                 data["defuncion"] = data["datos_extra"].get("defuncion")
+            if not data.get("nombre_completo") and data.get("nombre"):
+                nombre_obj = data["nombre"]
+                if isinstance(nombre_obj, dict):
+                    try:
+                        nombre_instance = Nombre(**nombre_obj)
+                        data["nombre_completo"] = nombre_instance.completo
+                    except Exception:
+                        pass
+                elif hasattr(nombre_obj, "completo"):
+                    data["nombre_completo"] = nombre_obj.completo
         return data
 
     model_config = ConfigDict(
-
         from_attributes=True,
-
         populate_by_name=True,
-
         extra="ignore"
-
     )
 
 # ===================================================================
@@ -401,67 +411,89 @@ class PacienteNacimientoConstancia(BaseModel):
 class PacientesNombre(BaseModel):
     id: int
     nombre: Nombre
+    nombre_completo: Optional[str] = None
     expediente: Optional[str] = Field(None, max_length=20)
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     contacto: Optional[Contacto] = None
     defuncion: Optional[str] = None
-    
+
     @model_validator(mode="before")
     @classmethod
-    def extraer_defuncion(cls, data):
-        # Si viene como ORM
+    def extraer_defuncion_nombre(cls, data):
         if hasattr(data, "__dict__"):
             raw = data.__dict__.copy()
             if "datos_extra" in raw and raw["datos_extra"]:
                 raw["defuncion"] = raw["datos_extra"].get("defuncion")
+            if not raw.get("nombre_completo") and raw.get("nombre"):
+                try:
+                    nombre_instance = Nombre(**raw["nombre"])
+                    raw["nombre_completo"] = nombre_instance.completo
+                except Exception:
+                    pass
             return raw
-        # Si ya es dict
         if isinstance(data, dict):
             if "datos_extra" in data and data["datos_extra"]:
                 data["defuncion"] = data["datos_extra"].get("defuncion")
+            if not data.get("nombre_completo") and data.get("nombre"):
+                nombre_obj = data["nombre"]
+                if isinstance(nombre_obj, dict):
+                    try:
+                        nombre_instance = Nombre(**nombre_obj)
+                        data["nombre_completo"] = nombre_instance.completo
+                    except Exception:
+                        pass
+                elif hasattr(nombre_obj, "completo"):
+                    data["nombre_completo"] = nombre_obj.completo
         return data
 
     model_config = ConfigDict(
-
         from_attributes=True,
-
         populate_by_name=True,
-
         extra="ignore"
-
     )
     
 class PacienteContacto(BaseModel):
     id: int
     nombre: Nombre
+    nombre_completo: Optional[str] = None
     sexo: str
     fecha_nacimiento: date
     expediente: Optional[str] = Field(None, max_length=20)
     contacto: Contacto
     defuncion: Optional[str] = None
-    
+
     @model_validator(mode="before")
     @classmethod
-    def extraer_defuncion(cls, data):
-        # Si viene como ORM
+    def extraer_defuncion_nombre(cls, data):
         if hasattr(data, "__dict__"):
             raw = data.__dict__.copy()
             if "datos_extra" in raw and raw["datos_extra"]:
                 raw["defuncion"] = raw["datos_extra"].get("defuncion")
+            if not raw.get("nombre_completo") and raw.get("nombre"):
+                try:
+                    nombre_instance = Nombre(**raw["nombre"])
+                    raw["nombre_completo"] = nombre_instance.completo
+                except Exception:
+                    pass
             return raw
-        # Si ya es dict
         if isinstance(data, dict):
             if "datos_extra" in data and data["datos_extra"]:
                 data["defuncion"] = data["datos_extra"].get("defuncion")
+            if not data.get("nombre_completo") and data.get("nombre"):
+                nombre_obj = data["nombre"]
+                if isinstance(nombre_obj, dict):
+                    try:
+                        nombre_instance = Nombre(**nombre_obj)
+                        data["nombre_completo"] = nombre_instance.completo
+                    except Exception:
+                        pass
+                elif hasattr(nombre_obj, "completo"):
+                    data["nombre_completo"] = nombre_obj.completo
         return data
 
     model_config = ConfigDict(
-
         from_attributes=True,
-
         populate_by_name=True,
-
         extra="ignore"
-
     )

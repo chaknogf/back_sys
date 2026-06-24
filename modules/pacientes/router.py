@@ -81,10 +81,21 @@ def listar_neonatales(
 def listar_personal_hospital(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
+    expediente: Optional[str] = Query(None, description="Filtrar por expediente"),
+    cui: Optional[str] = Query(None, description="Filtrar por CUI"),
+    primer_nombre: Optional[str] = Query(None, description="Filtrar por primer nombre"),
+    segundo_nombre: Optional[str] = Query(None, description="Filtrar por segundo nombre"),
+    primer_apellido: Optional[str] = Query(None, description="Filtrar por primer apellido"),
+    segundo_apellido: Optional[str] = Query(None, description="Filtrar por segundo apellido"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    resultado = buscar_personal_hospital(db, skip, limit)
+    filters = {k: v for k, v in {
+        "expediente": expediente, "cui": cui,
+        "primer_nombre": primer_nombre, "segundo_nombre": segundo_nombre,
+        "primer_apellido": primer_apellido, "segundo_apellido": segundo_apellido,
+    }.items() if v is not None}
+    resultado = buscar_personal_hospital(db, filters, skip, limit)
     registrar_acceso(db, current_user.username, "pacientes", "/pacientes/personal-hospital")
     return resultado
 

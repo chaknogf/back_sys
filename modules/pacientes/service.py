@@ -129,7 +129,7 @@ def buscar_neonatales(db: Session, filters: dict, skip: int = 0, limit: int = 50
     return PacienteListResponse(total=total, pacientes=pacientes)
 
 
-def buscar_personal_hospital(db: Session, skip: int = 0, limit: int = 50):
+def buscar_personal_hospital(db: Session, filters: dict | None = None, skip: int = 0, limit: int = 50):
     _LIST_COLS = [
         PacienteModel.id, PacienteModel.cui, PacienteModel.expediente,
         PacienteModel.pasaporte, PacienteModel.nombre, PacienteModel.nombre_completo,
@@ -141,6 +141,24 @@ def buscar_personal_hospital(db: Session, skip: int = 0, limit: int = 50):
     query = query.filter(
         func.jsonb_extract_path_text(PacienteModel.datos_extra, 'socioeconomicos', 'personal_hospital') == 'S'
     )
+
+    filters = filters or {}
+    for campo in ["primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido"]:
+        val = filters.get(campo)
+        if val:
+            query = query.filter(filtro_nombre_campo(campo, val))
+
+    cui = filters.get("cui")
+    if cui:
+        if cui.isdigit():
+            query = query.filter(PacienteModel.cui == int(cui))
+        else:
+            query = query.filter(cast(PacienteModel.cui, String).ilike(f"%{cui}%"))
+
+    expediente = filters.get("expediente")
+    if expediente:
+        query = query.filter(PacienteModel.expediente == expediente)
+
     total = query.count()
     pacientes = query.offset(skip).limit(limit).all()
     return PacienteListResponse(total=total, pacientes=pacientes)

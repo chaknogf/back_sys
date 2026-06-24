@@ -74,7 +74,7 @@ class NacimientoClasePartoItem(BaseModel):
 
 
 class NacimientoClasificacionPartoItem(BaseModel):
-    clasificacion_parto: Optional[str] = Field(None, description="Tipo de parto (EUTOCICO/DISTOCICO/CESAREA/OTRO)")
+    clasificacion_parto: Optional[str] = Field(None, description="Clasificación del nacimiento (EBP/MBP/BP/PN)")
     estado: str = Field(..., description="Estado (V/F)")
     sexo: str = Field(..., description="Sexo del neonato (M/F)")
     total: int = Field(..., ge=0)

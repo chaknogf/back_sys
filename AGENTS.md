@@ -104,9 +104,9 @@ All routes under root path `/fah` (e.g., `https://host/fah/auth/login`).
 | Births | `/nacimientos` | `GET/POST`, `GET/PATCH/DELETE /{id}`, `/desde-paciente/{id}`, `/sincronizar` (unifica madre-hijo + legacy), `/referenciar-legacy` (cruza con `nacimientos_legacy`). **Sin datos redundantes:** expediente, sexo, fecha_nac, neonatales se obtienen vía JOIN con `pacientes`. Columnas computadas: `peso_gramos`, `clasificacion_nacimiento` (EBP/MBP/BP/PN), `trabajo_parto` (Prematuro/a Termino/Prolongado) |
 | Countries | `/paises` | `GET /`, `GET /select` |
 | RENAP | `/renap` | `GET /persona` |
-| Totals | `/totales` | `GET /` |
-| Statistics | `/estadisticas` | `/resumen`, `/consultas/por-dia`, `/por-especialidad`, `/pacientes/piramide`, `/procedimientos/top`, `/ocupacion`, `/reporte`, `/personal-salud` |
+| Statistics | `/estadisticas` | `/consultas/pacientesAtendidos`, `/consultas/hospitalizacion-infantil`, `/consultas/promedioDiario`, `/consultas/personal-hospital`, `/consultas/estudiante-publico`, `/consultas/reingresos`, `/consultas/reingresos-tipo3`, `/consultas/activos-mayores-a-30-dias`, `/nacimientos` |
 | SIGSA-3 | `/sigsa3` | `GET/POST`, `GET/PUT/DELETE /{id}`, filtros: personal_salud, fecha, nombre, sexo, tipo_consulta, especialidad, cie10, q |
+| Totales | `/totales` | `GET /` (KPIs dashboard, 7 indicadores, opcional `fecha`) |
 | Audit | `/audit-log` | `GET /` |
 
 ## Database
@@ -189,7 +189,6 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Paises | GET | `/paises/select` | public | `List[PaisSelect]` | For select/autocomplete |
 | Paises | GET | `/paises/{codigo}` | public | `PaisOut` | By ISO code |
 | RENAP | GET | `/renap/persona` | auth | `RespuestaRenap` | By CUI or names+dob |
-| Totales | GET | `/totales/` | auth | `TotalesResponse` | Dashboard KPIs |
 | Prestamos | POST | `/prestamos/` | auth | `PrestamoSchema` | Create |
 | Prestamos | GET | `/prestamos/` | auth | `PrestamoListResponse` | List (6 filtros) |
 | Prestamos | GET | `/prestamos/{prestamo_id}` | auth | `PrestamoSchema` | By ID |
@@ -212,14 +211,17 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Eventos | POST | `/eventos/` | auth | `EventoConsultaOut` (201) | Create (ingreso/evolucion/egreso) |
 | Eventos | PATCH | `/eventos/{evento_id}` | auth | `EventoConsultaOut` | Update |
 | Eventos | DELETE | `/eventos/{evento_id}` | auth | 204 | Delete |
-| Estadisticas | GET | `/estadisticas/resumen` | auth | `ResumenResponse` | Dashboard resumen |
-| Estadisticas | GET | `/estadisticas/consultas/por-dia` | auth | `SerieResponse` | Por día en rango |
-| Estadisticas | GET | `/estadisticas/consultas/por-especialidad` | auth | `SerieResponse` | Por especialidad |
-| Estadisticas | GET | `/estadisticas/pacientes/piramide` | auth | `PiramidePoblacional` | Pirámide poblacional |
-| Estadisticas | GET | `/estadisticas/procedimientos/top` | auth | `TopProcedimientos` | Top procedimientos |
-| Estadisticas | GET | `/estadisticas/ocupacion` | auth | `OcupacionResponse` | Ocupación hospitalaria |
-| Estadisticas | GET | `/estadisticas/reporte` | auth | `ReporteFechas` | Reporte personalizado |
-| Estadisticas | GET | `/estadisticas/personal-salud` | auth | `PersonalSaludReporte` | Personal de salud |
+| Estadisticas | GET | `/estadisticas/consultas/pacientesAtendidos` | auth | `PacientesAtendidosResponse` | Pacientes atendidos por tipo, especialidad y sexo (req: `desde`, `hasta`) |
+| Estadisticas | GET | `/estadisticas/consultas/hospitalizacion-infantil` | auth | `HospitalizacionInfantilResponse` | Hospitalizaciones infantiles >28d y <5años (req: `desde`, `hasta`) |
+| Estadisticas | GET | `/estadisticas/consultas/promedioDiario` | auth | `PromedioDiarioResponse` | Promedio diario de consultas por especialidad (req: `desde`, `hasta`) |
+| Estadisticas | GET | `/estadisticas/consultas/personal-hospital` | auth | `PersonalHospitalResponse` | Consultas de personal del hospital (filtro `datos_extra.socioeconomicos.personal_hospital=S`, req: `desde`, `hasta`) |
+| Estadisticas | GET | `/estadisticas/consultas/estudiante-publico` | auth | `EstudiantePublicoResponse` | Consultas de estudiantes públicos (filtro `datos_extra.socioeconomicos.estudiante_publico=S`, req: `desde`, `hasta`) |
+| Estadisticas | GET | `/estadisticas/consultas/reingresos` | auth | `ReingresoResponse` | Reingresos hospitalarios clasificados (<8d / complicaciones). req: `desde`, `hasta` |
+| Estadisticas | GET | `/estadisticas/consultas/reingresos-tipo3` | auth | `ConsultaListResponse` | Reingresos tipo 3 paginados (filtros: `skip`, `limit`) |
+| Estadisticas | GET | `/estadisticas/consultas/activos-mayores-a-30-dias` | auth | `ConsultaListResponse` | Consultas activas >30 días (filtros: `skip`, `limit`) |
+| Estadisticas | GET | `/estadisticas/nacimientos` | auth | `NacimientosStatsResponse` | Estadísticas de nacimientos por sexo/estado, clase de parto, clasificación y trabajo de parto (req: `desde`, `hasta`) |
+| Totales | GET | `/totales/` | auth | `TotalesResponse` | KPIs dashboard (7 indicadores: pacientes totales/activos, consultas totales/día, COEX/hosp/emerg del día). Opcional: `fecha` |
+| Procedimientos | GET | `/procedimientos/estadisticas/resumen` | auth | dict | Estadísticas anuales/mensuales de procedimientos (req: `anio`, opc: `mes`). Retorna total registros, total cantidad, top 5 |
 | Audit | GET | `/audit-log/` | admin | dict (paginated) | Logs (filtros: tabla, username, desde, hasta) |
 | Encamamiento | POST | `/encamamiento/` | public | `EncamamientoOut` (201) | Create servicio |
 | Encamamiento | GET | `/encamamiento/` | public | `List[EncamamientoOut]` | List (filtro: activo) |
@@ -239,6 +241,112 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | SIGSA-3 | POST | `/sigsa3/` | auth | `Sigsa3Out` (201) | Create |
 | SIGSA-3 | PUT | `/sigsa3/{id}` | auth | `Sigsa3Out` | Update |
 | SIGSA-3 | DELETE | `/sigsa3/{id}` | auth | 204 | Delete |
+
+## Estadísticas y Reportes
+
+Módulo centralizado en `modules/estadisticas/`. Todos los endpoints devuelven JSON con `titulo`, `desde`, `hasta`, `datos`, `total_general` y `generado_en`.
+
+```bash
+# Autenticación requerida para todos los endpoints
+TOKEN=$(curl -s -X POST https://host/fah/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"user","password":"pass"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+AUTH="Authorization: Bearer $TOKEN"
+```
+
+### Consultas por rango de fechas (requieren `desde` y `hasta` en YYYY-MM-DD)
+
+```bash
+# Pacientes atendidos agrupados por tipo_consulta, especialidad y sexo
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/pacientesAtendidos?desde=2025-01-01&hasta=2025-12-31"
+
+# Hospitalizaciones infantiles (>28 días y <5 años) solo tipo_consulta=2
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/hospitalizacion-infantil?desde=2025-01-01&hasta=2025-12-31"
+
+# Promedio diario de consultas por especialidad (con desglose por tipo)
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/promedioDiario?desde=2025-01-01&hasta=2025-12-31"
+
+# Consultas de personal del hospital (filtra datos_extra.socioeconomicos.personal_hospital=S)
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/personal-hospital?desde=2025-01-01&hasta=2025-12-31"
+
+# Consultas de estudiantes públicos (filtra datos_extra.socioeconomicos.estudiante_publico=S)
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/estudiante-publico?desde=2025-01-01&hasta=2025-12-31"
+
+# Reingresos hospitalarios clasificados en <8 días y por complicaciones
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/reingresos?desde=2025-01-01&hasta=2025-12-31"
+```
+
+### Consultas paginadas (usan `skip`/`limit`)
+
+```bash
+# Reingresos tipo 3 (delegado a consultas.service)
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/reingresos-tipo3?skip=0&limit=50"
+
+# Consultas activas con más de 30 días de antigüedad
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/activos-mayores-a-30-dias?skip=0&limit=50"
+```
+
+### Nacimientos
+
+```bash
+# Estadísticas de nacimientos: por sexo/estado, clase de parto, clasificación, trabajo de parto
+curl -H "$AUTH" "https://host/fah/estadisticas/nacimientos?desde=2025-01-01&hasta=2025-12-31"
+```
+
+### Dashboard KPIs (`modules/totales/`)
+
+```bash
+# 7 indicadores en tiempo real (hoy)
+curl -H "$AUTH" "https://host/fah/totales/"
+
+# O de una fecha específica
+curl -H "$AUTH" "https://host/fah/totales/?fecha=2025-06-15"
+```
+
+Retorna:
+```json
+{
+  "totales": [
+    {"entidad": "Pacientes Totales", "total": 15000, "icono": "users", "color": "blue"},
+    {"entidad": "Pacientes Activos", "total": 12000, "icono": "user-check", "color": "purple"},
+    {"entidad": "Consultas Totales", "total": 85000, "icono": "file-medical", "color": "green"},
+    {"entidad": "Consultas Hoy", "total": 120, "icono": "calendar-check", "color": "teal"},
+    {"entidad": "COEX Hoy", "total": 45, "icono": "stethoscope", "color": "cyan"},
+    {"entidad": "Hospitalizaciones Hoy", "total": 30, "icono": "bed", "color": "orange"},
+    {"entidad": "Emergencias Hoy", "total": 45, "icono": "ambulance", "color": "red"}
+  ],
+  "generado_en": "2025-06-23T10:30:00"
+}
+```
+
+### Procedimientos
+
+```bash
+# Reporte agregado de procedimientos realizados
+curl -H "$AUTH" "https://host/fah/procedimientos/reporte"
+
+# Estadísticas anuales/mensuales (top 5 procedimientos)
+curl -H "$AUTH" "https://host/fah/procedimientos/estadisticas/resumen?anio=2025"
+curl -H "$AUTH" "https://host/fah/procedimientos/estadisticas/resumen?anio=2025&mes=6"
+```
+
+### Arquitectura del módulo
+
+```
+modules/
+├── estadisticas/           # Reportes personalizados sobre consultas + pacientes + nacimientos
+│   ├── router.py           # 9 endpoints, todos auth, SQL raw con text()
+│   ├── service.py          # Lógica de negocio con consultas SQL directas
+│   └── schemas.py          # Schemas Pydantic de respuesta (sin modelos ORM)
+├── totales/                # KPIs del dashboard en tiempo real
+│   ├── router.py           # 1 endpoint GET / (fecha opcional), SQL con text()
+│   ├── service.py          # Misma lógica que router (duplicado)
+│   └── schemas.py          # TotalesItem + TotalesResponse
+└── procedimientos/         # Catálogo + procedimientos realizados
+    ├── router.py           # CRUD + GET /reporte + GET /estadisticas/resumen
+    ├── models.py           # Procedimiento + ProceMedico (ORM)
+    └── schemas.py          # Schemas de solicitud/respuesta
+```
 
 ## Auth Flow
 

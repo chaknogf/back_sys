@@ -150,43 +150,47 @@ def reingresos_consulta_tipo3(
     skip: int = 0,
     limit: int = 50,
 ):
-    desde = date.today() - timedelta(days=15)
+    desde = date.today() - timedelta(days=20)
     hasta = date.today()
 
-    rn_subq = (
-        db.query(
-            ConsultaModel.id,
-            func.row_number().over(
-                partition_by=ConsultaModel.paciente_id,
-                order_by=ConsultaModel.fecha_consulta.asc()
-            ).label('rn')
-        )
-        .filter(
-            ConsultaModel.tipo_consulta == 3,
-            ConsultaModel.activo.is_(True),
-            ConsultaModel.fecha_consulta.between(desde, hasta)
-        )
+    filters = (
+        ConsultaModel.tipo_consulta == 3,
+        ConsultaModel.activo.is_(True),
+        ConsultaModel.fecha_consulta.between(desde, hasta),
+    )
+
+    multi_pacientes = (
+        db.query(ConsultaModel.paciente_id)
+        .filter(*filters)
+        .group_by(ConsultaModel.paciente_id)
+        .having(func.count(ConsultaModel.id) >= 2)
         .subquery()
     )
 
-    query = (
-        db.query(ConsultaModel)
-        .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
-        .options(joinedload(ConsultaModel.paciente))
-        .join(rn_subq, ConsultaModel.id == rn_subq.c.id)
-        .filter(rn_subq.c.rn > 1)
+    total_query = (
+        db.query(func.count(ConsultaModel.id))
+        .filter(
+            ConsultaModel.paciente_id.in_(db.query(multi_pacientes.c.paciente_id)),
+            *filters,
+        )
     )
+    total = total_query.scalar()
 
-    total = query.count()
     resultados = (
-        query
-        .order_by(ConsultaModel.fecha_consulta.desc())
-        .limit(limit).offset(skip)
+        db.query(ConsultaModel)
+        .options(joinedload(ConsultaModel.paciente))
+        .filter(
+            ConsultaModel.paciente_id.in_(db.query(multi_pacientes.c.paciente_id)),
+            *filters,
+        )
+        .order_by(ConsultaModel.paciente_id, ConsultaModel.fecha_consulta.desc())
+        .offset(skip)
+        .limit(limit)
         .all()
     )
 
     return ConsultaListResponse(
-        total=total,
+        total=total or 0,
         consultas=resultados
     )
 

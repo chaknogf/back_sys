@@ -89,6 +89,7 @@ class NacimientoTrabajoPartoItem(BaseModel):
 
 class PersonalHospitalItem(BaseModel):
     nombre: Optional[dict] = Field(None, description="Nombre del paciente (JSONB)")
+    nombre_completo: Optional[str] = None
     expediente: Optional[str] = Field(None, description="Expediente del paciente")
     tipo_consulta: int = Field(..., description="1=COEX, 2=Hospitalización, 3=Emergencia")
     tipo_consulta_nombre: str = Field(..., description="Nombre del tipo de consulta")
@@ -97,6 +98,8 @@ class PersonalHospitalItem(BaseModel):
     especialidad: str = Field(..., description="Especialidad médica")
     documento: Optional[str] = Field(None, description="Documento de la consulta")
     diagnostico: Optional[str] = Field(None, description="Diagnóstico de egreso")
+    fecha_consulta: Optional[date] = None
+    paciente_id: Optional[int] = None
 
 
 class PersonalHospitalResponse(BaseModel):
@@ -110,6 +113,7 @@ class PersonalHospitalResponse(BaseModel):
 
 class EstudiantePublicoItem(BaseModel):
     nombre: Optional[dict] = Field(None, description="Nombre del paciente (JSONB)")
+    nombre_completo: Optional[str] = None
     expediente: Optional[str] = Field(None, description="Expediente del paciente")
     tipo_consulta: int = Field(..., description="1=COEX, 2=Hospitalización, 3=Emergencia")
     tipo_consulta_nombre: str = Field(..., description="Nombre del tipo de consulta")
@@ -118,6 +122,8 @@ class EstudiantePublicoItem(BaseModel):
     especialidad: str = Field(..., description="Especialidad médica")
     documento: Optional[str] = Field(None, description="Documento de la consulta")
     diagnostico: Optional[str] = Field(None, description="Diagnóstico de egreso")
+    fecha_consulta: Optional[date] = None
+    paciente_id: Optional[int] = None
 
 
 class EstudiantePublicoResponse(BaseModel):

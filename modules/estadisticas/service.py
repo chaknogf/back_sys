@@ -174,6 +174,7 @@ def personal_hospital(db: Session, desde: str, hasta: str) -> dict:
     rows = db.execute(text("""
         SELECT
             p.nombre,
+            p.nombre_completo,
             p.expediente,
             c.tipo_consulta,
             p.sexo,
@@ -181,6 +182,7 @@ def personal_hospital(db: Session, desde: str, hasta: str) -> dict:
             c.fecha_consulta,
             c.especialidad,
             c.documento,
+            c.paciente_id,
             c.egreso#>>'{diagnosticos}' AS diagnostico
         FROM consultas c
         JOIN pacientes p ON p.id = c.paciente_id
@@ -201,6 +203,7 @@ def personal_hospital(db: Session, desde: str, hasta: str) -> dict:
             edad = (m["fecha_consulta"] - m["fecha_nacimiento"]).days // 365
         datos.append({
             "nombre": m["nombre"] if m["nombre"] else None,
+            "nombre_completo": m["nombre_completo"], 
             "expediente": str(m["expediente"]) if m["expediente"] else None,
             "tipo_consulta": tc,
             "tipo_consulta_nombre": TIPO_CONSULTA_MAP.get(tc, f"Tipo {tc}"),
@@ -209,6 +212,8 @@ def personal_hospital(db: Session, desde: str, hasta: str) -> dict:
             "especialidad": str(m["especialidad"]),
             "documento": str(m["documento"]) if m["documento"] else None,
             "diagnostico": str(m["diagnostico"]) if m["diagnostico"] else None,
+            "paciente_id": str(m["paciente_id"]),
+            "fecha_consulta": str(m["fecha_consulta"])
         })
 
     return {
@@ -227,6 +232,7 @@ def estudiante_publico(db: Session, desde: str, hasta: str) -> dict:
     rows = db.execute(text("""
         SELECT
             p.nombre,
+            p.nombre_completo,
             p.expediente,
             c.tipo_consulta,
             p.sexo,
@@ -234,6 +240,8 @@ def estudiante_publico(db: Session, desde: str, hasta: str) -> dict:
             c.fecha_consulta,
             c.especialidad,
             c.documento,
+            c.fecha_consulta,
+            c.paciente_id,
             c.egreso#>>'{diagnosticos}' AS diagnostico
         FROM consultas c
         JOIN pacientes p ON p.id = c.paciente_id
@@ -254,6 +262,7 @@ def estudiante_publico(db: Session, desde: str, hasta: str) -> dict:
             edad = (m["fecha_consulta"] - m["fecha_nacimiento"]).days // 365
         datos.append({
             "nombre": m["nombre"] if m["nombre"] else None,
+            "nombre_completo": m["nombre_completo"],
             "expediente": str(m["expediente"]) if m["expediente"] else None,
             "tipo_consulta": tc,
             "tipo_consulta_nombre": TIPO_CONSULTA_MAP.get(tc, f"Tipo {tc}"),
@@ -262,6 +271,8 @@ def estudiante_publico(db: Session, desde: str, hasta: str) -> dict:
             "especialidad": str(m["especialidad"]),
             "documento": str(m["documento"]) if m["documento"] else None,
             "diagnostico": str(m["diagnostico"]) if m["diagnostico"] else None,
+            "fecha_consulta": str(m["fecha_consulta"]),
+            "paciente_id": str(m["paciente_id"])
         })
 
     return {

@@ -263,24 +263,55 @@ class PacientesResumen(BaseModel):
     fecha_nacimiento: Optional[date] = None
     estado: Optional[str] = None
     defuncion: Optional[str] = None
+    personal_hospital: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
     def extraer_defuncion_nombre(cls, data):
-        if isinstance(data, dict):
-            if "datos_extra" in data and data["datos_extra"]:
-                data["defuncion"] = data["datos_extra"].get("defuncion")
-            if not data.get("nombre_completo") and data.get("nombre"):
-                nombre_obj = data["nombre"]
-                if isinstance(nombre_obj, dict):
-                    try:
-                        nombre_instance = Nombre(**nombre_obj)
-                        data["nombre_completo"] = nombre_instance.completo
-                    except Exception:
-                        pass
-                elif hasattr(nombre_obj, "completo"):
-                    data["nombre_completo"] = nombre_obj.completo
+        if not isinstance(data, dict):
+            if hasattr(data, "datos_extra"):
+                d = {f: getattr(data, f, None) for f in cls.model_fields}
+                extras = data.datos_extra
+                if extras:
+                    d["defuncion"] = extras.get("defuncion")
+                    ph = extras.get("socioeconomicos", {}).get("personal_hospital")
+                    if ph is True or ph == "S":
+                        d["personal_hospital"] = "S"
+                    elif ph is False or ph == "N":
+                        d["personal_hospital"] = "N"
+                    else:
+                        d["personal_hospital"] = None
+                nombre_obj = data.nombre
+                if not d.get("nombre_completo") and nombre_obj:
+                    if isinstance(nombre_obj, dict):
+                        try:
+                            d["nombre_completo"] = Nombre(**nombre_obj).completo
+                        except Exception:
+                            pass
+                    elif hasattr(nombre_obj, "completo"):
+                        d["nombre_completo"] = nombre_obj.completo
+                return d
             return data
+        if "datos_extra" in data and data["datos_extra"]:
+            extras = data["datos_extra"]
+            data["defuncion"] = extras.get("defuncion")
+            ph = extras.get("socioeconomicos", {}).get("personal_hospital")
+            if ph is True or ph == "S":
+                data["personal_hospital"] = "S"
+            elif ph is False or ph == "N":
+                data["personal_hospital"] = "N"
+            else:
+                data["personal_hospital"] = None
+        if not data.get("nombre_completo") and data.get("nombre"):
+            nombre_obj = data["nombre"]
+            if isinstance(nombre_obj, dict):
+                try:
+                    nombre_instance = Nombre(**nombre_obj)
+                    data["nombre_completo"] = nombre_instance.completo
+                except Exception:
+                    pass
+            elif hasattr(nombre_obj, "completo"):
+                data["nombre_completo"] = nombre_obj.completo
         return data
 
     model_config = ConfigDict(

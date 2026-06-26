@@ -127,7 +127,29 @@ def obtener_constanciaNac(
         raise HTTPException(status_code=404, detail="No encontrado")
 
     return data
-    
+
+
+@router.get("/paciente/{paciente_id}", response_model=ConstanciaNacimientoResponse)
+def obtener_constancia_por_paciente(
+    paciente_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    constancia = (
+        db.query(ConstanciaNacimientoModel)
+        .options(
+            joinedload(ConstanciaNacimientoModel.paciente),
+            joinedload(ConstanciaNacimientoModel.madre),
+            joinedload(ConstanciaNacimientoModel.medico),
+        )
+        .filter(ConstanciaNacimientoModel.paciente_id == paciente_id)
+        .order_by(desc(ConstanciaNacimientoModel.id))
+        .first()
+    )
+    if not constancia:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    return constancia
+
 
 @router.put("/{constancia_id}", response_model=ConstanciaNacimientoResponse)
 def actualizar_constancia(

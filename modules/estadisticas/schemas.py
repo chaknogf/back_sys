@@ -151,12 +151,20 @@ class ReingresoItem(BaseModel):
     clasificacion: Optional[str] = Field(None, description="Clasificación: menores a 8 dias / por complicaciones")
 
 
+class ReingresoEspecialidadItem(BaseModel):
+    especialidad: str = Field(..., description="Especialidad médica")
+    menores_a_8_dias: int = Field(0, ge=0, description="Reingresos <8 días")
+    por_complicaciones: int = Field(0, ge=0, description="Reingresos por complicaciones")
+    total: int = Field(..., ge=0, description="Total de reingresos en la especialidad")
+
+
 class ReingresoResponse(BaseModel):
     titulo: str = "Reingresos Hospitalarios"
     desde: date
     hasta: date
     datos: List[ReingresoItem]
     resumen: dict = Field(..., description="Conteo por clasificación: menores a 8 dias, por complicaciones")
+    por_especialidad: List[ReingresoEspecialidadItem] = Field(..., description="Reingresos agrupados por especialidad y clasificación")
     total_general: int = Field(..., ge=0)
     generado_en: str
 

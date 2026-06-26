@@ -195,24 +195,20 @@ def reingresos_consulta_tipo3(
     )
 
 
-def consultas_activas_mayores_30_dias(
+def consultas_activas_admision_mayores_7_dias(
     db: Session,
     skip: int = 0,
     limit: int = 50,
 ):
-    corte = date.today() - timedelta(days=30)
+    corte = date.today() - timedelta(days=7)
     query = (
         db.query(ConsultaModel)
         .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
         .options(joinedload(ConsultaModel.paciente))
         .filter(
-            ConsultaModel.tipo_consulta == 2,
             ConsultaModel.activo.is_(True),
-            or_(
-                ConsultaModel.ultimo_estado.is_(None),
-                ConsultaModel.ultimo_estado != "archivo"
-            ),
-            ConsultaModel.fecha_consulta <= corte
+            ConsultaModel.ultimo_estado == "admision",
+            ConsultaModel.fecha_consulta < corte
         )
     )
 
@@ -223,6 +219,10 @@ def consultas_activas_mayores_30_dias(
         .limit(limit).offset(skip)
         .all()
     )
+
+    hoy = date.today()
+    for r in resultados:
+        r.dias_acumulados = (hoy - r.fecha_consulta).days
 
     return ConsultaListResponse(
         total=total,

@@ -248,6 +248,7 @@ class ConsultasModel(BaseModel):
     activo: bool = True
     egreso: Optional[Dict[str, Any]] = None
     paciente: Optional[PacientesNombre] = None
+    dias_acumulados: Optional[int] = None
     
     model_config = ConfigDict(from_attributes=True)
 

@@ -5,7 +5,7 @@ from core.security import get_current_user
 from modules.users.models import UserModel
 from modules.consultas.schemas import ConsultaListResponse
 from modules.consultas.service import (
-    consultas_activas_mayores_30_dias as svc_activas_mayores_30_dias,
+    consultas_activas_admision_mayores_7_dias as svc_activas_admision_mayores_7_dias,
     reingresos_consulta_tipo3 as svc_reingresos_tipo3,
 )
 
@@ -101,14 +101,14 @@ def reingresos_tipo3(
     return svc_reingresos_tipo3(db, skip=skip, limit=limit)
 
 
-@router.get("/consultas/activos-mayores-a-30-dias", response_model=ConsultaListResponse)
-def activos_mayores_a_30_dias(
+@router.get("/consultas/mayores-a-7-dias", response_model=ConsultaListResponse)
+def consultas_mayores_7_dias(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return svc_activas_mayores_30_dias(db, skip=skip, limit=limit)
+    return svc_activas_admision_mayores_7_dias(db, skip=skip, limit=limit)
 
 
 @router.get("/nacimientos", response_model=NacimientosStatsResponse)

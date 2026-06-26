@@ -383,10 +383,29 @@ def reingresos(db: Session, desde: str, hasta: str) -> dict:
         })
 
     resumen = {"menores a 8 dias": 0, "por complicaciones": 0}
+    por_esp: dict[str, dict] = {}
     for d in datos:
         c = d["clasificacion"]
         if c in resumen:
             resumen[c] += 1
+        esp = d["especialidad"]
+        if esp not in por_esp:
+            por_esp[esp] = {"menores a 8 dias": 0, "por complicaciones": 0}
+        if c in por_esp[esp]:
+            por_esp[esp][c] += 1
+
+    por_especialidad = sorted(
+        [
+            {
+                "especialidad": esp,
+                "menores_a_8_dias": v["menores a 8 dias"],
+                "por_complicaciones": v["por complicaciones"],
+                "total": v["menores a 8 dias"] + v["por complicaciones"],
+            }
+            for esp, v in por_esp.items()
+        ],
+        key=lambda x: x["especialidad"],
+    )
 
     return {
         "titulo": "Reingresos Hospitalarios",
@@ -394,6 +413,7 @@ def reingresos(db: Session, desde: str, hasta: str) -> dict:
         "hasta": f_hasta,
         "datos": datos,
         "resumen": resumen,
+        "por_especialidad": por_especialidad,
         "total_general": len(datos),
         "generado_en": datetime.now().isoformat(),
     }

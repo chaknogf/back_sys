@@ -104,7 +104,7 @@ All routes under root path `/fah` (e.g., `https://host/fah/auth/login`).
 | Births | `/nacimientos` | `GET/POST`, `GET/PATCH/DELETE /{id}`, `/desde-paciente/{id}`, `/sincronizar` (unifica madre-hijo + legacy), `/referenciar-legacy` (cruza con `nacimientos_legacy`). **Sin datos redundantes:** expediente, sexo, fecha_nac, neonatales se obtienen vía JOIN con `pacientes`. Columnas computadas: `peso_gramos`, `clasificacion_nacimiento` (EBP/MBP/BP/PN), `trabajo_parto` (Prematuro/a Termino/Prolongado) |
 | Countries | `/paises` | `GET /`, `GET /select` |
 | RENAP | `/renap` | `GET /persona` |
-| Statistics | `/estadisticas` | `/consultas/pacientesAtendidos`, `/consultas/hospitalizacion-infantil`, `/consultas/promedioDiario`, `/consultas/personal-hospital`, `/consultas/estudiante-publico`, `/consultas/reingresos`, `/consultas/reingresos-tipo3`, `/consultas/activos-mayores-a-30-dias`, `/nacimientos` |
+| Statistics | `/estadisticas` | `/consultas/pacientesAtendidos`, `/consultas/hospitalizacion-infantil`, `/consultas/promedioDiario`, `/consultas/personal-hospital`, `/consultas/estudiante-publico`, `/consultas/reingresos`, `/consultas/reingresos-tipo3`, `/consultas/mayores-a-7-dias`, `/nacimientos` |
 | SIGSA-3 | `/sigsa3` | `GET/POST`, `GET/PUT/DELETE /{id}`, filtros: personal_salud, fecha, nombre, sexo, tipo_consulta, especialidad, cie10, q |
 | Totales | `/totales` | `GET /` (KPIs dashboard, 7 indicadores, opcional `fecha`) |
 | Audit | `/audit-log` | `GET /` |
@@ -218,7 +218,7 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Estadisticas | GET | `/estadisticas/consultas/estudiante-publico` | auth | `EstudiantePublicoResponse` | Consultas de estudiantes públicos (filtro `datos_extra.socioeconomicos.estudiante_publico=S`, req: `desde`, `hasta`) |
 | Estadisticas | GET | `/estadisticas/consultas/reingresos` | auth | `ReingresoResponse` | Reingresos hospitalarios clasificados (<8d / complicaciones). req: `desde`, `hasta` |
 | Estadisticas | GET | `/estadisticas/consultas/reingresos-tipo3` | auth | `ConsultaListResponse` | Reingresos tipo 3 paginados (filtros: `skip`, `limit`) |
-| Estadisticas | GET | `/estadisticas/consultas/activos-mayores-a-30-dias` | auth | `ConsultaListResponse` | Consultas activas >30 días (filtros: `skip`, `limit`) |
+| Estadisticas | GET | `/estadisticas/consultas/mayores-a-7-dias` | auth | `ConsultaListResponse` | Consultas activas con >7 días desde fecha_consulta, incluye `dias_acumulados` (filtros: `skip`, `limit`) |
 | Estadisticas | GET | `/estadisticas/nacimientos` | auth | `NacimientosStatsResponse` | Estadísticas de nacimientos por sexo/estado, clase de parto, clasificación y trabajo de parto (req: `desde`, `hasta`) |
 | Totales | GET | `/totales/` | auth | `TotalesResponse` | KPIs dashboard (7 indicadores: pacientes totales/activos, consultas totales/día, COEX/hosp/emerg del día). Opcional: `fecha` |
 | Procedimientos | GET | `/procedimientos/estadisticas/resumen` | auth | dict | Estadísticas anuales/mensuales de procedimientos (req: `anio`, opc: `mes`). Retorna total registros, total cantidad, top 5 |
@@ -283,7 +283,7 @@ curl -H "$AUTH" "https://host/fah/estadisticas/consultas/reingresos?desde=2025-0
 curl -H "$AUTH" "https://host/fah/estadisticas/consultas/reingresos-tipo3?skip=0&limit=50"
 
 # Consultas activas con más de 30 días de antigüedad
-curl -H "$AUTH" "https://host/fah/estadisticas/consultas/activos-mayores-a-30-dias?skip=0&limit=50"
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/mayores-a-7-dias?skip=0&limit=50"
 ```
 
 ### Nacimientos

@@ -242,6 +242,22 @@ def registrar_consulta(datos: RegistroConsultaCreate, db: Session, current_user)
     if not paciente:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
 
+    ahora = datetime.now()
+    hace_3_horas = (ahora - timedelta(hours=3)).time()
+    duplicado = db.query(ConsultaModel).filter(
+        ConsultaModel.paciente_id == datos.paciente_id,
+        ConsultaModel.especialidad == datos.especialidad,
+        ConsultaModel.tipo_consulta == datos.tipo_consulta,
+        ConsultaModel.fecha_consulta == date.today(),
+        ConsultaModel.hora_consulta >= hace_3_horas,
+        ConsultaModel.activo == True,
+    ).first()
+    if duplicado:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ya existe una consulta registrada para este paciente en '{datos.especialidad}' (tipo {datos.tipo_consulta}) en las últimas 3 horas (ID {duplicado.id})"
+        )
+
     expediente_consulta: str | None = None
     documento_consulta: str | None = None
 

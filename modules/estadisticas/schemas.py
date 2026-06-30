@@ -60,29 +60,35 @@ class PromedioDiarioResponse(BaseModel):
     generado_en: str
 
 
-class NacimientoSexoEstadoItem(BaseModel):
+class NacimientoMortinatoItem(BaseModel):
     sexo: str = Field(..., description="Sexo del neonato (M/F)")
-    estado: str = Field(..., description="Estado (V=Vivo, F=Fallecido)")
+    estado: str = Field(..., description="Estado por mortinato (Vivo/Mortinato)")
+    total: int = Field(..., ge=0, description="Cantidad de nacimientos")
+
+
+class NacimientoSexoEstadoFallecidoItem(BaseModel):
+    sexo: str = Field(..., description="Sexo del neonato (M/F)")
+    estado: str = Field(..., description="Estado del paciente en el sistema (V/F)")
     total: int = Field(..., ge=0, description="Cantidad de nacimientos")
 
 
 class NacimientoClasePartoItem(BaseModel):
     clase_parto: Optional[str] = Field(None, description="Clase de parto (UNICO/GEMELAR/TRIPLE/MULTIPLE)")
-    estado: str = Field(..., description="Estado (V/F)")
+    estado: str = Field(..., description="Estado por mortinato (Vivo/Mortinato)")
     sexo: str = Field(..., description="Sexo del neonato (M/F)")
     total: int = Field(..., ge=0)
 
 
 class NacimientoClasificacionPartoItem(BaseModel):
     clasificacion_parto: Optional[str] = Field(None, description="Clasificación del nacimiento (EBP/MBP/BP/PN)")
-    estado: str = Field(..., description="Estado (V/F)")
+    estado: str = Field(..., description="Estado por mortinato (Vivo/Mortinato)")
     sexo: str = Field(..., description="Sexo del neonato (M/F)")
     total: int = Field(..., ge=0)
 
 
 class NacimientoTrabajoPartoItem(BaseModel):
     trabajo_parto: Optional[str] = Field(None, description="Trabajo de parto (Prematuro/a Termino/Prolongado)")
-    estado: str = Field(..., description="Estado (V/F)")
+    estado: str = Field(..., description="Estado por mortinato (Vivo/Mortinato)")
     sexo: str = Field(..., description="Sexo del neonato (M/F)")
     total: int = Field(..., ge=0)
 
@@ -174,7 +180,8 @@ class NacimientosStatsResponse(BaseModel):
     desde: date
     hasta: date
     total: int = Field(..., ge=0, description="Total de nacimientos en el período")
-    por_sexo_estado: List[NacimientoSexoEstadoItem]
+    por_mortinato: List[NacimientoMortinatoItem] = Field(..., description="Agrupación por sexo y mortinato (Vivo/Mortinato)")
+    por_fallecidos_posteriores: List[NacimientoSexoEstadoFallecidoItem] = Field(..., description="Agrupación por sexo y estado del paciente (post-natal)")
     por_clase_parto: List[NacimientoClasePartoItem]
     por_clasificacion_parto: List[NacimientoClasificacionPartoItem]
     por_trabajo_parto: List[NacimientoTrabajoPartoItem]

@@ -9,11 +9,12 @@ class NacimientoBase(BaseModel):
 
 
 class NacimientoCreate(NacimientoBase):
-    pass
+    mortinato: Optional[bool] = None
 
 
 class NacimientoUpdate(BaseModel):
     madre_id: Optional[int] = None
+    mortinato: Optional[bool] = None
 
 
 class NeonatalesInfo(BaseModel):
@@ -55,6 +56,7 @@ class NacimientoOut(NacimientoBase):
     registrador_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
+    mortinato: bool = False
     peso_gramos: Optional[float] = None
     clasificacion_nacimiento: Optional[str] = None
     trabajo_parto: Optional[str] = None

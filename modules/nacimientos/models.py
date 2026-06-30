@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, TIMESTAMP, text
+from sqlalchemy import Boolean, Column, Integer, String, Numeric, ForeignKey, TIMESTAMP, text
 from sqlalchemy.orm import relationship
 from core.database import Base
 
@@ -14,6 +14,7 @@ class NacimientoModel(Base):
         Integer, ForeignKey("pacientes.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
+    mortinato = Column(Boolean, default=False)
     peso_gramos = Column(Numeric)
     clasificacion_nacimiento = Column(String(50))
     trabajo_parto = Column(String(50))

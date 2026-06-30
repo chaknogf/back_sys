@@ -799,6 +799,58 @@ class TestMadreHijoCreaConstanciaYNacimiento:
         created_ids["nacimientos"].append(n["id"])
 
 
+    def test_nacimiento_mortinato_default_false(self, client, auth_headers):
+        if not created_ids["nacimientos"]:
+            pytest.skip("No nacimiento created")
+        nid = created_ids["nacimientos"][0]
+        r = client.get(f"/nacimientos/{nid}", headers=auth_headers)
+        assert r.status_code == 200
+        data = r.json()
+        assert data["mortinato"] == False
+
+    def test_nacimiento_update_mortinato_true(self, client, auth_headers):
+        if not created_ids["nacimientos"]:
+            pytest.skip("No nacimiento created")
+        nid = created_ids["nacimientos"][0]
+        r = client.patch(
+            f"/nacimientos/{nid}",
+            headers=auth_headers,
+            json={"mortinato": True},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["mortinato"] == True
+
+        # verify persist
+        r2 = client.get(f"/nacimientos/{nid}", headers=auth_headers)
+        assert r2.status_code == 200
+        assert r2.json()["mortinato"] == True
+
+    def test_nacimiento_update_mortinato_false(self, client, auth_headers):
+        if not created_ids["nacimientos"]:
+            pytest.skip("No nacimiento created")
+        nid = created_ids["nacimientos"][0]
+        r = client.patch(
+            f"/nacimientos/{nid}",
+            headers=auth_headers,
+            json={"mortinato": False},
+        )
+        assert r.status_code == 200
+        assert r.json()["mortinato"] == False
+
+    def test_nacimiento_list_returns_mortinato(self, client, auth_headers):
+        if not created_ids["nacimientos"]:
+            pytest.skip("No nacimiento created")
+        nid = created_ids["nacimientos"][0]
+        r = client.get("/nacimientos/", headers=auth_headers)
+        assert r.status_code == 200
+        data = r.json()
+        items = data.get("nacimientos") or []
+        match = [n for n in items if n["id"] == nid]
+        assert len(match) == 1
+        assert "mortinato" in match[0]
+
+
 # =====================================================================
 # NACIMIENTOS LEGACY
 # =====================================================================

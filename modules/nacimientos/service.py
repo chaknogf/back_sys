@@ -23,7 +23,7 @@ def _fetchall(db: Session, sql: str, params: dict | None = None) -> list[dict]:
 _NACIMIENTO_COLS = """
     n.id, n.paciente_id, n.madre_id, n.registrador_id,
     n.created_at, n.updated_at,
-    n.peso_gramos, n.clasificacion_nacimiento, n.trabajo_parto
+    n.mortinato, n.peso_gramos, n.clasificacion_nacimiento, n.trabajo_parto
 """
 
 _PACIENTE_JOIN = """
@@ -112,6 +112,14 @@ def _row_to_out(row: dict) -> dict:
             "estado": row.get("paciente_estado"),
         }
 
+    mortinato = row.get("mortinato")
+    if mortinato is None:
+        mortinato = False
+    elif isinstance(mortinato, bool):
+        pass
+    else:
+        mortinato = str(mortinato).lower() in ("true", "1", "yes")
+
     return {
         "id": row["id"],
         "paciente_id": row.get("paciente_id"),
@@ -119,6 +127,7 @@ def _row_to_out(row: dict) -> dict:
         "registrador_id": row.get("registrador_id"),
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
+        "mortinato": mortinato,
         "peso_gramos": peso_gramos,
         "clasificacion_nacimiento": clasificacion_nacimiento,
         "trabajo_parto": trabajo_parto,
@@ -220,11 +229,13 @@ def _recomputar_desde_origen(db: Session, nacimiento: NacimientoModel) -> bool:
 
 
 def _insert_nacimiento(db: Session, paciente_id: int, madre_id: int | None,
-                       registrador_id: int | None, computado: dict) -> NacimientoModel:
+                       registrador_id: int | None, computado: dict,
+                       mortinato: bool = False) -> NacimientoModel:
     nacimiento = NacimientoModel(
         paciente_id=paciente_id,
         madre_id=madre_id,
         registrador_id=registrador_id,
+        mortinato=mortinato,
         peso_gramos=computado["peso_gramos"],
         clasificacion_nacimiento=computado["clasificacion_nacimiento"],
         trabajo_parto=computado["trabajo_parto"],
@@ -265,7 +276,10 @@ def crear_nacimiento_desde_paciente(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ya existe un registro de nacimiento para este paciente")
 
     computado = _computar(neonatales)
-    nacimiento = _insert_nacimiento(db, paciente_id, madre_id, registrador_id, computado)
+    mortinato = neonatales.get("mortinato", False)
+    if isinstance(mortinato, str):
+        mortinato = mortinato.lower() in ("true", "1", "yes")
+    nacimiento = _insert_nacimiento(db, paciente_id, madre_id, registrador_id, computado, mortinato=mortinato)
 
     return _row_to_out(_fetchone(db, f"""
         SELECT {_NACIMIENTO_COLS}, {_PACIENTE_SELECT}, {_NEONATALES_SELECT}, {_MADRE_SELECT}
@@ -303,10 +317,16 @@ def crear_nacimiento(data: NacimientoCreate, db: Session) -> dict:
     madre_id = data.madre_id or origen.get("paciente_id")
 
     computado = _computar(neonatales)
+    mortinato = data.mortinato
+    if mortinato is None:
+        mortinato = neonatales.get("mortinato", False)
+        if isinstance(mortinato, str):
+            mortinato = mortinato.lower() in ("true", "1", "yes")
     nacimiento = NacimientoModel(
         paciente_id=data.paciente_id,
         madre_id=madre_id,
         registrador_id=None,
+        mortinato=mortinato,
         peso_gramos=computado["peso_gramos"],
         clasificacion_nacimiento=computado["clasificacion_nacimiento"],
         trabajo_parto=computado["trabajo_parto"],
@@ -420,10 +440,18 @@ def actualizar_nacimiento(
     if not nacimiento:
         raise HTTPException(status_code=404, detail="Registro de nacimiento no encontrado")
 
+    cambios = False
     if data.madre_id is not None:
         nacimiento.madre_id = data.madre_id
+        cambios = True
+    if data.mortinato is not None:
+        nacimiento.mortinato = data.mortinato
+        cambios = True
 
-    _recomputar_desde_origen(db, nacimiento)
+    recomputado = _recomputar_desde_origen(db, nacimiento)
+    if cambios and not recomputado:
+        db.commit()
+        db.refresh(nacimiento)
 
     return obtener_nacimiento(nacimiento_id, db)
 
@@ -764,12 +792,13 @@ def importar_desde_legacy(
 
             db.execute(text("""
                 INSERT INTO nacimientos
-                    (paciente_id, madre_id, registrador_id, peso_gramos, clasificacion_nacimiento, trabajo_parto)
+                    (paciente_id, madre_id, registrador_id, mortinato, peso_gramos, clasificacion_nacimiento, trabajo_parto)
                 VALUES
-                    (:pid, :mid, NULL, :pg, :clasif, :tp)
+                    (:pid, :mid, NULL, :mortinato, :pg, :clasif, :tp)
             """), {
                 "pid": hijo["id"] if hijo else None,
                 "mid": madre_id,
+                "mortinato": False,
                 "pg": computado["peso_gramos"],
                 "clasif": computado["clasificacion_nacimiento"],
                 "tp": computado["trabajo_parto"],

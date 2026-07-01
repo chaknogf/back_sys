@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
@@ -12,6 +13,8 @@ from .service import (
     crear_registro as service_crear,
     actualizar_registro as service_actualizar,
     eliminar_registro as service_eliminar,
+    generar_plantilla_csv,
+    importar_csv,
 )
 
 router = APIRouter(
@@ -48,6 +51,27 @@ def listar(
         q=q,
         limit=limit,
     )
+
+
+@router.get("/plantilla-csv", tags=["SIGSA-3"])
+def descargar_plantilla(
+    current_user: UserModel = Depends(get_current_user),
+):
+    buf = generar_plantilla_csv()
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="plantilla_sigsa3.csv"'},
+    )
+
+
+@router.post("/importar-csv", tags=["SIGSA-3"])
+async def importar(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return await importar_csv(file, db)
 
 
 @router.get("/{registro_id}", response_model=Sigsa3Out)

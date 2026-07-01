@@ -503,7 +503,22 @@ def obtener_estadisticas(
         .limit(5)
         .all()
     )
-    
+
+    usg_gine_query = (
+        db.query(
+            func.count(ProceMedicoModel.id).label('total_registros'),
+            func.coalesce(func.sum(ProceMedicoModel.cantidad), 0).label('total_cantidad')
+        )
+        .join(ProcedimientoModel, ProcedimientoModel.id == ProceMedicoModel.id_procedimiento)
+        .filter(
+            ProceMedicoModel.fecha >= fecha_inicio,
+            ProceMedicoModel.fecha <= fecha_fin,
+            ProceMedicoModel.especialidad == 'GINE',
+            ProcedimientoModel.nombre.ilike('%ultrasonido%')
+        )
+        .first()
+    )
+
     return {
         "anio": anio,
         "mes": mes,
@@ -513,5 +528,9 @@ def obtener_estadisticas(
         "total_cantidad_procedimientos": total_cantidad,
         "top_procedimientos": [
             {"nombre": p.nombre, "total": p.total} for p in top_procedimientos
-        ]
+        ],
+        "usg_gine": {
+            "total_registros": usg_gine_query.total_registros if usg_gine_query else 0,
+            "total_cantidad": int(usg_gine_query.total_cantidad) if usg_gine_query else 0
+        }
     }

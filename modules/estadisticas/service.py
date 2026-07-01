@@ -433,13 +433,24 @@ def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
         WHERE p.fecha_nacimiento BETWEEN :desde AND :hasta
     """), {"desde": f_desde, "hasta": f_hasta}).scalar()
 
-    rows_sexo_estado = db.execute(text("""
+    rows_mortinato = db.execute(text("""
+        SELECT p.sexo, n.mortinato, COUNT(*) AS total
+        FROM nacimientos n
+        JOIN pacientes p ON p.id = n.paciente_id
+        WHERE p.fecha_nacimiento BETWEEN :desde AND :hasta
+          AND p.sexo IN ('M', 'F')
+        GROUP BY p.sexo, n.mortinato
+        ORDER BY p.sexo, n.mortinato
+    """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
+
+    rows_fallecidos_posteriores = db.execute(text("""
         SELECT p.sexo, p.estado, COUNT(*) AS total
         FROM nacimientos n
         JOIN pacientes p ON p.id = n.paciente_id
         WHERE p.fecha_nacimiento BETWEEN :desde AND :hasta
           AND p.sexo IN ('M', 'F')
           AND p.estado IN ('V', 'F')
+          AND (n.mortinato = false OR n.mortinato IS NULL)
         GROUP BY p.sexo, p.estado
         ORDER BY p.sexo, p.estado
     """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
@@ -447,49 +458,60 @@ def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
     rows_clase_parto = db.execute(text("""
         SELECT
             p.datos_extra#>'{neonatales,clase_parto}' AS clase_parto,
-            p.estado,
+            n.mortinato,
             p.sexo,
             COUNT(*) AS total
         FROM nacimientos n
         JOIN pacientes p ON p.id = n.paciente_id
         WHERE p.fecha_nacimiento BETWEEN :desde AND :hasta
           AND p.sexo IN ('M', 'F')
-          AND p.estado IN ('V', 'F')
-        GROUP BY p.datos_extra#>'{neonatales,clase_parto}', p.estado, p.sexo
-        ORDER BY clase_parto, p.estado, p.sexo
+        GROUP BY p.datos_extra#>'{neonatales,clase_parto}', n.mortinato, p.sexo
+        ORDER BY clase_parto, n.mortinato, p.sexo
     """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
 
     rows_clasificacion_parto = db.execute(text("""
         SELECT
             n.clasificacion_nacimiento AS clasificacion_parto,
-            p.estado,
+            n.mortinato,
             p.sexo,
             COUNT(*) AS total
         FROM nacimientos n
         JOIN pacientes p ON p.id = n.paciente_id
         WHERE p.fecha_nacimiento BETWEEN :desde AND :hasta
           AND p.sexo IN ('M', 'F')
-          AND p.estado IN ('V', 'F')
-        GROUP BY n.clasificacion_nacimiento, p.estado, p.sexo
-        ORDER BY clasificacion_parto, p.estado, p.sexo
+        GROUP BY n.clasificacion_nacimiento, n.mortinato, p.sexo
+        ORDER BY clasificacion_parto, n.mortinato, p.sexo
     """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
 
     rows_trabajo_parto = db.execute(text("""
         SELECT
             n.trabajo_parto,
-            p.estado,
+            n.mortinato,
             p.sexo,
             COUNT(*) AS total
         FROM nacimientos n
         JOIN pacientes p ON p.id = n.paciente_id
         WHERE p.fecha_nacimiento BETWEEN :desde AND :hasta
           AND p.sexo IN ('M', 'F')
-          AND p.estado IN ('V', 'F')
-        GROUP BY n.trabajo_parto, p.estado, p.sexo
-        ORDER BY n.trabajo_parto, p.estado, p.sexo
+        GROUP BY n.trabajo_parto, n.mortinato, p.sexo
+        ORDER BY n.trabajo_parto, n.mortinato, p.sexo
     """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
 
-    def _build(items, key) -> list[dict]:
+    def _build_mortinato(items, key) -> list[dict]:
+        result = []
+        for r in items:
+            m = r._mapping
+            mort_val = m["mortinato"]
+            if isinstance(mort_val, bool):
+                label = "Mortinato" if mort_val else "Vivo"
+            else:
+                label = "Vivo" if str(mort_val).lower() in ("false", "0", "none") else "Mortinato"
+            item = {"estado": label, "sexo": str(m["sexo"]), "total": int(m["total"])}
+            item[key] = str(m[key]) if m.get(key) is not None else None
+            result.append(item)
+        return result
+
+    def _build_estado(items, key) -> list[dict]:
         result = []
         for r in items:
             m = r._mapping
@@ -498,14 +520,30 @@ def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
             result.append(item)
         return result
 
+    por_mortinato = []
+    for r in rows_mortinato:
+        m = r._mapping
+        mort_val = m["mortinato"]
+        if isinstance(mort_val, bool):
+            label = "Mortinato" if mort_val else "Vivo"
+        else:
+            label = "Vivo" if str(mort_val).lower() in ("false", "0", "none") else "Mortinato"
+        por_mortinato.append({
+            "sexo": str(m["sexo"]),
+            "estado": label,
+            "total": int(m["total"]),
+            "mortinato": mort_val,
+        })
+
     return {
         "titulo": "Estadísticas de Nacimientos",
         "desde": f_desde,
         "hasta": f_hasta,
         "total": int(total),
-        "por_sexo_estado": _build(rows_sexo_estado, "sexo"),
-        "por_clase_parto": _build(rows_clase_parto, "clase_parto"),
-        "por_clasificacion_parto": _build(rows_clasificacion_parto, "clasificacion_parto"),
-        "por_trabajo_parto": _build(rows_trabajo_parto, "trabajo_parto"),
+        "por_mortinato": por_mortinato,
+        "por_fallecidos_posteriores": _build_estado(rows_fallecidos_posteriores, "sexo"),
+        "por_clase_parto": _build_mortinato(rows_clase_parto, "clase_parto"),
+        "por_clasificacion_parto": _build_mortinato(rows_clasificacion_parto, "clasificacion_parto"),
+        "por_trabajo_parto": _build_mortinato(rows_trabajo_parto, "trabajo_parto"),
         "generado_en": datetime.now().isoformat(),
     }

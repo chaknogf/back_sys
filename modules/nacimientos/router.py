@@ -14,6 +14,7 @@ from .service import (
     eliminar_nacimiento as service_eliminar,
     sincronizar_nacimientos as service_sincronizar,
     referenciar_legacy as service_referenciar_legacy,
+    recomputar_todos as service_recomputar,
 )
 
 router = APIRouter(
@@ -60,6 +61,32 @@ def listar_nacimientos(
     return NacimientoListResponse(total=total, nacimientos=nacimientos)
 
 
+@router.post("/sincronizar")
+def sincronizar(
+    db: Session = Depends(get_db),
+):
+    resultado = service_sincronizar(db, registrador_id=None)
+    return resultado
+
+
+@router.get("/referenciar-legacy", response_model=LegacyReferenceResponse)
+def referenciar_legacy(
+    limit: int = Query(500, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
+    solo_sin_match: bool = Query(False, description="Solo registros legacy sin match en pacientes"),
+    db: Session = Depends(get_db),
+):
+    return service_referenciar_legacy(
+        db=db, limit=limit, offset=offset, solo_sin_match=solo_sin_match
+    )
+
+
+@router.post("/recomputar")
+def recomputar(db: Session = Depends(get_db)):
+    """Recomputa peso_gramos, clasificacion_nacimiento y trabajo_parto para todos los nacimientos."""
+    return service_recomputar(db)
+
+
 @router.get("/{nacimiento_id}", response_model=NacimientoOut)
 def obtener_nacimiento(
     nacimiento_id: int,
@@ -83,23 +110,3 @@ def eliminar_nacimiento(
     db: Session = Depends(get_db),
 ):
     return service_eliminar(nacimiento_id, db)
-
-
-@router.post("/sincronizar")
-def sincronizar(
-    db: Session = Depends(get_db),
-):
-    resultado = service_sincronizar(db, registrador_id=None)
-    return resultado
-
-
-@router.get("/referenciar-legacy", response_model=LegacyReferenceResponse)
-def referenciar_legacy(
-    limit: int = Query(500, ge=1, le=5000),
-    offset: int = Query(0, ge=0),
-    solo_sin_match: bool = Query(False, description="Solo registros legacy sin match en pacientes"),
-    db: Session = Depends(get_db),
-):
-    return service_referenciar_legacy(
-        db=db, limit=limit, offset=offset, solo_sin_match=solo_sin_match
-    )

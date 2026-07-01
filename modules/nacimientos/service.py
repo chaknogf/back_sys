@@ -128,10 +128,10 @@ def _row_to_out(row: dict) -> dict:
     }
 
 
-def peso_lb_onz_a_gramos(peso: str | None) -> Decimal | None:
+def peso_lb_onz_a_gramos(peso: str | float | int | None) -> Decimal | None:
     if not peso:
         return None
-    peso_clean = peso.strip().upper()
+    peso_clean = str(peso).strip().upper()
     lb = Decimal(0)
     onz = Decimal(0)
 
@@ -189,6 +189,11 @@ def _computar(neonatales: dict) -> dict:
 
 
 def _recomputar_desde_origen(db: Session, nacimiento: NacimientoModel) -> bool:
+    """Recomputa valores desde datos_extra.neonatales del paciente.
+    
+    Solo sobrescribe si el valor computado NO es None.
+    Si el valor computado es None (dato fuente faltante), preserva el valor almacenado.
+    """
     if not nacimiento.paciente_id:
         return False
     row = _fetchone(db, """
@@ -202,17 +207,28 @@ def _recomputar_desde_origen(db: Session, nacimiento: NacimientoModel) -> bool:
     neonatales = de.get("neonatales") or {}
     if not neonatales:
         return False
+    
+    tiene_peso = neonatales.get("peso_nacimiento")
+    tiene_eg = neonatales.get("edad_gestacional")
+    
+    if not tiene_peso and not tiene_eg:
+        return False
+    
     computado = _computar(neonatales)
     cambios = False
-    if computado["peso_gramos"] != nacimiento.peso_gramos:
+    
+    if tiene_peso and computado["peso_gramos"] is not None and computado["peso_gramos"] != nacimiento.peso_gramos:
         nacimiento.peso_gramos = computado["peso_gramos"]
         cambios = True
-    if computado["clasificacion_nacimiento"] != nacimiento.clasificacion_nacimiento:
+    
+    if tiene_peso and computado["clasificacion_nacimiento"] is not None and computado["clasificacion_nacimiento"] != nacimiento.clasificacion_nacimiento:
         nacimiento.clasificacion_nacimiento = computado["clasificacion_nacimiento"]
         cambios = True
-    if computado["trabajo_parto"] != nacimiento.trabajo_parto:
+    
+    if tiene_eg and computado["trabajo_parto"] is not None and computado["trabajo_parto"] != nacimiento.trabajo_parto:
         nacimiento.trabajo_parto = computado["trabajo_parto"]
         cambios = True
+    
     if cambios:
         db.commit()
         db.refresh(nacimiento)
@@ -426,6 +442,98 @@ def actualizar_nacimiento(
     _recomputar_desde_origen(db, nacimiento)
 
     return obtener_nacimiento(nacimiento_id, db)
+
+
+def recomputar_todos(db: Session) -> dict:
+    """Recomputa peso_gramos, clasificacion_nacimiento y trabajo_parto para todos los nacimientos
+    usando los datos de pacientes.datos_extra.neonatales.
+    
+    Solo actualiza si el paciente tiene datos neonatales con edad_gestacional o peso_nacimiento.
+    No sobrescribe valores existentes con null.
+    """
+    rows = _fetchall(db, """
+        SELECT n.id, n.paciente_id, n.peso_gramos, n.clasificacion_nacimiento, n.trabajo_parto
+        FROM nacimientos n
+        ORDER BY n.id
+    """)
+
+    actualizados = 0
+    sin_datos = 0
+    sin_cambios = 0
+    detalles = []
+
+    for row in rows:
+        nac_id = row["id"]
+        paciente_id = row["paciente_id"]
+        if not paciente_id:
+            sin_datos += 1
+            continue
+
+        pac = _fetchone(db, "SELECT datos_extra FROM pacientes WHERE id = :id", {"id": paciente_id})
+        if not pac:
+            sin_datos += 1
+            continue
+
+        de = pac.get("datos_extra") or {}
+        if isinstance(de, str):
+            de = json.loads(de)
+        neonatales = de.get("neonatales") or {}
+        
+        if not neonatales:
+            sin_datos += 1
+            continue
+
+        tiene_peso = neonatales.get("peso_nacimiento")
+        tiene_eg = neonatales.get("edad_gestacional")
+        
+        if not tiene_peso and not tiene_eg:
+            sin_datos += 1
+            continue
+
+        computado = _computar(neonatales)
+        cambios = False
+        detal = {"id": nac_id, "paciente_id": paciente_id, "cambios": {}}
+
+        if tiene_peso and computado["peso_gramos"] is not None and computado["peso_gramos"] != row["peso_gramos"]:
+            detal["cambios"]["peso_gramos"] = {"de": row["peso_gramos"], "a": float(computado["peso_gramos"])}
+            cambios = True
+
+        if tiene_peso and computado["clasificacion_nacimiento"] is not None and computado["clasificacion_nacimiento"] != row["clasificacion_nacimiento"]:
+            detal["cambios"]["clasificacion_nacimiento"] = {"de": row["clasificacion_nacimiento"], "a": computado["clasificacion_nacimiento"]}
+            cambios = True
+
+        if tiene_eg and computado["trabajo_parto"] is not None and computado["trabajo_parto"] != row["trabajo_parto"]:
+            detal["cambios"]["trabajo_parto"] = {"de": row["trabajo_parto"], "a": computado["trabajo_parto"]}
+            cambios = True
+
+        if cambios:
+            pg = computado["peso_gramos"] if tiene_peso and computado["peso_gramos"] is not None else row["peso_gramos"]
+            clasif = computado["clasificacion_nacimiento"] if tiene_peso and computado["clasificacion_nacimiento"] is not None else row["clasificacion_nacimiento"]
+            tp = computado["trabajo_parto"] if tiene_eg and computado["trabajo_parto"] is not None else row["trabajo_parto"]
+            
+            db.execute(text("""
+                UPDATE nacimientos
+                SET peso_gramos = :pg, clasificacion_nacimiento = :clasif, trabajo_parto = :tp, updated_at = NOW()
+                WHERE id = :id
+            """), {
+                "id": nac_id,
+                "pg": pg,
+                "clasif": clasif,
+                "tp": tp,
+            })
+            actualizados += 1
+            detalles.append(detal)
+        else:
+            sin_cambios += 1
+
+    db.commit()
+    return {
+        "total_analizados": len(rows),
+        "actualizados": actualizados,
+        "sin_cambios": sin_cambios,
+        "sin_datos_neonatales": sin_datos,
+        "detalles": detalles,
+    }
 
 
 def eliminar_nacimiento(nacimiento_id: int, db: Session) -> None:

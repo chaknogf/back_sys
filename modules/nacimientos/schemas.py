@@ -17,6 +17,11 @@ class NacimientoUpdate(BaseModel):
     mortinato: Optional[bool] = None
 
 
+class NeonatalesUpdate(BaseModel):
+    peso_nacimiento: Optional[str] = None
+    edad_gestacional: Optional[str] = None
+
+
 class NeonatalesInfo(BaseModel):
     peso_nacimiento: Optional[str] = None
     edad_gestacional: Optional[str] = None

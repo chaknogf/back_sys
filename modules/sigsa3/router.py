@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
+from pydantic import BaseModel, Field
 
 from core.dependencies import get_db, get_current_user
 from modules.users.models import UserModel
@@ -15,6 +16,9 @@ from .service import (
     eliminar_registro as service_eliminar,
     generar_plantilla_csv,
     importar_csv,
+    asociar_paciente,
+    listar_no_asociados,
+    actualizar_especialidad_por_medico,
 )
 
 router = APIRouter(
@@ -72,6 +76,45 @@ async def importar(
     current_user: UserModel = Depends(get_current_user),
 ):
     return await importar_csv(file, db)
+
+
+class AsociarPacienteRequest(BaseModel):
+    expediente: str = Field(..., max_length=30, description="Expediente del paciente")
+    no_historia_clinica: str = Field(..., max_length=30, description="No. historia clínica SIGSA-3")
+
+
+@router.post("/asociar-paciente", tags=["SIGSA-3"])
+def asociar(
+    data: AsociarPacienteRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Asocia registros SIGSA-3 con un paciente por expediente y no_historia_clinica."""
+    return asociar_paciente(data.expediente, data.no_historia_clinica, db)
+
+
+@router.get("/no-asociados/", response_model=List[Sigsa3Out], tags=["SIGSA-3"])
+def no_asociados(
+    limit: int = Query(100, le=500),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Lista registros SIGSA-3 que no están asociados a ningún paciente."""
+    return listar_no_asociados(db, limit)
+
+
+class ActualizarEspecialidadRequest(BaseModel):
+    personal_salud: str = Field(..., max_length=100, description="Nombre del personal de salud")
+
+
+@router.post("/actualizar-especialidad", tags=["SIGSA-3"])
+def actualizar_especialidad(
+    data: ActualizarEspecialidadRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Actualiza especialidad en registros SIGSA-3 usando personal_salud como referencia con la tabla medicos."""
+    return actualizar_especialidad_por_medico(data.personal_salud, db)
 
 
 @router.get("/{registro_id}", response_model=Sigsa3Out)

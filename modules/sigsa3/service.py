@@ -261,3 +261,93 @@ def eliminar_registro(registro_id: int, db: Session) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No se puede eliminar el registro, está relacionado con otros datos"
         )
+
+
+def asociar_paciente(expediente: str, no_historia_clinica: str, db: Session) -> dict:
+    from modules.pacientes.models import PacienteModel
+
+    paciente = db.query(PacienteModel).filter(
+        PacienteModel.expediente == expediente
+    ).first()
+    if not paciente:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Paciente con expediente '{expediente}' no encontrado"
+        )
+
+    registros = db.query(Sigsa3Model).filter(
+        Sigsa3Model.no_historia_clinica == no_historia_clinica
+    ).all()
+    if not registros:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontraron registros SIGSA-3 con historia clínica '{no_historia_clinica}'"
+        )
+
+    asociados = 0
+    for reg in registros:
+        if reg.paciente_id != paciente.id:
+            reg.paciente_id = paciente.id
+            asociados += 1
+
+    db.commit()
+    return {
+        "expediente": expediente,
+        "no_historia_clinica": no_historia_clinica,
+        "paciente_id": paciente.id,
+        "registros_encontrados": len(registros),
+        "registros_asociados": asociados,
+    }
+
+
+def listar_no_asociados(db: Session, limit: int = 100) -> list[Sigsa3Model]:
+    return (
+        db.query(Sigsa3Model)
+        .filter(Sigsa3Model.paciente_id.is_(None))
+        .order_by(Sigsa3Model.id.desc())
+        .limit(min(limit, 500))
+        .all()
+    )
+
+
+def actualizar_especialidad_por_medico(personal_salud: str, db: Session) -> dict:
+    from modules.medicos.models import MedicoModel
+
+    medico = db.query(MedicoModel).filter(
+        MedicoModel.nombre.ilike(f"%{personal_salud}%")
+    ).first()
+    if not medico:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró médico con nombre '{personal_salud}'"
+        )
+    if not medico.especialidad:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El médico '{medico.nombre}' no tiene especialidad registrada"
+        )
+
+    registros = db.query(Sigsa3Model).filter(
+        Sigsa3Model.personal_salud == personal_salud
+    ).all()
+    if not registros:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontraron registros SIGSA-3 con personal_salud '{personal_salud}'"
+        )
+
+    actualizados = 0
+    for reg in registros:
+        if reg.especialidad != medico.especialidad:
+            reg.especialidad = medico.especialidad
+            actualizados += 1
+
+    db.commit()
+    return {
+        "personal_salud": personal_salud,
+        "medico_id": medico.id,
+        "medico_nombre": medico.nombre,
+        "especialidad": medico.especialidad,
+        "registros_encontrados": len(registros),
+        "registros_actualizados": actualizados,
+    }

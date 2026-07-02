@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from .schemas import NacimientoCreate, NacimientoUpdate, NacimientoOut, NacimientoListResponse, LegacyReferenceResponse
+from .schemas import NacimientoCreate, NacimientoUpdate, NeonatalesUpdate, NacimientoOut, NacimientoListResponse, LegacyReferenceResponse
 from .service import (
     crear_nacimiento_desde_paciente as service_desde_paciente,
     crear_nacimiento as service_crear,
@@ -15,6 +15,7 @@ from .service import (
     sincronizar_nacimientos as service_sincronizar,
     referenciar_legacy as service_referenciar_legacy,
     recomputar_todos as service_recomputar,
+    actualizar_neonatales_y_recomputar as serviceActualizarNeonatales,
 )
 
 router = APIRouter(
@@ -105,6 +106,17 @@ def actualizar_nacimiento(
     db: Session = Depends(get_db),
 ):
     return service_actualizar(nacimiento_id, data, db)
+
+
+@router.patch("/{nacimiento_id}/neonatales", response_model=NacimientoOut)
+def actualizar_neonatales(
+    nacimiento_id: int,
+    data: NeonatalesUpdate,
+    db: Session = Depends(get_db),
+):
+    """Actualiza peso_nacimiento y/o edad_gestacional en datos_extra del paciente,
+    y recomputa peso_gramos, clasificacion_nacimiento y trabajo_parto."""
+    return serviceActualizarNeonatales(nacimiento_id, data, db)
 
 
 @router.delete("/{nacimiento_id}", status_code=status.HTTP_204_NO_CONTENT)

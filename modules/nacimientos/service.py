@@ -8,7 +8,7 @@ from sqlalchemy import desc, text
 from typing import Optional
 
 from modules.nacimientos.models import NacimientoModel
-from modules.nacimientos.schemas import NacimientoCreate, NacimientoUpdate, LegacyReferenceOut
+from modules.nacimientos.schemas import NacimientoCreate, NacimientoUpdate, NeonatalesUpdate, LegacyReferenceOut
 
 
 def _fetchone(db: Session, sql: str, params: dict | None = None) -> dict | None:
@@ -181,7 +181,7 @@ def trabajo_parto(eg: str | None) -> str | None:
         semanas = Decimal(str(eg).strip())
     except Exception:
         return "no especificado"
-    if semanas > 41:
+    if semanas >= 41:
         return "Prolongado"
     if semanas < 37:
         return "Prematuro"
@@ -242,6 +242,51 @@ def _recomputar_desde_origen(db: Session, nacimiento: NacimientoModel) -> bool:
         db.commit()
         db.refresh(nacimiento)
     return cambios
+
+
+def actualizar_neonatales_y_recomputar(
+    nacimiento_id: int, data: NeonatalesUpdate, db: Session
+) -> NacimientoModel:
+    """Actualiza peso_nacimiento y/o edad_gestacional en pacientes.datos_extra.neonatales,
+    luego recomputa peso_gramos, clasificacion_nacimiento y trabajo_parto en nacimientos."""
+    nac = db.query(NacimientoModel).filter(NacimientoModel.id == nacimiento_id).first()
+    if not nac:
+        raise HTTPException(status_code=404, detail="Registro de nacimiento no encontrado")
+    if not nac.paciente_id:
+        raise HTTPException(status_code=400, detail="El nacimiento no tiene paciente asociado")
+
+    row = _fetchone(db, "SELECT datos_extra FROM pacientes WHERE id = :id", {"id": nac.paciente_id})
+    if not row:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+    de = row.get("datos_extra") or {}
+    if isinstance(de, str):
+        de = json.loads(de)
+    neonatales = de.get("neonatales") or {}
+
+    if data.peso_nacimiento is not None:
+        neonatales["peso_nacimiento"] = data.peso_nacimiento
+    if data.edad_gestacional is not None:
+        neonatales["edad_gestacional"] = data.edad_gestacional
+
+    de["neonatales"] = neonatales
+    db.execute(
+        text("UPDATE pacientes SET datos_extra = :de WHERE id = :id"),
+        {"de": json.dumps(de, default=str), "id": nac.paciente_id},
+    )
+    db.flush()
+
+    computado = _computar(neonatales)
+    if computado["peso_gramos"] is not None:
+        nac.peso_gramos = computado["peso_gramos"]
+    if computado["clasificacion_nacimiento"] is not None:
+        nac.clasificacion_nacimiento = computado["clasificacion_nacimiento"]
+    if computado["trabajo_parto"] is not None:
+        nac.trabajo_parto = computado["trabajo_parto"]
+
+    db.commit()
+    db.refresh(nac)
+    return nac
 
 
 def _insert_nacimiento(db: Session, paciente_id: int, madre_id: int | None,

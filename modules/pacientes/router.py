@@ -48,7 +48,6 @@ def buscar_pacientes_endpoint(
         "fecha_nac": fecha_nac
     }.items() if v is not None}
     resultado = buscar_pacientes(db, filters, skip, limit)
-    registrar_acceso(db, current_user.username, "pacientes", "/pacientes/")
     return resultado
 
 
@@ -73,7 +72,6 @@ def listar_neonatales(
         "sexo": sexo, "estado": estado,
     }.items() if v is not None}
     resultado = buscar_neonatales(db, filters, skip, limit)
-    registrar_acceso(db, current_user.username, "pacientes", "/pacientes/neonatales")
     return resultado
 
 
@@ -96,7 +94,6 @@ def listar_personal_hospital(
         "primer_apellido": primer_apellido, "segundo_apellido": segundo_apellido,
     }.items() if v is not None}
     resultado = buscar_personal_hospital(db, filters, skip, limit)
-    registrar_acceso(db, current_user.username, "pacientes", "/pacientes/personal-hospital")
     return resultado
 
 
@@ -233,7 +230,6 @@ def debug_count(
     activos = db.query(PacienteModel).filter(PacienteModel.estado == "A").count()
     inactivos = db.query(PacienteModel).filter(PacienteModel.estado == "I").count()
     ejemplos = db.query(PacienteModel).limit(3).all()
-    registrar_acceso(db, current_user.username, "pacientes", "/pacientes/debug/count")
     return {
         "total": total,
         "activos": activos,

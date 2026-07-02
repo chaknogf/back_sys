@@ -99,7 +99,7 @@ async def importar_csv(file: UploadFile, db: Session) -> dict:
             detail="No se pudo leer el archivo",
         )
 
-    for encoding in ("utf-8", "latin-1", "cp1252"):
+    for encoding in ("utf-8-sig", "utf-8", "latin-1", "cp1252"):
         try:
             text = content.decode(encoding)
             break
@@ -111,7 +111,15 @@ async def importar_csv(file: UploadFile, db: Session) -> dict:
             detail="No se pudo decodificar el archivo. Use UTF-8 o Latin-1",
         )
 
-    reader = csv.DictReader(io.StringIO(text))
+    if text.startswith("\ufeff"):
+        text = text[1:]
+
+    try:
+        dialect = csv.Sniffer().sniff(text[:8192])
+    except csv.Error:
+        dialect = csv.excel
+
+    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
 
     if not reader.fieldnames:
         raise HTTPException(

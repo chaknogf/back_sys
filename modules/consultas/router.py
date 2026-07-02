@@ -71,7 +71,6 @@ def buscar_consultas_activas(
         skip=skip,
         limit=limit,
     )
-    registrar_acceso(db, current_user.username, "consultas", "/consultas/")
     return resultado
 
 
@@ -141,7 +140,6 @@ def buscar_pacientes(
     )
 
     resultado = [PacienteSimple.from_orm(p) for p in pacientes]
-    registrar_acceso(db, current_user.username, "pacientes", "/consultas/buscarpaciente")
     return resultado
 
 

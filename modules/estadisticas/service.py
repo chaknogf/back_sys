@@ -449,7 +449,7 @@ def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
         JOIN pacientes p ON p.id = n.paciente_id
         WHERE p.fecha_nacimiento BETWEEN :desde AND :hasta
           AND p.sexo IN ('M', 'F')
-          AND p.estado IN ('V', 'F')
+          AND p.estado = 'F'
           AND (n.mortinato = false OR n.mortinato IS NULL)
         GROUP BY p.sexo, p.estado
         ORDER BY p.sexo, p.estado
@@ -459,42 +459,45 @@ def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
         SELECT
             p.datos_extra#>'{neonatales,clase_parto}' AS clase_parto,
             n.mortinato,
+            p.estado,
             p.sexo,
             COUNT(*) AS total
         FROM nacimientos n
         JOIN pacientes p ON p.id = n.paciente_id
         WHERE p.fecha_nacimiento BETWEEN :desde AND :hasta
           AND p.sexo IN ('M', 'F')
-        GROUP BY p.datos_extra#>'{neonatales,clase_parto}', n.mortinato, p.sexo
-        ORDER BY clase_parto, n.mortinato, p.sexo
+        GROUP BY p.datos_extra#>'{neonatales,clase_parto}', n.mortinato, p.estado, p.sexo
+        ORDER BY clase_parto, n.mortinato, p.estado, p.sexo
     """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
 
     rows_clasificacion_parto = db.execute(text("""
         SELECT
             n.clasificacion_nacimiento AS clasificacion_parto,
             n.mortinato,
+            p.estado,
             p.sexo,
             COUNT(*) AS total
         FROM nacimientos n
         JOIN pacientes p ON p.id = n.paciente_id
         WHERE p.fecha_nacimiento BETWEEN :desde AND :hasta
           AND p.sexo IN ('M', 'F')
-        GROUP BY n.clasificacion_nacimiento, n.mortinato, p.sexo
-        ORDER BY clasificacion_parto, n.mortinato, p.sexo
+        GROUP BY n.clasificacion_nacimiento, n.mortinato, p.estado, p.sexo
+        ORDER BY clasificacion_parto, n.mortinato, p.estado, p.sexo
     """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
 
     rows_trabajo_parto = db.execute(text("""
         SELECT
             n.trabajo_parto,
             n.mortinato,
+            p.estado,
             p.sexo,
             COUNT(*) AS total
         FROM nacimientos n
         JOIN pacientes p ON p.id = n.paciente_id
         WHERE p.fecha_nacimiento BETWEEN :desde AND :hasta
           AND p.sexo IN ('M', 'F')
-        GROUP BY n.trabajo_parto, n.mortinato, p.sexo
-        ORDER BY n.trabajo_parto, n.mortinato, p.sexo
+        GROUP BY n.trabajo_parto, n.mortinato, p.estado, p.sexo
+        ORDER BY n.trabajo_parto, n.mortinato, p.estado, p.sexo
     """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
 
     def _build_mortinato(items, key) -> list[dict]:
@@ -502,10 +505,17 @@ def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
         for r in items:
             m = r._mapping
             mort_val = m["mortinato"]
-            if isinstance(mort_val, bool):
-                label = "Mortinato" if mort_val else "Vivo"
+            es_mortinato = isinstance(mort_val, bool) and mort_val
+            if not es_mortinato and not isinstance(mort_val, bool):
+                es_mortinato = str(mort_val).lower() in ("true", "1", "yes")
+
+            if es_mortinato:
+                label = "Mortinato"
+            elif str(m.get("estado", "")).upper() == "F":
+                label = "Fallecido"
             else:
-                label = "Vivo" if str(mort_val).lower() in ("false", "0", "none") else "Mortinato"
+                label = "Vivo"
+
             item = {"estado": label, "sexo": str(m["sexo"]), "total": int(m["total"])}
             item[key] = str(m[key]) if m.get(key) is not None else None
             result.append(item)

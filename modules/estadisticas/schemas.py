@@ -74,21 +74,21 @@ class NacimientoSexoEstadoFallecidoItem(BaseModel):
 
 class NacimientoClasePartoItem(BaseModel):
     clase_parto: Optional[str] = Field(None, description="Clase de parto (UNICO/GEMELAR/TRIPLE/MULTIPLE)")
-    estado: str = Field(..., description="Estado por mortinato (Vivo/Mortinato)")
+    estado: str = Field(..., description="Estado: Vivo, Mortinato o Fallecido")
     sexo: str = Field(..., description="Sexo del neonato (M/F)")
     total: int = Field(..., ge=0)
 
 
 class NacimientoClasificacionPartoItem(BaseModel):
     clasificacion_parto: Optional[str] = Field(None, description="Clasificación del nacimiento (EBP/MBP/BP/PN)")
-    estado: str = Field(..., description="Estado por mortinato (Vivo/Mortinato)")
+    estado: str = Field(..., description="Estado: Vivo, Mortinato o Fallecido")
     sexo: str = Field(..., description="Sexo del neonato (M/F)")
     total: int = Field(..., ge=0)
 
 
 class NacimientoTrabajoPartoItem(BaseModel):
     trabajo_parto: Optional[str] = Field(None, description="Trabajo de parto (Prematuro/a Termino/Prolongado)")
-    estado: str = Field(..., description="Estado por mortinato (Vivo/Mortinato)")
+    estado: str = Field(..., description="Estado: Vivo, Mortinato o Fallecido")
     sexo: str = Field(..., description="Sexo del neonato (M/F)")
     total: int = Field(..., ge=0)
 

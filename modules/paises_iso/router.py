@@ -36,7 +36,6 @@ def paises_para_select(
         q = q.strip().upper()
         query = query.filter(
             PaisIsoModel.nombre.ilike(f"%{q}%") |
-            PaisIsoModel.codigo_iso2.ilike(f"%{q}%") |
             PaisIsoModel.codigo_iso3.ilike(f"%{q}%")
         )
 
@@ -48,8 +47,7 @@ def paises_para_select(
 def pais_por_codigo(codigo: str, db: Session = Depends(get_db)):
     codigo = codigo.upper()
     pais = db.query(PaisIsoModel).filter(
-        (PaisIsoModel.codigo_iso2 == codigo) |
-        (PaisIsoModel.codigo_iso3 == codigo)
+        PaisIsoModel.codigo_iso3 == codigo
     ).first()
 
     if not pais:

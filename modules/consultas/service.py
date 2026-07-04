@@ -12,9 +12,8 @@ from modules.ciclos.models import CiclosConsulta
 from modules.laboratorios.models import Laboratorios
 from modules.rayos_x.models import RayosX
 from modules.consultas.schemas import (
-    CicloConsultaUpdate, ConsultaListado, ConsultaOut,
-    ConsultaUpdate, ConsultaBusqueda, RegistroConsultaCreate, RegistroConsultaOut,
-    Indicador, CicloClinico, Egreso, ConsultaHistoriaResumidaOut, ConsultaListResponse
+    ConsultaOut, ConsultaUpdate, RegistroConsultaCreate, RegistroConsultaOut,
+    Indicador, CicloClinico, Egreso, ConsultaListResponse
 )
 from modules.expediente.service import generar_expediente, generar_emergencia
 

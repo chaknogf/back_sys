@@ -37,7 +37,7 @@ def obtener_usuario(
     return get_user_by_id(db, user_id)
 
 
-@router.post("/", response_model=UserCreate, status_code=201)
+@router.post("/", response_model=UserResponse, status_code=201)
 async def crear_usuario(
     user_data: UserCreate,
     background_tasks: BackgroundTasks,

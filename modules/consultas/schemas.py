@@ -3,7 +3,7 @@ from typing import List, Literal, Optional, Dict, Any, Union
 from datetime import date, time
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from modules.pacientes.schemas import PacienteConsultaBase, PacientesNombre, PacienteSchema, PacienteOut
+from modules.pacientes.schemas import PacienteConsultaBase, PacientesNombre
 
 
 # ===================================================================
@@ -125,20 +125,6 @@ class CicloUpdate(BaseModel):
         extra="allow",
         from_attributes=True
     )
-
-class CicloConsultaUpdate(BaseModel):
-    estado: EstadoCiclo = Field(..., description="Estado del ciclo clínico")
-
-    @field_validator('estado', mode='before')
-    @classmethod
-    def normalizar_estado(cls, v):
-        return v.lower() if isinstance(v, str) else v
-
-    def model_dump_clean(self, **kwargs) -> dict:
-        data = super().model_dump(exclude_none=True, **kwargs)
-        return {k: v for k, v in data.items() if v != '' and v != {} and v != []}
-
-    model_config = ConfigDict(extra="allow", from_attributes=True)
        
 # ===================================================================
 # Schema base (común)
@@ -162,20 +148,6 @@ class ConsultaBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ConsultaCreate(BaseModel):
-    paciente_id: int = Field(..., gt=0, description="ID del paciente")
-    tipo_consulta: int = Field(..., ge=1, description="Tipo de consulta")
-    especialidad: str = Field(..., max_length=50)
-    servicio: str = Field(..., max_length=50)
-    documento: Optional[str] = Field(None, max_length=20, description="Se genera automáticamente si no se proporciona")
-    fecha_consulta: date = Field(..., description="Fecha de la consulta")
-    hora_consulta: time = Field(..., description="Hora de la consulta")
-    indicadores: Optional[Indicador] = None
-    ciclo: Optional[List[CicloClinico]] = None
-   
-    model_config = ConfigDict(from_attributes=True)
-
-
 class ConsultaUpdate(BaseModel):
     ultimo_estado: Optional[str] = None
     expediente: Optional[str] = None
@@ -193,18 +165,6 @@ class ConsultaUpdate(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    @field_validator("ciclo", mode="before")
-    @classmethod
-    def no_aceptar_listas(cls, v):
-        if isinstance(v, list):
-            raise ValueError("El campo 'ciclo' debe ser un objeto, no una lista")
-        return v
-
-class ConsultaUpdateCiclo(BaseModel):
-    ciclo: Optional[Dict[str, Any]] = None
-    activo: Optional[bool] = None
-    model_config = ConfigDict(extra="ignore")
-    
     @field_validator("ciclo", mode="before")
     @classmethod
     def no_aceptar_listas(cls, v):
@@ -251,20 +211,6 @@ class ConsultasModel(BaseModel):
     dias_acumulados: Optional[int] = None
     
     model_config = ConfigDict(from_attributes=True)
-
-class ConsultaBusqueda(BaseModel):
-    id: int
-    expediente: Optional[str] = None
-    paciente_id: int
-    documento: Optional[str] = None
-    indicadores: Optional[Indicador] = None
-    paciente: Optional[PacienteSchema] = None
-    ultimo_estado: Optional[str] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-class ConsultaListado(BaseModel):
-    consultas: list[ConsultaBusqueda]
 
 class RegistroConsultaOut(BaseModel):
     id: int
@@ -330,134 +276,3 @@ class ConsultaHistoriaResumidaOut(ConsultaBaseOut):
     ultimo_estado: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
-
-
-# ===================================================================
-# Desde app/schemas/common.py y app/schemas/clasesCiclos.py
-# ===================================================================
-class Datos(BaseModel):
-    clave: str
-    valor: str
-    registro: str
-
-class Signos_vitales(BaseModel):
-    pa: str
-    fc: str
-    fr: str
-    sat02: str
-    temp: str
-    peso: str
-    talla: str
-    pt: str
-    te: str
-    pe: str
-    gmt: str
-    
-class Antecedentes(BaseModel):
-    familiares: List[Dict[str, Any]]
-    medicos: List[Dict[str, Any]]
-    quirurgicos: List[Dict[str, Any]]
-    alergicos: List[Dict[str, Any]]
-    traumaticos: List[Dict[str, Any]]
-    ginecoobstetricos: List[Dict[str, Any]]
-    habitos: List[Dict[str, Any]]
-
-class Nota(BaseModel):
-    usuario: str
-    nota: str
-    registro: str
-    
-class Enfermeria(BaseModel):
-    usuario: str
-    turno: str
-    nota: str
-    registro: str
-    signos: Dict[str, Signos_vitales]  
-    
-class Silverman(BaseModel):
-    retraso_esternal: int
-    aleteo_nasal: int
-    quejido_expiratorio: int
-    movimiento_toracico: int
-    retraccion_supraclavicular: int
-    puntuacion_total: int
-    
-class Downe(BaseModel):
-    frecuencia_respiratoria: int
-    aleteo_nasal: int
-    quejido_respiratorio: int
-    retraccion_toracoabdominal: int
-    cinoasis: int
-    puntuacion_total: int
-
-class Cuerpo(BaseModel):
-    cabeza: str
-    ojos: str
-    oidos: str
-    nariz: str
-    boca: str
-    cuello: str
-    torax: str
-    pulmones: str
-    corazon: str
-    abdomen: str
-    genitales: str
-    extremidades: str
-    columna: str
-    piel: str
-    neurologico: str
-    
-class Glasgow(BaseModel):
-    apertura_ocular: int
-    respuesta_verbal: int
-    respuesta_motora: int
-    puntuacion_total: int
-    
-class Bishop(BaseModel):
-    dilatacion: int
-    borramiento: int
-    posicion: int
-    consistencia: int
-    altura_presentacion: int
-    puntuacion_total: int
-    
-class Apgar(BaseModel):
-    tono_muscular: int
-    respuesta_refleja: int
-    llanto: int
-    respiracion: int
-    coloracion: int
-    puntuacion_total: int
-    interpretacion: str
-    
-class ExamenFisico(BaseModel):
-    silverman: Silverman
-    downe: Downe
-    cuerpo: Cuerpo
-    glasgow: Glasgow
-    bishop: Bishop
-    apgar: Apgar
-    
-class Sistema(BaseModel):
-    usuario: str
-    accion: str
-    fecha: str
-    
-class Dx(BaseModel):
-    codigo: str
-    descripcion: str
-    tipo: str
-    
-class EgresoCiclo(BaseModel):
-    registro: str
-    usuario: str
-    referencia: str
-    diagnostico: List[Dx]
-    condicion_egreso: str
-    
-class Presa_quirurgica(BaseModel):
-    programada: str
-    reprogramada: str
-    realizada: str
-    detalle: str
-    especialidad: str

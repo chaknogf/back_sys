@@ -12,9 +12,8 @@ from modules.audit_log.service import registrar_acceso
 from modules.pacientes.models import PacienteModel
 from modules.pacientes.schemas import PacienteSimple
 from .schemas import (
-    CicloConsultaUpdate, ConsultaListado, ConsultaOut,
-    ConsultaUpdate, ConsultaBusqueda, RegistroConsultaCreate, RegistroConsultaOut,
-    Indicador, CicloClinico, Egreso, ConsultaHistoriaResumidaOut, ConsultaListResponse
+    ConsultaOut, ConsultaUpdate, RegistroConsultaCreate, RegistroConsultaOut,
+    ConsultaHistoriaResumidaOut, ConsultaListResponse
 )
 from .service import (
     _agregar_ciclo, buscar_consultas_activas as service_buscar_consultas,

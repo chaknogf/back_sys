@@ -667,10 +667,6 @@ def sincronizar_nacimientos(
     }
 
 
-_TIPO_PARTO_MAP = {1: "EUTOCICO", 2: "DISTOCICO", 3: "CESAREA", 4: "OTRO"}
-_CLASE_PARTO_MAP = {1: "UNICO", 2: "GEMELAR", 3: "TRIPLE", 4: "MULTIPLE"}
-
-
 def _peso_legacy_a_str(lb: int | None, onz: int | None) -> str | None:
     if lb is None and onz is None:
         return None
@@ -795,7 +791,7 @@ def referenciar_legacy(
 
         if madre and not hijo:
             n_legacy = _fetchone(db,
-                "SELECT id FROM nacimientos WHERE datos_extra->>'legacy_id' = :lid",
+                "SELECT id FROM nacimientos WHERE id_legacy = :lid",
                 {"lid": str(leg["id"])}
             )
             if n_legacy:

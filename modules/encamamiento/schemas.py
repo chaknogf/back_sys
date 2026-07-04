@@ -18,7 +18,7 @@ class EncamamientoUpdate(BaseModel):
     nombre_servicio: Optional[str] = Field(None, max_length=100)
     descripcion: Optional[str] = None
     camas_censables: Optional[int] = Field(None, ge=0)
-    activo: Optional[bool]
+    activo: Optional[bool] = None
 
 
 class EncamamientoOut(EncamamientoBase):

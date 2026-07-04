@@ -1,5 +1,6 @@
 import csv
 import io
+import re
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -9,24 +10,223 @@ from datetime import date, datetime
 from modules.sigsa3.models import Sigsa3Model
 from modules.sigsa3.schemas import Sigsa3Create, Sigsa3Update
 
+# Mapeo de columnas Excel → campos SIGSA-3
+EXCEL_COLUMN_MAP = {
+    "personal salud": "personal_salud",
+    "fecha de la consulta": "fecha_consulta",
+    "no. historia clinica": "no_historia_clinica",
+    "nombre del paciente": "nombre_paciente",
+    "sexo": "sexo",
+    "edad en dias": "edad_dias",
+    "edad en meses": "edad_meses",
+    "edad en anos": "edad_anios",
+    "consulta nueva": "consulta_nueva",
+    "consulta primera": "consulta_primera",
+    "reconsulta": "reconsulta",
+    "emergencia": "emergencia",
+    "control": "control",
+    "semana gestacional": "semana_gestacional",
+    "codigo cie-10": "codigo_cie_10",
+    "descripcion de diagnostico/control": "descripcion_diagnostico",
+    "especialidad": "especialidad",
+}
+
+
+def _normalizar_columna(col: str) -> str:
+    """Normaliza nombre de columna para matching (minúsculas, sin acentos)."""
+    import unicodedata
+    col = col.strip().lower()
+    # Eliminar acentos
+    col = unicodedata.normalize('NFD', col)
+    col = ''.join(c for c in col if unicodedata.category(c) != 'Mn')
+    return col
+
+MESES_ES = {
+    "ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6,
+    "jul": 7, "ago": 8, "sep": 9, "oct": 10, "nov": 11, "dic": 12,
+}
+
+
+def _parse_fecha_excel(fecha_str: str) -> Opt[date]:
+    """Parsea formato '22-jun' a date (asume año actual)."""
+    if not fecha_str:
+        return None
+    fecha_str = fecha_str.strip().lower()
+    match = re.match(r"(\d{1,2})[-/](\w+)", fecha_str)
+    if not match:
+        return None
+    dia = int(match.group(1))
+    mes_str = match.group(2)[:3]
+    mes = MESES_ES.get(mes_str)
+    if not mes:
+        return None
+    anio = date.today().year
+    try:
+        return date(anio, mes, dia)
+    except ValueError:
+        return None
+
+
+def _determinar_tipo_consulta(row: dict) -> str:
+    """Determina tipo_consulta basado en las columnas con 'X'."""
+    if (row.get("consulta_nueva") or "").strip().upper() == "X":
+        return "1 Primeras"
+    if (row.get("consulta_primera") or "").strip().upper() == "X":
+        return "1 Primeras"
+    if (row.get("reconsulta") or "").strip().upper() == "X":
+        return "2 Reconsulta"
+    if (row.get("emergencia") or "").strip().upper() == "X":
+        return "3 Emergencia"
+    return "4 Interconsulta"
+
+
+def _parse_int_safe(value: str) -> Opt[int]:
+    """Convierte string a int de forma segura."""
+    if not value:
+        return None
+    value = value.strip()
+    if value in ("--", "", "N/A", "NA"):
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
+    """Importa CSV exportado desde Excel con formato SIGSA-3."""
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El archivo debe tener extensión .csv",
+        )
+
+    try:
+        content = await file.read()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pudo leer el archivo",
+        )
+
+    for encoding in ("utf-8-sig", "utf-8", "latin-1", "cp1252"):
+        try:
+            text = content.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No se pudo decodificar el archivo. Use UTF-8 o Latin-1",
+        )
+
+    if text.startswith("\ufeff"):
+        text = text[1:]
+
+    try:
+        dialect = csv.Sniffer().sniff(text[:8192])
+    except csv.Error:
+        dialect = csv.excel
+
+    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+
+    if not reader.fieldnames:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El archivo CSV está vacío o no tiene encabezados",
+        )
+
+    col_map = {}
+    for col in reader.fieldnames:
+        normalized = _normalizar_columna(col)
+        if normalized in EXCEL_COLUMN_MAP:
+            col_map[col] = EXCEL_COLUMN_MAP[normalized]
+
+    registros = []
+    errores = []
+    for i, row in enumerate(reader, start=2):
+        try:
+            mapped = {}
+            for orig_col, target_field in col_map.items():
+                val = row.get(orig_col, "").strip()
+                if val in ("--", "", "N/A", "NA"):
+                    val = None
+                mapped[target_field] = val
+
+            personal_salud = mapped.get("personal_salud")
+            fecha_consulta = _parse_fecha_excel(mapped.get("fecha_consulta"))
+            no_historia_clinica = mapped.get("no_historia_clinica")
+            nombre_paciente = mapped.get("nombre_paciente")
+            sexo = mapped.get("sexo")
+            edad_dias = _parse_int_safe(mapped.get("edad_dias"))
+            edad_meses = _parse_int_safe(mapped.get("edad_meses"))
+            edad_anios = _parse_int_safe(mapped.get("edad_anios"))
+            tipo_consulta = _determinar_tipo_consulta(mapped)
+            control = mapped.get("control")
+            semana_gestacional = _parse_int_safe(mapped.get("semana_gestacional"))
+            codigo_cie_10 = mapped.get("codigo_cie_10")
+            descripcion_diag = mapped.get("descripcion_diagnostico")
+            especialidad = mapped.get("especialidad")
+
+            dx = None
+            if codigo_cie_10 and descripcion_diag:
+                dx = f"{codigo_cie_10} {descripcion_diag}"
+            elif descripcion_diag:
+                dx = descripcion_diag
+
+            registro = Sigsa3Create(
+                personal_salud=personal_salud,
+                fecha_consulta=fecha_consulta,
+                no_historia_clinica=no_historia_clinica,
+                nombre_paciente=nombre_paciente,
+                sexo=sexo,
+                edad_dias=edad_dias,
+                edad_meses=edad_meses,
+                edad_anios=edad_anios,
+                tipo_consulta=tipo_consulta,
+                control=control,
+                semana_gestacional=semana_gestacional,
+                codigo_cie_10=codigo_cie_10,
+                dx=dx,
+                especialidad=especialidad,
+            )
+            registros.append(registro)
+        except Exception as e:
+            errores.append({"fila": i, "error": str(e)})
+
+    if not registros:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No se encontraron registros válidos en el archivo",
+        )
+
+    try:
+        objs = [Sigsa3Model(**r.model_dump()) for r in registros]
+        db.add_all(objs)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al insertar los registros en la base de datos",
+        )
+
+    return {"insertados": len(registros), "errores": errores}
+
 CSV_HEADERS = [
     "personal_salud", "fecha_consulta", "no_historia_clinica",
-    "nombre_paciente", "sexo", "pueblo", "comunidad_linguistica",
-    "edad_dias", "edad_meses", "edad_anios",
-    "departamento_residencia", "municipio_residencia", "comunidad",
-    "direccion", "tipo_consulta", "control", "semana_gestacional",
-    "descripcion_diagnostico_control", "codigo_cie_10", "dx",
-    "tipologia", "especialidad",
+    "nombre_paciente", "sexo", "edad_dias", "edad_meses", "edad_anios",
+    "tipo_consulta", "control", "semana_gestacional",
+    "codigo_cie_10", "dx", "especialidad",
 ]
 
 INTEGER_FIELDS = {"edad_dias", "edad_meses", "edad_anios", "semana_gestacional"}
 DATE_FIELDS = {"fecha_consulta"}
 MAX_LENGTHS = {
     "personal_salud": 100, "no_historia_clinica": 30, "nombre_paciente": 150,
-    "sexo": 1, "pueblo": 80, "comunidad_linguistica": 80,
-    "departamento_residencia": 100, "municipio_residencia": 100,
-    "comunidad": 150, "tipo_consulta": 80, "control": 80,
-    "codigo_cie_10": 30, "tipologia": 100, "especialidad": 100,
+    "sexo": 1, "tipo_consulta": 80, "control": 80,
+    "codigo_cie_10": 30, "especialidad": 100,
 }
 
 
@@ -36,12 +236,9 @@ def generar_plantilla_csv() -> io.StringIO:
     writer.writerow(CSV_HEADERS)
     writer.writerow([
         "Dr. Juan Perez", "2025-01-15", "HC-00123",
-        "Maria Lopez", "F", "Kaqchikel", "Kaqchikel",
-        "0", "6", "25",
-        "Chimaltenango", "Tecpán", "Centro",
-        "5a Avenida 12-34", "Consulta Externa", "Control Prenatal", "32",
-        "Control prenatal normal", "Z34.9", "Embarazo normal",
-        "Población General", "Medicina General",
+        "Maria Lopez", "F", "0", "6", "25",
+        "Consulta Externa", "Control Prenatal", "32",
+        "Z34.9", "Embarazo normal", "Medicina General",
     ])
     buf.seek(0)
     return buf

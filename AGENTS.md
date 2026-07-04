@@ -24,8 +24,6 @@ pytest tests/ -v
 - **Validation**: Pydantic 2.12
 - **Email**: FastAPI-Mail (SMTP Gmail) + Jinja2 templates
 - **Testing**: pytest 9 + FastAPI TestClient
-- **Analytics**: pandas, matplotlib, numpy, plotly
-- **Excel**: openpyxl
 - **Package manager**: Poetry (primary) + pip
 
 ## Architecture: Modular Monolith
@@ -65,11 +63,7 @@ back_sys/
 │   ├── rayos_x/               # X-rays (models only)
 │   ├── sigsa3/                # SIGSA-3 consultation registry
 │   └── common/schemas.py      # Shared Pydantic schemas
-├── app/                       # Legacy (being migrated to modules/)
-│   ├── models/                # 18 legacy model files
-│   ├── routes/                # 20 legacy route files
-│   └── schemas/               # 19 legacy schema files
-└── api-cie11/                 # ICD-11 medical coding data
+└── tests/                     # pytest tests
 ```
 
 ## Module Convention
@@ -221,7 +215,6 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Estadisticas | GET | `/estadisticas/consultas/mayores-a-7-dias` | auth | `ConsultaListResponse` | Consultas activas con >7 días desde fecha_consulta, incluye `dias_acumulados` (filtros: `skip`, `limit`) |
 | Estadisticas | GET | `/estadisticas/nacimientos` | auth | `NacimientosStatsResponse` | Estadísticas de nacimientos por sexo/estado, clase de parto, clasificación y trabajo de parto (req: `desde`, `hasta`) |
 | Totales | GET | `/totales/` | auth | `TotalesResponse` | KPIs dashboard (7 indicadores: pacientes totales/activos, consultas totales/día, COEX/hosp/emerg del día). Opcional: `fecha` |
-| Procedimientos | GET | `/procedimientos/estadisticas/resumen` | auth | dict | Estadísticas anuales/mensuales de procedimientos (req: `anio`, opc: `mes`). Retorna total registros, total cantidad, top 5 |
 | Audit | GET | `/audit-log/` | admin | dict (paginated) | Logs (filtros: tabla, username, desde, hasta) |
 | Encamamiento | POST | `/encamamiento/` | public | `EncamamientoOut` (201) | Create servicio |
 | Encamamiento | GET | `/encamamiento/` | public | `List[EncamamientoOut]` | List (filtro: activo) |
@@ -339,8 +332,8 @@ modules/
 │   ├── service.py          # Lógica de negocio con consultas SQL directas
 │   └── schemas.py          # Schemas Pydantic de respuesta (sin modelos ORM)
 ├── totales/                # KPIs del dashboard en tiempo real
-│   ├── router.py           # 1 endpoint GET / (fecha opcional), SQL con text()
-│   ├── service.py          # Misma lógica que router (duplicado)
+│   ├── router.py           # 1 endpoint GET / (fecha opcional), delega a service
+│   ├── service.py          # Lógica de negocio SQL con text()
 │   └── schemas.py          # TotalesItem + TotalesResponse
 └── procedimientos/         # Catálogo + procedimientos realizados
     ├── router.py           # CRUD + GET /reporte + GET /estadisticas/resumen

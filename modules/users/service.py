@@ -1,3 +1,4 @@
+import logging
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from core.security import hash_password
@@ -5,6 +6,8 @@ from modules.users.models import UserModel
 from modules.users.schemas import UserCreate, UserUpdate
 from core.mail import mail_config
 from fastapi_mail import FastMail, MessageSchema, MessageType
+
+logger = logging.getLogger(__name__)
 
 
 def list_users(db: Session, filters: dict, skip: int = 0, limit: int = 50):
@@ -98,4 +101,4 @@ async def send_welcome_email(usuario: UserModel):
         )
         await fm.send_message(message)
     except Exception as e:
-        print("❌ Error enviando correo:", str(e))
+        logger.error("Error enviando correo: %s", str(e))

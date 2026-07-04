@@ -68,27 +68,6 @@ def buscar_neonatales(db: Session, filters: dict, skip: int = 0, limit: int = 50
         func.jsonb_extract_path_text(PacienteModel.datos_extra, 'neonatales', 'extrahositalario') == 'false'
     )
 
-    casada_raw_pn = func.jsonb_extract_path_text(PacienteModel.nombre, 'apellido_casada')
-    casada_expr_pn = case(
-        (and_(
-            casada_raw_pn.isnot(None),
-            casada_raw_pn != '',
-            func.lower(casada_raw_pn).notlike('de %')
-        ), func.concat('de ', casada_raw_pn)),
-        else_=func.coalesce(casada_raw_pn, '')
-    )
-    nombre_completo_json = func.unaccent(
-        func.concat_ws(
-            ' ',
-            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_nombre'), ''),
-            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_nombre'), ''),
-            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'otro_nombre'), ''),
-            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_apellido'), ''),
-            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_apellido'), ''),
-            casada_expr_pn
-        )
-    )
-
     nombre = filters.get("nombre")
     if nombre:
         palabras = [quitar_tildes(p) for p in nombre.split() if p.strip()]
@@ -173,27 +152,6 @@ def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50)
     ]
     query = db.query(PacienteModel).options(load_only(*_LIST_COLS)).order_by(desc(PacienteModel.id))
     query = query.filter(PacienteModel.estado != "I")
-
-    casada_raw_bp = func.jsonb_extract_path_text(PacienteModel.nombre, 'apellido_casada')
-    casada_expr_bp = case(
-        (and_(
-            casada_raw_bp.isnot(None),
-            casada_raw_bp != '',
-            func.lower(casada_raw_bp).notlike('de %')
-        ), func.concat('de ', casada_raw_bp)),
-        else_=func.coalesce(casada_raw_bp, '')
-    )
-    nombre_completo_json = func.unaccent(
-        func.concat_ws(
-            ' ',
-            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_nombre'), ''),
-            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_nombre'), ''),
-            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'otro_nombre'), ''),
-            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'primer_apellido'), ''),
-            func.coalesce(func.jsonb_extract_path_text(PacienteModel.nombre, 'segundo_apellido'), ''),
-            casada_expr_bp
-        )
-    )
 
     q = filters.get("q")
     if q:

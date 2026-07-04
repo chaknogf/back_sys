@@ -16,6 +16,7 @@ from .service import (
     eliminar_registro as service_eliminar,
     generar_plantilla_csv,
     importar_csv,
+    importar_excel_csv,
     asociar_paciente,
     listar_no_asociados,
     actualizar_especialidad_por_medico,
@@ -76,6 +77,16 @@ async def importar(
     current_user: UserModel = Depends(get_current_user),
 ):
     return await importar_csv(file, db)
+
+
+@router.post("/importar-excel", tags=["SIGSA-3"])
+async def importar_excel(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Importa CSV exportado desde Excel con formato SIGSA-3 (columnas con X para tipo_consulta)."""
+    return await importar_excel_csv(file, db)
 
 
 class AsociarPacienteRequest(BaseModel):

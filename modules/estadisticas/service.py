@@ -419,10 +419,6 @@ def reingresos(db: Session, desde: str, hasta: str) -> dict:
     }
 
 
-def _rows_to_list(rows) -> list[dict]:
-    return [dict(r._mapping) for r in rows]
-
-
 def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
     f_desde, f_hasta = _parse_fechas(desde, hasta)
 

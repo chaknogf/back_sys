@@ -19,11 +19,11 @@ class MedicoCreate(MedicoBase):
 
 class MedicoUpdate(BaseModel):
     nombre: Optional[str] = Field(None, max_length=200)
-    colegiado: Optional[int]
-    dpi: Optional[int]
+    colegiado: Optional[int] = None
+    dpi: Optional[int] = None
     sexo: Optional[str] = Field(None, max_length=1)
     especialidad: Optional[str] = Field(None, max_length=100)
-    activo: Optional[bool]
+    activo: Optional[bool] = None
 
 
 class MedicoOut(MedicoBase):

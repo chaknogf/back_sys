@@ -599,21 +599,20 @@ def sigsa3_por_especialidad(db: Session, desde: str, hasta: str) -> dict:
     }
 
 
-def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str) -> dict:
+def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str, top: int = 10, tipo_consulta: int = None, especialidad: str = None) -> dict:
     f_desde, f_hasta = _parse_fechas(desde, hasta)
 
+    if top is None or top <= 0:
+        top = 10
+
     rows = db.execute(text("""
-        WITH ranked_dx AS (
+        WITH base AS (
             SELECT
                 especialidad,
                 tipo_consulta,
                 sexo,
                 dx,
-                COUNT(*) AS total,
-                ROW_NUMBER() OVER (
-                    PARTITION BY especialidad, tipo_consulta, sexo
-                    ORDER BY COUNT(*) DESC
-                ) AS rn
+                COUNT(*) AS total
             FROM sigsa3
             WHERE fecha_consulta BETWEEN :desde AND :hasta
               AND especialidad IS NOT NULL
@@ -625,33 +624,124 @@ def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str) -> dict:
               AND dx NOT LIKE 'O:82:9%'
               AND dx NOT LIKE 'O:80:9%'
               AND dx NOT LIKE 'O:62:0%'
+              AND (CAST(:tc AS TEXT) IS NULL OR tipo_consulta LIKE CAST(:tc AS TEXT) || ' %')
+              AND (:esp IS NULL OR especialidad = :esp)
             GROUP BY especialidad, tipo_consulta, sexo, dx
+        ),
+        combinado AS (
+            SELECT
+                especialidad,
+                tipo_consulta,
+                dx,
+                SUM(total) AS total_combinado
+            FROM base
+            GROUP BY especialidad, tipo_consulta, dx
+        ),
+        ranked_dx AS (
+            SELECT
+                especialidad,
+                tipo_consulta,
+                dx,
+                total_combinado,
+                ROW_NUMBER() OVER (
+                    PARTITION BY especialidad, tipo_consulta
+                    ORDER BY total_combinado DESC, dx ASC
+                ) AS rn
+            FROM combinado
         )
-        SELECT especialidad, tipo_consulta, sexo, dx, total
-        FROM ranked_dx
-        WHERE rn <= 10
-        ORDER BY especialidad, tipo_consulta, sexo, total DESC
-    """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
+        SELECT
+            b.especialidad,
+            b.tipo_consulta,
+            b.sexo,
+            b.dx,
+            b.total,
+            r.total_combinado,
+            r.rn
+        FROM base b
+        JOIN ranked_dx r
+          ON r.especialidad = b.especialidad
+         AND r.tipo_consulta = b.tipo_consulta
+         AND r.dx = b.dx
+        ORDER BY b.especialidad, b.tipo_consulta, r.rn, b.sexo
+    """), {"desde": f_desde, "hasta": f_hasta, "tc": tipo_consulta, "esp": especialidad}).fetchall()
 
-    datos = []
-    total_general = 0
+    from collections import defaultdict
+
+    grupos: dict[tuple, dict] = defaultdict(
+        lambda: defaultdict(lambda: {"m": 0, "f": 0, "rn": None, "total_combinado": 0})
+    )
+
     for r in rows:
         m = r._mapping
-        t = int(m["total"])
-        total_general += t
-        datos.append({
-            "especialidad": m["especialidad"],
-            "tipo_consulta": m["tipo_consulta"],
-            "sexo": m["sexo"],
-            "dx": m["dx"],
-            "total": t,
+        key_grupo = (m["especialidad"], m["tipo_consulta"])
+        dx = m["dx"]
+        sexo = m["sexo"]
+        total = int(m["total"])
+
+        entry = grupos[key_grupo][dx]
+        if sexo == "M":
+            entry["m"] += total
+        elif sexo == "F":
+            entry["f"] += total
+        else:
+            entry["m"] += total
+
+        entry["rn"] = int(m["rn"])
+        entry["total_combinado"] = int(m["total_combinado"])
+
+    datos = []
+    totales_grupo = []
+    total_general = 0
+
+    for (esp, tc), dx_map in sorted(grupos.items()):
+        dx_items = sorted(dx_map.items(), key=lambda kv: kv[1]["rn"])
+
+        top_items = [(dx, v) for dx, v in dx_items if v["rn"] <= top]
+        resto_items = [(dx, v) for dx, v in dx_items if v["rn"] > top]
+
+        grupo_total = sum(v["total_combinado"] for _, v in dx_items)
+        total_general += grupo_total
+
+        for dx, v in top_items:
+            datos.append({
+                "especialidad": esp,
+                "tipo_consulta": tc,
+                "dx": dx,
+                "total_m": v["m"],
+                "total_f": v["f"],
+                "total": v["m"] + v["f"],
+            })
+
+        resto_m = sum(v["m"] for _, v in resto_items)
+        resto_f = sum(v["f"] for _, v in resto_items)
+        resto_sum = resto_m + resto_f
+
+        if resto_sum > 0:
+            datos.append({
+                "especialidad": esp,
+                "tipo_consulta": tc,
+                "dx": "Resto de causas",
+                "total_m": resto_m,
+                "total_f": resto_f,
+                "total": resto_sum,
+            })
+
+        total_top = sum(v["m"] + v["f"] for _, v in top_items)
+        totales_grupo.append({
+            "especialidad": esp,
+            "tipo_consulta": tc,
+            "total_top": total_top,
+            "total_resto": resto_sum,
+            "total": grupo_total,
         })
 
     return {
-        "titulo": "Top 10 Diagnósticos Más Frecuentes por Especialidad",
+        "titulo": "Diagnósticos Más Frecuentes por Especialidad",
         "desde": f_desde,
         "hasta": f_hasta,
+        "top": top,
         "datos": datos,
+        "totales_por_grupo": totales_grupo,
         "total_general": total_general,
         "generado_en": datetime.now().isoformat(),
     }

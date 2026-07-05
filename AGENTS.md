@@ -98,8 +98,8 @@ All routes under root path `/fah` (e.g., `https://host/fah/auth/login`).
 | Births | `/nacimientos` | `GET/POST`, `GET/PATCH/DELETE /{id}`, `/desde-paciente/{id}`, `/sincronizar` (unifica madre-hijo + legacy), `/referenciar-legacy` (cruza con `nacimientos_legacy`). **Sin datos redundantes:** expediente, sexo, fecha_nac, neonatales se obtienen vía JOIN con `pacientes`. Columnas computadas: `peso_gramos`, `clasificacion_nacimiento` (EBP/MBP/BP/PN), `trabajo_parto` (Prematuro/a Termino/Prolongado) |
 | Countries | `/paises` | `GET /`, `GET /select` |
 | RENAP | `/renap` | `GET /persona` |
-| Statistics | `/estadisticas` | `/consultas/pacientesAtendidos`, `/consultas/hospitalizacion-infantil`, `/consultas/promedioDiario`, `/consultas/personal-hospital`, `/consultas/estudiante-publico`, `/consultas/reingresos`, `/consultas/reingresos-tipo3`, `/consultas/mayores-a-7-dias`, `/nacimientos` |
-| SIGSA-3 | `/sigsa3` | `GET/POST`, `GET/PUT/DELETE /{id}`, filtros: personal_salud, fecha, nombre, sexo, tipo_consulta, especialidad, cie10, q |
+| Statistics | `/estadisticas` | `/consultas/pacientesAtendidos`, `/consultas/hospitalizacion-infantil`, `/consultas/promedioDiario`, `/consultas/personal-hospital`, `/consultas/estudiante-publico`, `/consultas/reingresos`, `/consultas/reingresos-tipo3`, `/consultas/mayores-a-7-dias`, `/nacimientos`, `/sigsa3/por-especialidad`, `/sigsa3/dx-frecuentes` |
+| SIGSA-3 | `/sigsa3` | `GET/POST`, `GET/PUT/DELETE /{id}`, `POST /importar-excel`, `POST /eliminar-por-ids`, `POST /eliminar-por-periodo`, `POST /asociar-medico`, `POST /asociar-todo`, filtros: personal_salud, fecha, nombre, sexo, tipo_consulta, especialidad, cie10, q |
 | Totales | `/totales` | `GET /` (KPIs dashboard, 7 indicadores, opcional `fecha`) |
 | Audit | `/audit-log` | `GET /` |
 
@@ -234,6 +234,11 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | SIGSA-3 | POST | `/sigsa3/` | auth | `Sigsa3Out` (201) | Create |
 | SIGSA-3 | PUT | `/sigsa3/{id}` | auth | `Sigsa3Out` | Update |
 | SIGSA-3 | DELETE | `/sigsa3/{id}` | auth | 204 | Delete |
+| SIGSA-3 | POST | `/sigsa3/importar-excel` | auth | dict (201) | Importar desde Excel (mapea columnas españolas, detecta tipo_consulta por columnas X) |
+| SIGSA-3 | POST | `/sigsa3/eliminar-por-ids` | admin | dict (200) | Eliminar registros por IDs |
+| SIGSA-3 | POST | `/sigsa3/eliminar-por-periodo` | admin | dict (200) | Eliminar registros por rango de fechas |
+| SIGSA-3 | POST | `/sigsa3/asociar-medico` | auth | dict (200) | Asociar medico_id por personal_salud → medicos.nombre |
+| SIGSA-3 | POST | `/sigsa3/asociar-todo` | auth | dict (200) | Pipeline completo: paciente → medico → consulta (5 pasos con pandas) |
 
 ## Estadísticas y Reportes
 
@@ -286,6 +291,16 @@ curl -H "$AUTH" "https://host/fah/estadisticas/consultas/mayores-a-7-dias?skip=0
 curl -H "$AUTH" "https://host/fah/estadisticas/nacimientos?desde=2025-01-01&hasta=2025-12-31"
 ```
 
+### SIGSA-3
+
+```bash
+# Consultas por especialidad, tipo y sexo (agrupa por especialidad, tipo_consulta, sexo)
+curl -H "$AUTH" "https://host/fah/estadisticas/sigsa3/por-especialidad"
+
+# Diagnósticos frecuentes (top 10 por especialidad/tipo/sexo, excluye Z:, O:82:9, O:80:9, O:62:0)
+curl -H "$AUTH" "https://host/fah/estadisticas/sigsa3/dx-frecuentes"
+```
+
 ### Dashboard KPIs (`modules/totales/`)
 
 ```bash
@@ -327,8 +342,8 @@ curl -H "$AUTH" "https://host/fah/procedimientos/estadisticas/resumen?anio=2025&
 
 ```
 modules/
-├── estadisticas/           # Reportes personalizados sobre consultas + pacientes + nacimientos
-│   ├── router.py           # 9 endpoints, todos auth, SQL raw con text()
+├── estadisticas/           # Reportes personalizados sobre consultas + pacientes + nacimientos + SIGSA-3
+│   ├── router.py           # 11 endpoints, todos auth, SQL raw con text()
 │   ├── service.py          # Lógica de negocio con consultas SQL directas
 │   └── schemas.py          # Schemas Pydantic de respuesta (sin modelos ORM)
 ├── totales/                # KPIs del dashboard en tiempo real

@@ -186,3 +186,39 @@ class NacimientosStatsResponse(BaseModel):
     por_clasificacion_parto: List[NacimientoClasificacionPartoItem]
     por_trabajo_parto: List[NacimientoTrabajoPartoItem]
     generado_en: str
+
+
+# =====================================================================
+# SIGSA-3 ESTADÍSTICAS
+# =====================================================================
+class Sigsa3EspecialidadItem(BaseModel):
+    especialidad: Optional[str] = None
+    tipo_consulta: Optional[str] = None
+    sexo: Optional[str] = None
+    total: int = Field(..., ge=0)
+
+
+class Sigsa3EspecialidadResponse(BaseModel):
+    titulo: str = "Consultas SIGSA-3 por Especialidad, Tipo y Sexo"
+    desde: date
+    hasta: date
+    datos: List[Sigsa3EspecialidadItem]
+    total_general: int = Field(..., ge=0)
+    generado_en: str
+
+
+class Sigsa3DxItem(BaseModel):
+    especialidad: Optional[str] = None
+    tipo_consulta: Optional[str] = None
+    sexo: Optional[str] = None
+    dx: Optional[str] = None
+    total: int = Field(..., ge=0)
+
+
+class Sigsa3DxFrecuentesResponse(BaseModel):
+    titulo: str = "Top 10 Diagnósticos Más Frecuentes por Especialidad"
+    desde: date
+    hasta: date
+    datos: List[Sigsa3DxItem]
+    total_general: int = Field(..., ge=0)
+    generado_en: str

@@ -553,3 +553,105 @@ def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
         "por_trabajo_parto": _build_mortinato(rows_trabajo_parto, "trabajo_parto"),
         "generado_en": datetime.now().isoformat(),
     }
+
+
+# =====================================================================
+# SIGSA-3 ESTADÍSTICAS
+# =====================================================================
+def sigsa3_por_especialidad(db: Session, desde: str, hasta: str) -> dict:
+    f_desde, f_hasta = _parse_fechas(desde, hasta)
+
+    rows = db.execute(text("""
+        SELECT
+            especialidad,
+            tipo_consulta,
+            sexo,
+            COUNT(*) AS total
+        FROM sigsa3
+        WHERE fecha_consulta BETWEEN :desde AND :hasta
+          AND especialidad IS NOT NULL
+          AND tipo_consulta IS NOT NULL
+          AND sexo IS NOT NULL
+        GROUP BY especialidad, tipo_consulta, sexo
+        ORDER BY especialidad, tipo_consulta, sexo
+    """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
+
+    datos = []
+    total_general = 0
+    for r in rows:
+        m = r._mapping
+        t = int(m["total"])
+        total_general += t
+        datos.append({
+            "especialidad": m["especialidad"],
+            "tipo_consulta": m["tipo_consulta"],
+            "sexo": m["sexo"],
+            "total": t,
+        })
+
+    return {
+        "titulo": "Consultas SIGSA-3 por Especialidad, Tipo y Sexo",
+        "desde": f_desde,
+        "hasta": f_hasta,
+        "datos": datos,
+        "total_general": total_general,
+        "generado_en": datetime.now().isoformat(),
+    }
+
+
+def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str) -> dict:
+    f_desde, f_hasta = _parse_fechas(desde, hasta)
+
+    rows = db.execute(text("""
+        WITH ranked_dx AS (
+            SELECT
+                especialidad,
+                tipo_consulta,
+                sexo,
+                dx,
+                COUNT(*) AS total,
+                ROW_NUMBER() OVER (
+                    PARTITION BY especialidad, tipo_consulta, sexo
+                    ORDER BY COUNT(*) DESC
+                ) AS rn
+            FROM sigsa3
+            WHERE fecha_consulta BETWEEN :desde AND :hasta
+              AND especialidad IS NOT NULL
+              AND tipo_consulta IS NOT NULL
+              AND sexo IS NOT NULL
+              AND dx IS NOT NULL
+              AND dx <> ''
+              AND dx NOT LIKE 'Z:%'
+              AND dx NOT LIKE 'O:82:9%'
+              AND dx NOT LIKE 'O:80:9%'
+              AND dx NOT LIKE 'O:62:0%'
+            GROUP BY especialidad, tipo_consulta, sexo, dx
+        )
+        SELECT especialidad, tipo_consulta, sexo, dx, total
+        FROM ranked_dx
+        WHERE rn <= 10
+        ORDER BY especialidad, tipo_consulta, sexo, total DESC
+    """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
+
+    datos = []
+    total_general = 0
+    for r in rows:
+        m = r._mapping
+        t = int(m["total"])
+        total_general += t
+        datos.append({
+            "especialidad": m["especialidad"],
+            "tipo_consulta": m["tipo_consulta"],
+            "sexo": m["sexo"],
+            "dx": m["dx"],
+            "total": t,
+        })
+
+    return {
+        "titulo": "Top 10 Diagnósticos Más Frecuentes por Especialidad",
+        "desde": f_desde,
+        "hasta": f_hasta,
+        "datos": datos,
+        "total_general": total_general,
+        "generado_en": datetime.now().isoformat(),
+    }

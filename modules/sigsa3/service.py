@@ -70,9 +70,9 @@ def _parse_fecha_excel(fecha_str: str) -> Opt[date]:
 def _determinar_tipo_consulta(row: dict) -> str:
     """Determina tipo_consulta basado en las columnas con 'X'."""
     if (row.get("consulta_nueva") or "").strip().upper() == "X":
-        return "1 Primeras"
+        return "1 Primera"
     if (row.get("consulta_primera") or "").strip().upper() == "X":
-        return "1 Primeras"
+        return "1 Primera"
     if (row.get("reconsulta") or "").strip().upper() == "X":
         return "2 Reconsulta"
     if (row.get("emergencia") or "").strip().upper() == "X":
@@ -214,154 +214,7 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
 
     return {"insertados": len(registros), "errores": errores}
 
-CSV_HEADERS = [
-    "personal_salud", "fecha_consulta", "no_historia_clinica",
-    "nombre_paciente", "sexo", "edad_dias", "edad_meses", "edad_anios",
-    "tipo_consulta", "control", "semana_gestacional",
-    "codigo_cie_10", "dx", "especialidad",
-]
 
-INTEGER_FIELDS = {"edad_dias", "edad_meses", "edad_anios", "semana_gestacional"}
-DATE_FIELDS = {"fecha_consulta"}
-MAX_LENGTHS = {
-    "personal_salud": 100, "no_historia_clinica": 30, "nombre_paciente": 150,
-    "sexo": 1, "tipo_consulta": 80, "control": 80,
-    "codigo_cie_10": 30, "especialidad": 100,
-}
-
-
-def generar_plantilla_csv() -> io.StringIO:
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(CSV_HEADERS)
-    writer.writerow([
-        "Dr. Juan Perez", "2025-01-15", "HC-00123",
-        "Maria Lopez", "F", "0", "6", "25",
-        "Consulta Externa", "Control Prenatal", "32",
-        "Z34.9", "Embarazo normal", "Medicina General",
-    ])
-    buf.seek(0)
-    return buf
-
-
-def _parse_row(row: dict) -> dict:
-    parsed = {}
-    for key in CSV_HEADERS:
-        value = row.get(key, "").strip()
-        if value == "":
-            parsed[key] = None
-        elif key in INTEGER_FIELDS:
-            try:
-                parsed[key] = int(value)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Valor inválido en columna '{key}': se esperaba un número entero, se recibió '{value}'",
-                )
-        elif key in DATE_FIELDS:
-            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
-                try:
-                    parsed[key] = datetime.strptime(value, fmt).date()
-                    break
-                except ValueError:
-                    continue
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Valor inválido en columna '{key}': formato de fecha no reconocido '{value}' (use YYYY-MM-DD)",
-                )
-        else:
-            max_len = MAX_LENGTHS.get(key)
-            if max_len and len(value) > max_len:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Valor demasiado largo en columna '{key}': máximo {max_len} caracteres, se recibió {len(value)}",
-                )
-            parsed[key] = value
-    return parsed
-
-
-async def importar_csv(file: UploadFile, db: Session) -> dict:
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="El archivo debe tener extensión .csv",
-        )
-
-    try:
-        content = await file.read()
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se pudo leer el archivo",
-        )
-
-    for encoding in ("utf-8-sig", "utf-8", "latin-1", "cp1252"):
-        try:
-            text = content.decode(encoding)
-            break
-        except UnicodeDecodeError:
-            continue
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="No se pudo decodificar el archivo. Use UTF-8 o Latin-1",
-        )
-
-    if text.startswith("\ufeff"):
-        text = text[1:]
-
-    try:
-        dialect = csv.Sniffer().sniff(text[:8192])
-    except csv.Error:
-        dialect = csv.excel
-
-    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
-
-    if not reader.fieldnames:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="El archivo CSV está vacío o no tiene encabezados",
-        )
-
-    normalized_headers = [h.strip().lower() for h in reader.fieldnames]
-    missing = [h for h in CSV_HEADERS if h not in normalized_headers]
-    if missing:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Faltan columnas requeridas: {', '.join(missing)}",
-        )
-
-    registros = []
-    errores = []
-    for i, row in enumerate(reader, start=2):
-        try:
-            clean_row = {k.strip().lower(): v for k, v in row.items()}
-            parsed = _parse_row(clean_row)
-            registros.append(Sigsa3Create(**parsed))
-        except HTTPException as e:
-            errores.append({"fila": i, "error": e.detail})
-        except Exception as e:
-            errores.append({"fila": i, "error": str(e)})
-
-    if not registros:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="No se encontraron registros válidos en el archivo",
-        )
-
-    try:
-        objs = [Sigsa3Model(**r.model_dump()) for r in registros]
-        db.add_all(objs)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al insertar los registros en la base de datos",
-        )
-
-    return {"insertados": len(registros), "errores": errores}
 
 
 def listar_registros(
@@ -458,6 +311,243 @@ def eliminar_registro(registro_id: int, db: Session) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No se puede eliminar el registro, está relacionado con otros datos"
         )
+
+
+def eliminar_por_ids(ids: List[int], db: Session) -> dict:
+    if not ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La lista de IDs no puede estar vacía"
+        )
+    registros = db.query(Sigsa3Model).filter(Sigsa3Model.id.in_(ids)).all()
+    if not registros:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontraron registros con los IDs proporcionados"
+        )
+    try:
+        eliminados = len(registros)
+        for reg in registros:
+            db.delete(reg)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Error al eliminar los registros"
+        )
+    return {"eliminados": eliminados}
+
+
+def eliminar_por_periodo(desde: date, hasta: date, db: Session) -> dict:
+    if desde > hasta:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La fecha 'desde' debe ser menor o igual a 'hasta'"
+        )
+    registros = db.query(Sigsa3Model).filter(
+        Sigsa3Model.fecha_consulta >= desde,
+        Sigsa3Model.fecha_consulta <= hasta,
+    ).all()
+    if not registros:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontraron registros en el periodo {desde} al {hasta}"
+        )
+    try:
+        eliminados = len(registros)
+        for reg in registros:
+            db.delete(reg)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Error al eliminar los registros"
+        )
+    return {"eliminados": eliminados, "desde": desde.isoformat(), "hasta": hasta.isoformat()}
+
+
+def asociar_medico(db: Session) -> dict:
+    """Asocia medico_id a registros SIGSA3 usando personal_salud con medicos.nombre."""
+    from modules.medicos.models import MedicoModel
+
+    registros = db.query(Sigsa3Model).filter(
+        Sigsa3Model.medico_id.is_(None),
+        Sigsa3Model.personal_salud.isnot(None),
+    ).all()
+    if not registros:
+        return {"registros_encontrados": 0, "asociados": 0}
+
+    medicos_cache = {}
+    asociados = 0
+    for reg in registros:
+        nombre = reg.personal_salud.strip()
+        if nombre not in medicos_cache:
+            medico = db.query(MedicoModel).filter(
+                MedicoModel.nombre.ilike(f"%{nombre}%")
+            ).first()
+            medicos_cache[nombre] = medico.id if medico else None
+        medico_id = medicos_cache[nombre]
+        if medico_id:
+            reg.medico_id = medico_id
+            asociados += 1
+
+    db.commit()
+    return {"registros_encontrados": len(registros), "asociados": asociados}
+
+
+def asociar_paciente_y_consulta(db: Session) -> dict:
+    """Pipeline completo usando pandas para asociación masiva:
+    1. paciente_id: nombre_paciente = nombre_completo AND no_historia_clinica = expediente
+    2. paciente_id: nombre_paciente CONTAINS nombre_completo (nulls)
+    3. paciente_id: no_historia_clinica = expediente (nulls)
+    4. consulta_id: paciente_id + fecha_consulta + tipo_consulta (nulls)
+    5. consulta_id: no_historia_clinica = documento + fecha_consulta (nulls) + paciente_id
+    """
+    import pandas as pd
+    from modules.pacientes.models import PacienteModel
+    from modules.consultas.models import ConsultaModel
+
+    resultados = {
+        "paso1_paciente": 0,
+        "paso2_paciente": 0,
+        "paso3_paciente": 0,
+        "paso4_consulta": 0,
+        "paso5_consulta": 0,
+        "paso5_paciente": 0,
+    }
+
+    def _extraer_tipo_consulta(tipo_str):
+        if not tipo_str:
+            return None
+        try:
+            return int(tipo_str.strip().split()[0])
+        except (ValueError, IndexError):
+            return None
+
+    # Cargar todos los registros SIGSA3
+    registros = db.query(Sigsa3Model).all()
+    if not registros:
+        return resultados
+
+    # Convertir a DataFrame
+    data = []
+    for r in registros:
+        data.append({
+            "id": r.id,
+            "nombre_paciente": r.nombre_paciente,
+            "no_historia_clinica": r.no_historia_clinica,
+            "fecha_consulta": r.fecha_consulta,
+            "tipo_consulta": r.tipo_consulta,
+            "paciente_id": r.paciente_id,
+            "consulta_id": r.consulta_id,
+            "medico_id": r.medico_id,
+        })
+    df = pd.DataFrame(data)
+
+    # Cargar pacientes y consultas como DataFrames
+    pacientes = db.query(PacienteModel).filter(
+        PacienteModel.nombre_completo.isnot(None),
+        PacienteModel.expediente.isnot(None),
+    ).all()
+    df_pac = pd.DataFrame([{
+        "pac_id": p.id,
+        "nombre_completo": p.nombre_completo,
+        "expediente": p.expediente,
+    } for p in pacientes]) if pacientes else pd.DataFrame(columns=["pac_id", "nombre_completo", "expediente"])
+
+    consultas = db.query(ConsultaModel).filter(
+        ConsultaModel.documento.isnot(None),
+    ).all()
+    df_con = pd.DataFrame([{
+        "con_id": c.id,
+        "paciente_id": c.paciente_id,
+        "fecha_consulta": c.fecha_consulta,
+        "tipo_consulta": c.tipo_consulta,
+        "documento": c.documento,
+    } for c in consultas]) if consultas else pd.DataFrame(columns=["con_id", "paciente_id", "fecha_consulta", "tipo_consulta", "documento"])
+
+    # Mapear ID → objeto SIGSA3 para escritura rápida
+    reg_map = {r.id: r for r in registros}
+
+    # PASO 1: nombre_paciente = nombre_completo AND no_historia_clinica = expediente
+    nulls = df[df["paciente_id"].isna() & df["nombre_paciente"].notna() & df["no_historia_clinica"].notna()]
+    if not nulls.empty and not df_pac.empty:
+        merged = nulls.merge(df_pac, left_on=["nombre_paciente", "no_historia_clinica"],
+                             right_on=["nombre_completo", "expediente"], how="inner")
+        for _, row in merged.iterrows():
+            reg_map[row["id"]].paciente_id = int(row["pac_id"])
+            resultados["paso1_paciente"] += 1
+        df = pd.DataFrame([{
+            "id": r.id, "nombre_paciente": r.nombre_paciente, "no_historia_clinica": r.no_historia_clinica,
+            "fecha_consulta": r.fecha_consulta, "tipo_consulta": r.tipo_consulta,
+            "paciente_id": r.paciente_id, "consulta_id": r.consulta_id, "medico_id": r.medico_id,
+        } for r in registros])
+
+    # PASO 2: nombre_paciente CONTAINS nombre_completo (nulls)
+    nulls = df[df["paciente_id"].isna() & df["nombre_paciente"].notna()]
+    if not nulls.empty and not df_pac.empty:
+        for _, row in nulls.iterrows():
+            match = df_pac[df_pac["nombre_completo"].str.contains(row["nombre_paciente"], case=False, na=False)]
+            if not match.empty:
+                reg_map[row["id"]].paciente_id = int(match.iloc[0]["pac_id"])
+                resultados["paso2_paciente"] += 1
+        df = pd.DataFrame([{
+            "id": r.id, "nombre_paciente": r.nombre_paciente, "no_historia_clinica": r.no_historia_clinica,
+            "fecha_consulta": r.fecha_consulta, "tipo_consulta": r.tipo_consulta,
+            "paciente_id": r.paciente_id, "consulta_id": r.consulta_id, "medico_id": r.medico_id,
+        } for r in registros])
+
+    # PASO 3: no_historia_clinica = expediente (nulls)
+    nulls = df[df["paciente_id"].isna() & df["no_historia_clinica"].notna()]
+    if not nulls.empty and not df_pac.empty:
+        merged = nulls.merge(df_pac, left_on="no_historia_clinica", right_on="expediente", how="inner")
+        for _, row in merged.iterrows():
+            reg_map[row["id"]].paciente_id = int(row["pac_id"])
+            resultados["paso3_paciente"] += 1
+        df = pd.DataFrame([{
+            "id": r.id, "nombre_paciente": r.nombre_paciente, "no_historia_clinica": r.no_historia_clinica,
+            "fecha_consulta": r.fecha_consulta, "tipo_consulta": r.tipo_consulta,
+            "paciente_id": r.paciente_id, "consulta_id": r.consulta_id, "medico_id": r.medico_id,
+        } for r in registros])
+
+    # PASO 4: consulta_id por paciente_id + fecha_consulta + tipo_consulta (nulls)
+    nulls = df[df["consulta_id"].isna() & df["paciente_id"].notna() & df["fecha_consulta"].notna()]
+    if not nulls.empty and not df_con.empty:
+        df_con["tipo_num"] = df_con["tipo_consulta"].apply(lambda x: x if isinstance(x, (int, float)) else None)
+        for _, row in nulls.iterrows():
+            tipo_num = _extraer_tipo_consulta(row["tipo_consulta"])
+            masks = [
+                df_con["paciente_id"] == row["paciente_id"],
+                df_con["fecha_consulta"] == row["fecha_consulta"],
+            ]
+            if tipo_num is not None:
+                masks.append(df_con["tipo_num"] == tipo_num)
+            match = df_con[pd.Series(masks).all()]
+            if not match.empty:
+                reg_map[row["id"]].consulta_id = int(match.iloc[0]["con_id"])
+                resultados["paso4_consulta"] += 1
+        df = pd.DataFrame([{
+            "id": r.id, "nombre_paciente": r.nombre_paciente, "no_historia_clinica": r.no_historia_clinica,
+            "fecha_consulta": r.fecha_consulta, "tipo_consulta": r.tipo_consulta,
+            "paciente_id": r.paciente_id, "consulta_id": r.consulta_id, "medico_id": r.medico_id,
+        } for r in registros])
+
+    # PASO 5: consulta_id por no_historia_clinica = documento + fecha_consulta (nulls)
+    nulls = df[df["consulta_id"].isna() & df["no_historia_clinica"].notna() & df["fecha_consulta"].notna()]
+    if not nulls.empty and not df_con.empty:
+        merged = nulls.merge(df_con, left_on=["no_historia_clinica", "fecha_consulta"],
+                             right_on=["documento", "fecha_consulta"], how="inner")
+        for _, row in merged.iterrows():
+            reg_map[row["id"]].consulta_id = int(row["con_id"])
+            resultados["paso5_consulta"] += 1
+            if pd.isna(row["paciente_id_x"]) or row["paciente_id_x"] is None:
+                reg_map[row["id"]].paciente_id = int(row["paciente_id_y"])
+                resultados["paso5_paciente"] += 1
+
+    db.commit()
+    return resultados
 
 
 def asociar_paciente(expediente: str, no_historia_clinica: str, db: Session) -> dict:

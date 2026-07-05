@@ -17,6 +17,8 @@ from .schemas import (
     EstudiantePublicoResponse,
     ReingresoResponse,
     NacimientosStatsResponse,
+    Sigsa3EspecialidadResponse,
+    Sigsa3DxFrecuentesResponse,
 )
 from .service import (
     pacientes_atendidos as svc_pacientes_atendidos,
@@ -26,6 +28,8 @@ from .service import (
     estudiante_publico as svc_estudiante_publico,
     reingresos as svc_reingresos,
     estadisticas_nacimientos as svc_estadisticas_nacimientos,
+    sigsa3_por_especialidad as svc_sigsa3_especialidad,
+    sigsa3_dx_frecuentes as svc_sigsa3_dx,
 )
 
 router = APIRouter(prefix="/estadisticas", tags=["Estadísticas y Reportes"])
@@ -119,3 +123,25 @@ def nacimientos(
     current_user: UserModel = Depends(get_current_user),
 ):
     return svc_estadisticas_nacimientos(db, desde, hasta)
+
+
+@router.get("/sigsa3/por-especialidad", response_model=Sigsa3EspecialidadResponse)
+def sigsa3_especialidad(
+    desde: str = Query(..., description="Fecha inicio (YYYY-MM-DD)"),
+    hasta: str = Query(..., description="Fecha fin (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Consulta SIGSA-3 agrupada por especialidad, tipo_consulta y sexo."""
+    return svc_sigsa3_especialidad(db, desde, hasta)
+
+
+@router.get("/sigsa3/dx-frecuentes", response_model=Sigsa3DxFrecuentesResponse)
+def sigsa3_dx(
+    desde: str = Query(..., description="Fecha inicio (YYYY-MM-DD)"),
+    hasta: str = Query(..., description="Fecha fin (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Top 10 diagnósticos más frecuentes por especialidad, tipo_consulta y sexo."""
+    return svc_sigsa3_dx(db, desde, hasta)

@@ -130,8 +130,12 @@ class TestUsers:
         r = client.get("/users/999999", headers=auth_headers)
         assert r.status_code == 404
 
-    def test_create_user(self, client, auth_headers):
+    def test_create_user(self, client, auth_headers, monkeypatch):
         s = _sufijo()
+        monkeypatch.setattr(
+            "modules.users.service.send_welcome_email",
+            lambda *a, **kw: None,
+        )
         r = client.post(
             "/users/",
             headers=auth_headers,
@@ -1360,11 +1364,6 @@ class TestSigsa3:
         r = client.delete(f"/sigsa3/{sid}", headers=auth_headers)
         assert r.status_code == 204
         created_ids["sigsa3"].remove(sid)
-
-    def test_plantilla_csv(self, client, auth_headers):
-        r = client.get("/sigsa3/plantilla-csv", headers=auth_headers)
-        assert r.status_code == 200
-        assert "text/csv" in r.headers["content-type"]
 
     def test_no_asociados(self, client, auth_headers):
         r = client.get("/sigsa3/no-asociados/", headers=auth_headers)

@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, status, Query, UploadFile, File
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
@@ -14,8 +13,10 @@ from .service import (
     crear_registro as service_crear,
     actualizar_registro as service_actualizar,
     eliminar_registro as service_eliminar,
-    generar_plantilla_csv,
-    importar_csv,
+    eliminar_por_ids,
+    eliminar_por_periodo,
+    asociar_medico,
+    asociar_paciente_y_consulta,
     importar_excel_csv,
     asociar_paciente,
     listar_no_asociados,
@@ -56,27 +57,6 @@ def listar(
         q=q,
         limit=limit,
     )
-
-
-@router.get("/plantilla-csv", tags=["SIGSA-3"])
-def descargar_plantilla(
-    current_user: UserModel = Depends(get_current_user),
-):
-    buf = generar_plantilla_csv()
-    return StreamingResponse(
-        iter([buf.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": 'attachment; filename="plantilla_sigsa3.csv"'},
-    )
-
-
-@router.post("/importar-csv", tags=["SIGSA-3"])
-async def importar(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
-):
-    return await importar_csv(file, db)
 
 
 @router.post("/importar-excel", tags=["SIGSA-3"])
@@ -163,3 +143,50 @@ def eliminar(
     current_user: UserModel = Depends(get_current_user),
 ):
     return service_eliminar(registro_id, db)
+
+
+class EliminarPorIdsRequest(BaseModel):
+    ids: List[int] = Field(..., description="Lista de IDs a eliminar")
+
+
+@router.post("/eliminar-por-ids", tags=["SIGSA-3"])
+def eliminar_ids(
+    data: EliminarPorIdsRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Elimina múltiples registros SIGSA-3 por lista de IDs."""
+    return eliminar_por_ids(data.ids, db)
+
+
+class EliminarPorPeriodoRequest(BaseModel):
+    desde: date = Field(..., description="Fecha inicio (YYYY-MM-DD)")
+    hasta: date = Field(..., description="Fecha fin (YYYY-MM-DD)")
+
+
+@router.post("/eliminar-por-periodo", tags=["SIGSA-3"])
+def eliminar_periodo(
+    data: EliminarPorPeriodoRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Elimina registros SIGSA-3 en un rango de fechas."""
+    return eliminar_por_periodo(data.desde, data.hasta, db)
+
+
+@router.post("/asociar-medico", tags=["SIGSA-3"])
+def asociar_medico_endpoint(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Asocia medico_id usando personal_salud con medicos.nombre."""
+    return asociar_medico(db)
+
+
+@router.post("/asociar-todo", tags=["SIGSA-3"])
+def asociar_todo_endpoint(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Pipeline completo: paciente_id (nombre+expediente, nombre contiene, expediente) y consulta_id (paciente+fecha+tipo, documento+fecha)."""
+    return asociar_paciente_y_consulta(db)

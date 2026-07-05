@@ -210,15 +210,26 @@ class Sigsa3EspecialidadResponse(BaseModel):
 class Sigsa3DxItem(BaseModel):
     especialidad: Optional[str] = None
     tipo_consulta: Optional[str] = None
-    sexo: Optional[str] = None
     dx: Optional[str] = None
+    total_m: int = Field(0, ge=0)
+    total_f: int = Field(0, ge=0)
+    total: int = Field(..., ge=0)
+
+
+class Sigsa3DxTotalGrupoItem(BaseModel):
+    especialidad: Optional[str] = None
+    tipo_consulta: Optional[str] = None
+    total_top: int = Field(..., ge=0)
+    total_resto: int = Field(..., ge=0)
     total: int = Field(..., ge=0)
 
 
 class Sigsa3DxFrecuentesResponse(BaseModel):
-    titulo: str = "Top 10 Diagnósticos Más Frecuentes por Especialidad"
+    titulo: str = "Diagnósticos Más Frecuentes por Especialidad"
     desde: date
     hasta: date
+    top: int = Field(..., ge=1, description="Cantidad de diagnósticos top por grupo")
     datos: List[Sigsa3DxItem]
+    totales_por_grupo: List[Sigsa3DxTotalGrupoItem]
     total_general: int = Field(..., ge=0)
     generado_en: str

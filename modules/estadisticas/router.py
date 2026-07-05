@@ -140,8 +140,11 @@ def sigsa3_especialidad(
 def sigsa3_dx(
     desde: str = Query(..., description="Fecha inicio (YYYY-MM-DD)"),
     hasta: str = Query(..., description="Fecha fin (YYYY-MM-DD)"),
+    top: int = Query(10, ge=1, le=50, description="Cantidad de diagnósticos top por grupo"),
+    tipo_consulta: int = Query(None, description="Filtrar por tipo: 1=Primeras, 2=Reconsultas, 3=Emergencias, 4=Interconsultas"),
+    especialidad: str = Query(None, description="Filtrar por especialidad médica"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Top 10 diagnósticos más frecuentes por especialidad, tipo_consulta y sexo."""
-    return svc_sigsa3_dx(db, desde, hasta)
+    """Top diagnósticos más frecuentes por especialidad, tipo_consulta y sexo."""
+    return svc_sigsa3_dx(db, desde, hasta, top, tipo_consulta, especialidad)

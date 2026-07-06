@@ -21,6 +21,8 @@ from .service import (
     asociar_paciente,
     listar_no_asociados,
     actualizar_especialidad_por_medico,
+    dx_z34,
+    dx_z10,
 )
 
 router = APIRouter(
@@ -106,6 +108,28 @@ def actualizar_especialidad(
 ):
     """Actualiza especialidad en registros SIGSA-3 usando personal_salud como referencia con la tabla medicos."""
     return actualizar_especialidad_por_medico(data.personal_salud, db)
+
+
+@router.get("/dx/z34", tags=["SIGSA-3"])
+def diag_z34(
+    desde: date = Query(..., description="Fecha inicio (YYYY-MM-DD)"),
+    hasta: date = Query(..., description="Fecha fin (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Diagnósticos con código CIE-10 Z:34 clasificados por tipo de consulta."""
+    return dx_z34(db, desde.isoformat(), hasta.isoformat())
+
+
+@router.get("/dx/z10", tags=["SIGSA-3"])
+def diag_z10(
+    desde: date = Query(..., description="Fecha inicio (YYYY-MM-DD)"),
+    hasta: date = Query(..., description="Fecha fin (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Diagnósticos con código CIE-10 Z:10:4, Z:10:5, Z:10:6 clasificados por tipo de consulta."""
+    return dx_z10(db, desde.isoformat(), hasta.isoformat())
 
 
 @router.get("/{registro_id}", response_model=Sigsa3Out)

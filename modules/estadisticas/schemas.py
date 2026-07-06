@@ -114,6 +114,8 @@ class PersonalHospitalResponse(BaseModel):
     hasta: date
     datos: List[PersonalHospitalItem]
     total_general: int = Field(..., ge=0)
+    skip: int = Field(..., ge=0)
+    limit: int = Field(..., ge=1)
     generado_en: str
 
 

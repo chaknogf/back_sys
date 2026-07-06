@@ -168,8 +168,10 @@ def promedio_diario(db: Session, desde: str, hasta: str) -> dict:
     }
 
 
-def personal_hospital(db: Session, desde: str, hasta: str) -> dict:
+def personal_hospital(db: Session, desde: str, hasta: str, skip: int = 0, limit: int = 100) -> dict:
     f_desde, f_hasta = _parse_fechas(desde, hasta)
+
+    limit = min(limit, 500)
 
     rows = db.execute(text("""
         SELECT
@@ -183,16 +185,18 @@ def personal_hospital(db: Session, desde: str, hasta: str) -> dict:
             c.especialidad,
             c.documento,
             c.paciente_id,
-            c.egreso#>>'{diagnosticos}' AS diagnostico
+            s.dx AS diagnostico
         FROM consultas c
         JOIN pacientes p ON p.id = c.paciente_id
+        LEFT JOIN sigsa3 s ON s.paciente_id = c.paciente_id
         WHERE c.fecha_consulta BETWEEN :desde AND :hasta
           AND c.activo = true
           AND (
               p.datos_extra#>>'{socioeconomicos,personal_hospital}' = 'S'
           )
         ORDER BY c.fecha_consulta, c.hora_consulta
-    """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
+        LIMIT :limit OFFSET :skip
+    """), {"desde": f_desde, "hasta": f_hasta, "limit": limit, "skip": skip}).fetchall()
 
     datos = []
     for r in rows:
@@ -216,12 +220,25 @@ def personal_hospital(db: Session, desde: str, hasta: str) -> dict:
             "fecha_consulta": str(m["fecha_consulta"])
         })
 
+    total = db.execute(text("""
+        SELECT COUNT(*) AS total
+        FROM consultas c
+        JOIN pacientes p ON p.id = c.paciente_id
+        WHERE c.fecha_consulta BETWEEN :desde AND :hasta
+          AND c.activo = true
+          AND (
+              p.datos_extra#>>'{socioeconomicos,personal_hospital}' = 'S'
+          )
+    """), {"desde": f_desde, "hasta": f_hasta}).scalar()
+
     return {
         "titulo": "Consultas de Personal del Hospital",
         "desde": f_desde,
         "hasta": f_hasta,
         "datos": datos,
-        "total_general": len(datos),
+        "total_general": int(total) if total else 0,
+        "skip": skip,
+        "limit": limit,
         "generado_en": datetime.now().isoformat(),
     }
 

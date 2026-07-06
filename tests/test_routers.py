@@ -1370,6 +1370,61 @@ class TestSigsa3:
         assert r.status_code == 200
         assert isinstance(r.json(), list)
 
+    def test_dx_z34(self, client, auth_headers):
+        desde = (date.today() - timedelta(days=365)).isoformat()
+        hasta = date.today().isoformat()
+        r = client.get(
+            f"/sigsa3/dx/z34?desde={desde}&hasta={hasta}",
+            headers=auth_headers,
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert "datos" in data
+        assert "total_general" in data
+        assert "total_pacientes" in data
+        assert "codigos_filtrados" in data
+        assert data["codigos_filtrados"] == ["Z:34"]
+
+    def test_dx_z10(self, client, auth_headers):
+        desde = (date.today() - timedelta(days=365)).isoformat()
+        hasta = date.today().isoformat()
+        r = client.get(
+            f"/sigsa3/dx/z10?desde={desde}&hasta={hasta}",
+            headers=auth_headers,
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert "datos" in data
+        assert "total_general" in data
+        assert "total_pacientes" in data
+        assert data["codigos_filtrados"] == ["Z:10:4", "Z:10:5", "Z:10:6"]
+
+    def test_dx_z34_fecha_invalida(self, client, auth_headers):
+        r = client.get(
+            "/sigsa3/dx/z34?desde=invalid&hasta=2025-01-01",
+            headers=auth_headers,
+        )
+        assert r.status_code == 422
+
+    def test_dx_z10_fecha_invalida(self, client, auth_headers):
+        r = client.get(
+            "/sigsa3/dx/z10?desde=invalid&hasta=2025-01-01",
+            headers=auth_headers,
+        )
+        assert r.status_code == 422
+
+    def test_dx_z34_sin_auth(self, client):
+        desde = (date.today() - timedelta(days=365)).isoformat()
+        hasta = date.today().isoformat()
+        r = client.get(f"/sigsa3/dx/z34?desde={desde}&hasta={hasta}")
+        assert r.status_code in (401, 403)
+
+    def test_dx_z10_sin_auth(self, client):
+        desde = (date.today() - timedelta(days=365)).isoformat()
+        hasta = date.today().isoformat()
+        r = client.get(f"/sigsa3/dx/z10?desde={desde}&hasta={hasta}")
+        assert r.status_code in (401, 403)
+
 
 # =====================================================================
 # AUDIT LOG

@@ -27,6 +27,7 @@ class Sigsa3Create(Sigsa3Base):
 
 
 class Sigsa3Update(BaseModel):
+    paciente_id: Optional[int] = None
     personal_salud: Optional[str] = Field(None, max_length=100)
     fecha_consulta: Optional[date] = None
     no_historia_clinica: Optional[str] = Field(None, max_length=30)

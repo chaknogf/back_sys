@@ -69,10 +69,12 @@ def promedio_diario(
 def personal_hospital(
     desde: str = Query(..., description="Fecha inicio (YYYY-MM-DD)"),
     hasta: str = Query(..., description="Fecha fin (YYYY-MM-DD)"),
+    skip: int = Query(0, ge=0, description="Registros a saltar"),
+    limit: int = Query(100, ge=1, le=500, description="Máximo de registros"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return svc_personal_hospital(db, desde, hasta)
+    return svc_personal_hospital(db, desde, hasta, skip, limit)
 
 
 @router.get("/consultas/estudiante-publico", response_model=EstudiantePublicoResponse)

@@ -2,8 +2,8 @@ import csv
 import io
 import re
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy import text, or_
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
 from typing import List, Optional as Opt
 from datetime import date, datetime
 
@@ -29,6 +29,9 @@ EXCEL_COLUMN_MAP = {
     "codigo cie-10": "codigo_cie_10",
     "descripcion de diagnostico/control": "descripcion_diagnostico",
     "especialidad": "especialidad",
+    "paciente_id": "paciente_id",
+    "medico_id": "medico_id",
+    "consulta_id": "consulta_id",
 }
 
 
@@ -168,6 +171,9 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
             codigo_cie_10 = mapped.get("codigo_cie_10")
             descripcion_diag = mapped.get("descripcion_diagnostico")
             especialidad = mapped.get("especialidad")
+            paciente_id = _parse_int_safe(mapped.get("paciente_id"))
+            medico_id = _parse_int_safe(mapped.get("medico_id"))
+            consulta_id = _parse_int_safe(mapped.get("consulta_id"))
 
             dx = None
             if codigo_cie_10 and descripcion_diag:
@@ -190,6 +196,9 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
                 codigo_cie_10=codigo_cie_10,
                 dx=dx,
                 especialidad=especialidad,
+                paciente_id=paciente_id,
+                medico_id=medico_id,
+                consulta_id=consulta_id,
             )
             registros.append(registro)
         except Exception as e:
@@ -585,6 +594,81 @@ def asociar_paciente(expediente: str, no_historia_clinica: str, db: Session) -> 
         "registros_encontrados": len(registros),
         "registros_asociados": asociados,
     }
+
+
+def _parse_fechas(desde: str, hasta: str) -> tuple[date, date]:
+    try:
+        return (
+            datetime.strptime(desde, "%Y-%m-%d").date(),
+            datetime.strptime(hasta, "%Y-%m-%d").date(),
+        )
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+
+
+def dx_por_codigo_cie(db: Session, desde: str, hasta: str, codigos: list[str]) -> dict:
+    f_desde, f_hasta = _parse_fechas(desde, hasta)
+
+    placeholders = ", ".join(f":c{i}" for i in range(len(codigos)))
+    params = {"desde": f_desde, "hasta": f_hasta}
+    for i, c in enumerate(codigos):
+        params[f"c{i}"] = c
+
+    rows = db.execute(text(f"""
+        SELECT
+            tipo_consulta,
+            codigo_cie_10,
+            COUNT(*) AS total,
+            COUNT(DISTINCT paciente_id) AS pacientes
+        FROM sigsa3
+        WHERE fecha_consulta BETWEEN :desde AND :hasta
+          AND codigo_cie_10 IS NOT NULL
+          AND codigo_cie_10 <> ''
+          AND codigo_cie_10 IN ({placeholders})
+        GROUP BY tipo_consulta, codigo_cie_10
+        ORDER BY tipo_consulta, total DESC
+    """), params).fetchall()
+
+    total_pacientes = db.execute(text(f"""
+        SELECT COUNT(DISTINCT paciente_id) AS total
+        FROM sigsa3
+        WHERE fecha_consulta BETWEEN :desde AND :hasta
+          AND codigo_cie_10 IS NOT NULL
+          AND codigo_cie_10 <> ''
+          AND codigo_cie_10 IN ({placeholders})
+    """), params).scalar()
+
+    datos = []
+    total_general = 0
+    for r in rows:
+        m = r._mapping
+        t = int(m["total"])
+        total_general += t
+        datos.append({
+            "tipo_consulta": str(m["tipo_consulta"]),
+            "codigo_cie_10": str(m["codigo_cie_10"]),
+            "total": t,
+            "pacientes": int(m["pacientes"]),
+        })
+
+    return {
+        "titulo": "Diagnósticos por Código CIE-10",
+        "desde": f_desde,
+        "hasta": f_hasta,
+        "codigos_filtrados": codigos,
+        "datos": datos,
+        "total_general": total_general,
+        "total_pacientes": int(total_pacientes) if total_pacientes else 0,
+        "generado_en": datetime.now().isoformat(),
+    }
+
+
+def dx_z34(db: Session, desde: str, hasta: str) -> dict:
+    return dx_por_codigo_cie(db, desde, hasta, ["Z:34"])
+
+
+def dx_z10(db: Session, desde: str, hasta: str) -> dict:
+    return dx_por_codigo_cie(db, desde, hasta, ["Z:10:4", "Z:10:5", "Z:10:6"])
 
 
 def listar_no_asociados(db: Session, limit: int = 100) -> list[Sigsa3Model]:

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
+from uuid import uuid4
 
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
@@ -40,10 +41,15 @@ def create_access_token(
     expires_delta: timedelta | None = None
 ) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (
+    now = datetime.now(timezone.utc)
+    expire = now + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    to_encode.update({"exp": expire})
+    to_encode.update({
+        "exp": expire,
+        "iat": now,
+        "jti": uuid4().hex,
+    })
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 

@@ -4,12 +4,15 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-SECRET_KEY = os.getenv(
-    "SECRET_KEY",
-    "e87cbfc88ff202c6442638d03d576513d01c153e8e1bdeb2eebc4832088ec9be"
-)
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY no configurada. "
+        "Copia .env.example a .env y genera una clave con: "
+        "python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 MAIL_USERNAME = os.getenv("MAIL_USERNAME")
 MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")

@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -76,9 +77,13 @@ def health():
         return {"status": "error", "database": str(e)}
 
 
+# CORS: orígenes específicos desde .env (separados por coma)
+origins_str = os.getenv("CORS_ORIGINS", "http://localhost:4200,http://localhost:3000")
+ALLOWED_ORIGINS = [o.strip() for o in origins_str.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

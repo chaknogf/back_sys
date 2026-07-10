@@ -7,11 +7,17 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-POSTGRES_USER = os.getenv("POSTGRES_USER", "admin")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "secreto123")
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "hospital")
+
+if not POSTGRES_USER or not POSTGRES_PASSWORD:
+    raise RuntimeError(
+        "POSTGRES_USER y POSTGRES_PASSWORD deben configurarse en .env "
+        "Copia .env.example a .env y completa los valores."
+    )
 
 DATABASE_URL = f"postgresql+psycopg2://{POSTGRES_USER}:{quote_plus(POSTGRES_PASSWORD)}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 

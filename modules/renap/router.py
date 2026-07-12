@@ -35,7 +35,7 @@ async def buscar_persona_renap(
         None,
         min_length=13,
         max_length=13,
-        regex=r"^\d{13}$",
+        pattern=r"^\d{13}$",
         description="CUI de 13 dígitos (recomendado)"
     ),
     primer_nombre: Optional[str] = Query(None, min_length=2, max_length=50),
@@ -44,7 +44,7 @@ async def buscar_persona_renap(
     segundo_apellido: Optional[str] = Query(None, max_length=50),
     fecha_nacimiento: Optional[str] = Query(
         None,
-        regex=r"^\d{2}/\d{2}/\d{4}$",
+        pattern=r"^\d{2}/\d{2}/\d{4}$",
         description="Fecha en formato dd/mm/aaaa (ej: 15/05/1990)"
     ),
     current_user: UserModel = Depends(get_current_user)

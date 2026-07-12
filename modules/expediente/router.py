@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from core.database import get_db
@@ -31,7 +32,7 @@ def generar_nuevo_expediente(
             "expediente": expediente,
             "tipo": "general",
             "generado_por": current_user.nombre,
-            "fecha": __import__("datetime").datetime.now().isoformat()
+            "fecha": datetime.now().isoformat()
         }
     except Exception as e:
         raise HTTPException(
@@ -57,7 +58,7 @@ def generar_hoja_emergencia(
             "hoja_emergencia": hoja,
             "tipo": "emergencia",
             "generado_por": current_user.nombre,
-            "fecha": __import__("datetime").datetime.now().isoformat()
+            "fecha": datetime.now().isoformat()
         }
     except Exception as e:
         raise HTTPException(
@@ -83,7 +84,7 @@ def generar_constancia_nacimiento(
             "constancia_nacimiento": correlativo,
             "tipo": "constancia_nacimiento",
             "generado_por": current_user.nombre,
-            "fecha": __import__("datetime").datetime.now().isoformat()
+            "fecha": datetime.now().isoformat()
         }
     except Exception as e:
         raise HTTPException(
@@ -109,7 +110,7 @@ def generar_constancia_defuncion(
             "constancia_defuncion": correlativo,
             "tipo": "constancia_defuncion",
             "generado_por": current_user.nombre,
-            "fecha": __import__("datetime").datetime.now().isoformat()
+            "fecha": datetime.now().isoformat()
         }
     except Exception as e:
         raise HTTPException(
@@ -135,7 +136,7 @@ def generar_constancia_medica(
             "constancia_medica": correlativo,
             "tipo": "constancia_medica",
             "generado_por": current_user.nombre,
-            "fecha": __import__("datetime").datetime.now().isoformat()
+            "fecha": datetime.now().isoformat()
         }
     except Exception as e:
         raise HTTPException(

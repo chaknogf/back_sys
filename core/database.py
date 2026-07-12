@@ -1,9 +1,11 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from urllib.parse import quote_plus
 import os
 from dotenv import load_dotenv
+
+from core.config import DB_POOL_SIZE, DB_MAX_OVERFLOW, DB_POOL_RECYCLE
 
 load_dotenv(override=True)
 
@@ -25,7 +27,9 @@ engine = create_engine(
     DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
-    pool_recycle=300,
+    pool_size=DB_POOL_SIZE,
+    max_overflow=DB_MAX_OVERFLOW,
+    pool_recycle=DB_POOL_RECYCLE,
     connect_args={
         "connect_timeout": 10,
         "options": "-c client_encoding=UTF8"

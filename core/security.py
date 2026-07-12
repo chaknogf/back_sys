@@ -2,7 +2,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import uuid4
 
-from jose import JWTError, jwt
+from joserfc import jwt
+from joserfc.jwk import OctKey
+from joserfc.errors import JoseError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
@@ -14,6 +16,8 @@ from core.config import (
     ALGORITHM,
     ACCESS_TOKEN_EXPIRE_MINUTES,
 )
+
+_jwt_key = OctKey.import_key(SECRET_KEY.encode("utf-8"))
 
 pwd_context = CryptContext(
     schemes=["argon2"],
@@ -50,7 +54,7 @@ def create_access_token(
         "iat": now,
         "jti": uuid4().hex,
     })
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode({"alg": ALGORITHM}, to_encode, _jwt_key)
 
 
 def get_current_user(
@@ -65,11 +69,11 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, _jwt_key).claims
         username: str | None = payload.get("sub")
         if not username:
             raise credentials_exception
-    except JWTError:
+    except JoseError:
         raise credentials_exception
     user = (
         db.query(UserModel)

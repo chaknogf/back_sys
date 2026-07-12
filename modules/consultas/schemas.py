@@ -151,6 +151,7 @@ class ConsultaBase(BaseModel):
 class ConsultaUpdate(BaseModel):
     ultimo_estado: Optional[str] = None
     expediente: Optional[str] = None
+    paciente_id: Optional[int] = Field(None, gt=0)
     tipo_consulta: Optional[int] = None
     especialidad: Optional[str] = None
     servicio: Optional[str] = None

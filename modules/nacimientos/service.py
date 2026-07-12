@@ -692,8 +692,8 @@ def referenciar_legacy(
     data_sql = "SELECT * FROM nacimientos_legacy ORDER BY id"
     if solo_sin_match:
         data_sql += " WHERE expediente IS NOT NULL AND CAST(expediente AS VARCHAR) NOT IN (SELECT expediente FROM pacientes WHERE expediente IS NOT NULL AND expediente <> '')"
-    data_sql += f" LIMIT {limit} OFFSET {offset}"
-    rows = db.execute(text(data_sql)).mappings().all()
+    data_sql += " LIMIT :limit OFFSET :offset"
+    rows = db.execute(text(data_sql), {"limit": limit, "offset": offset}).mappings().all()
 
     referencias: list[LegacyReferenceOut] = []
     coincidencias = 0
@@ -874,8 +874,8 @@ def importar_desde_legacy(
     count_sql = f"SELECT COUNT(*) FROM nacimientos_legacy{where}"
     total = db.execute(text(count_sql)).scalar()
 
-    data_sql = f"SELECT * FROM nacimientos_legacy{where} ORDER BY id LIMIT {limit} OFFSET {offset}"
-    rows = db.execute(text(data_sql)).mappings().all()
+    data_sql = f"SELECT * FROM nacimientos_legacy{where} ORDER BY id LIMIT :limit OFFSET :offset"
+    rows = db.execute(text(data_sql), {"limit": limit, "offset": offset}).mappings().all()
 
     creados = 0
     saltados = 0

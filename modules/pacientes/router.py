@@ -124,7 +124,7 @@ def gestionar_paciente(
     paciente_update: Optional[PacienteUpdate] = None,
     accion: str = Query(
         default="mantener",
-        regex="^(mantener|generar|sobrescribir|activar|desactivar)$",
+        pattern="^(mantener|generar|sobrescribir|activar|desactivar)$",
         description="Acción a ejecutar sobre el paciente"
     ),
     db: Session = Depends(get_db),

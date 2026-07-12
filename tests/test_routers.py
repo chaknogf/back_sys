@@ -166,6 +166,7 @@ class TestUsers:
     def test_recover_password(self, client, auth_headers):
         r = client.patch(
             "/users/recuperar",
+            headers=auth_headers,
             json={
                 "email": "test_integration@hospital.com",
                 "password": "NewPass123!",

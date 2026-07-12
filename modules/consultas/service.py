@@ -130,7 +130,9 @@ def buscar_consultas_activas(
             .ilike(f"%{segundo_apellido}%")
         )
 
-    total = query.count()
+    from sqlalchemy import func as sa_func
+    count_query = query.with_entities(sa_func.count(ConsultaModel.id))
+    total = count_query.scalar()
     resultados = (
         query
         .order_by(ConsultaModel.id.desc())

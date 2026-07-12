@@ -14,6 +14,18 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
+# ────────────────────────────────
+# CONCURRENCIA Y ESCALABILIDAD
+# ────────────────────────────────
+# Número de workers para producción (uvicorn/gunicorn)
+WORKERS_PER_NODE = int(os.getenv("WORKERS", "4"))
+# Pool de conexiones por worker (pool_size * workers <= max_connections de PostgreSQL)
+DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "10"))
+DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "20"))
+DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "300"))
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
 MAIL_USERNAME = os.getenv("MAIL_USERNAME")
 MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
 MAIL_FROM = os.getenv("MAIL_FROM", "ticshosptecpan@gmail.com")
@@ -21,4 +33,10 @@ MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
 MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
 MAIL_TLS = os.getenv("MAIL_TLS", "true").lower() == "true"
 MAIL_SSL = os.getenv("MAIL_SSL", "false").lower() == "true"
+
+CIE10_LLM_API_KEY = os.getenv("CIE10_LLM_API_KEY", "")
+CIE10_LLM_MODEL = os.getenv("CIE10_LLM_MODEL", "phi3:mini")
+CIE10_LLM_PROVIDER = os.getenv("CIE10_LLM_PROVIDER", "ollama")
+CIE10_LLM_BASE_URL = os.getenv("CIE10_LLM_BASE_URL", "https://api.openai.com/v1")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 

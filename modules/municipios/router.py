@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi_cache.decorator import cache
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from typing import List, Optional
@@ -10,10 +11,15 @@ from core.security import get_current_user
 from modules.users.models import UserModel
 
 
+def _unaccent_ilike(column, pattern: str):
+    return func.unaccent(column).ilike(f"%{pattern}%")
+
+
 router = APIRouter(prefix="/municipios", tags=["Ubicación"])
 
 
 @router.get("/", response_model=MunicipioListResponse)
+@cache(expire=3600)
 def listar_municipios(
     q: Optional[str] = Query(None, description="Búsqueda general por municipio o departamento"),
     codigo: Optional[str] = Query(None, description="Filtrar por código exacto (ej: 0101)"),
@@ -31,21 +37,15 @@ def listar_municipios(
     if codigo:
         query = query.filter(MunicipiosModel.codigo == codigo)
     if departamento:
-        query = query.filter(
-            func.unaccent(MunicipiosModel.departamento).ilike(func.unaccent(f"%{departamento}%"))
-        )
+        query = query.filter(_unaccent_ilike(MunicipiosModel.departamento, departamento))
     if municipio:
-        query = query.filter(
-            func.unaccent(MunicipiosModel.municipio).ilike(func.unaccent(f"%{municipio}%"))
-        )
+        query = query.filter(_unaccent_ilike(MunicipiosModel.municipio, municipio))
     if vecindad:
-        query = query.filter(
-            func.unaccent(MunicipiosModel.vecindad).ilike(func.unaccent(f"%{vecindad}%"))
-        )
+        query = query.filter(_unaccent_ilike(MunicipiosModel.vecindad, vecindad))
     if q:
         query = query.filter(
-            func.unaccent(MunicipiosModel.municipio).ilike(func.unaccent(f"%{q}%"))
-            | func.unaccent(MunicipiosModel.departamento).ilike(func.unaccent(f"%{q}%"))
+            _unaccent_ilike(MunicipiosModel.municipio, q)
+            | _unaccent_ilike(MunicipiosModel.departamento, q)
         )
 
     total = query.count()
@@ -114,8 +114,9 @@ def eliminar_municipio(
 
 
 @router.get("/departamentos", response_model=List[DepartamentoOut])
+@cache(expire=3600)
 def listar_departamentos(db: Session = Depends(get_db)):
-    resultados = (
+    rows = (
         db.query(
             func.substr(MunicipiosModel.codigo, 1, 2).label("codigo"),
             MunicipiosModel.departamento.label("departamento")
@@ -124,5 +125,4 @@ def listar_departamentos(db: Session = Depends(get_db)):
         .order_by("codigo")
         .all()
     )
-
-    return resultados
+    return [{"codigo": r.codigo, "departamento": r.departamento} for r in rows]

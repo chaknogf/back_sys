@@ -1,5 +1,6 @@
 import logging
 from fastapi import APIRouter, Depends, Query
+from fastapi_cache.decorator import cache
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import date
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/totales", tags=["totales"])
     summary="Indicadores clave del hospital",
     description="KPIs en tiempo real o de una fecha específica.",
 )
+@cache(expire=30)
 def obtener_totales(
     fecha: Optional[str] = None,
     db: Session = Depends(get_db),

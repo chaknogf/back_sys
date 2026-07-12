@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from datetime import date
 
 
@@ -22,7 +22,8 @@ class PersonaRenap(BaseModel):
         description="Formato YYYY-MM-DD o DD/MM/YYYY según el servicio"
     )
 
-    @validator("FECHA_NACIMIENTO", pre=True)
+    @field_validator("FECHA_NACIMIENTO", mode="before")
+    @classmethod
     def parsear_fecha(cls, v):
         if isinstance(v, date):
             return v.isoformat()

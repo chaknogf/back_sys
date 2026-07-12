@@ -9,11 +9,16 @@ CERT = (
     os.path.join(BASE_DIR, "ssl/client.key.pem"),
 )
 
-API_KEY = "b6039f4a35ae824f9d7abe6a8bda8f7d5e590cfd9ee53ba87dce37b890588fb3"
+API_KEY = os.getenv("RENAP_API_KEY") or ""
 API_URL = "https://salud-digital.mspas.gob.gt/personas"
 
 
 async def fetch_persona(filtros: Dict[str, str]) -> RespuestaRenap:
+    if not API_KEY:
+        raise RuntimeError(
+            "RENAP_API_KEY no configurada. "
+            "Agrega RENAP_API_KEY a tu .env"
+        )
     headers = {
         "accept": "application/json",
         "x-api-key": API_KEY
@@ -21,7 +26,7 @@ async def fetch_persona(filtros: Dict[str, str]) -> RespuestaRenap:
 
     async with httpx.AsyncClient(
         cert=CERT,
-        verify=False,
+        verify=True,
         timeout=40.0,
         transport=httpx.AsyncHTTPTransport(
             retries=2,

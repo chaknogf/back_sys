@@ -92,7 +92,7 @@ def merge_campos_unicos(principal, duplicado, db: Session):
     """
     Maneja el merge de campos con constraint UNIQUE.
     Si el duplicado tiene un valor y el principal no, lo asigna.
-    Si ambos tienen valores diferentes, los guarda en datos_extra del principal.
+    Si ambos tienen valores diferentes, o si el valor ya existe en otro paciente, los guarda en datos_extra del principal.
     """
     campos_unicos = ["cui", "expediente", "pasaporte"]
     campos_alternativos = {}
@@ -103,7 +103,16 @@ def merge_campos_unicos(principal, duplicado, db: Session):
 
         if valor_dup is not None:
             if valor_principal is None:
-                setattr(principal, campo, valor_dup)
+                ya_existe = db.query(PacienteModel).filter(
+                    getattr(PacienteModel, campo) == valor_dup,
+                    PacienteModel.id.notin_([principal.id, duplicado.id]),
+                ).first()
+                if ya_existe:
+                    if campo not in campos_alternativos:
+                        campos_alternativos[campo] = []
+                    campos_alternativos[campo].append(str(valor_dup))
+                else:
+                    setattr(principal, campo, valor_dup)
             elif valor_principal != valor_dup:
                 if campo not in campos_alternativos:
                     campos_alternativos[campo] = []
@@ -208,6 +217,14 @@ def merge_pacientes(
                     status_code=400,
                     detail=f"El paciente ID {dup.id} ya está marcado como inactivo"
                 )
+
+            if dup.cui is not None:
+                if dup.datos_extra is None:
+                    dup.datos_extra = {}
+                if "personaid" not in dup.datos_extra:
+                    dup.datos_extra["personaid"] = str(dup.cui)
+                dup.cui = None
+                flag_modified(dup, "datos_extra")
 
             merge_telefonos(principal, dup)
 

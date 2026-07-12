@@ -152,7 +152,7 @@ def actualizar_cita(cita_id: int, datos: CitaUpdate, db: Session):
         raise HTTPException(status_code=404, detail="Cita no encontrada")
 
     try:
-        datos_dict = datos.dict(exclude_unset=True)
+        datos_dict = datos.model_dump(exclude_unset=True)
 
         for campo, valor in datos_dict.items():
             setattr(cita, campo, valor)

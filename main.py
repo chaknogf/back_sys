@@ -1,12 +1,45 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import RedirectResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 
+from core.config import REDIS_URL
 from core.database import engine
 from core.exceptions import register_exception_handlers
+from core.limiter import limiter
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.inmemory import InMemoryBackend
+
+
+FastAPICache.init(InMemoryBackend(), prefix="fah-cache")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if REDIS_URL:
+        try:
+            from fastapi_cache.backends.redis import RedisBackend
+            import redis.asyncio as aioredis
+            r = aioredis.from_url(REDIS_URL)
+            FastAPICache.init(RedisBackend(r), prefix="fah-cache")
+        except Exception as e:
+            print(f"⚠️  Redis no disponible, caché en memoria: {e}")
+    yield
+    try:
+        await FastAPICache.clear()
+    except Exception:
+        pass
+    engine.dispose()
+
+
+FastAPICache.init(InMemoryBackend(), prefix="fah-cache")
 
 from modules.auth.router import router as auth_router
 from modules.users.router import router as users_router
@@ -34,8 +67,10 @@ from modules.encamamiento.router import router as encamamiento_router
 from modules.censo_camas.router import router as censo_camas_router
 from modules.nacimientos.router import router as nacimientos_router
 from modules.sigsa3.router import router as sigsa3_router
+from modules.cie10.router import router as cie10_router
 
 app = FastAPI(
+    lifespan=lifespan,
     title="Hospital General Tipo I de Tecpán - Sistema FAH",
     version="3.0.0",
     description="""
@@ -64,6 +99,9 @@ app = FastAPI(
     root_path="/fah",
 )
 
+app.state.limiter = limiter  # shared instance from core/limiter.py
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 register_exception_handlers(app)
 
 
@@ -87,6 +125,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=os.getenv("ALLOWED_HOSTS", "*").split(","),
 )
 
 app.include_router(auth_router)
@@ -115,6 +158,7 @@ app.include_router(encamamiento_router)
 app.include_router(censo_camas_router)
 app.include_router(nacimientos_router)
 app.include_router(sigsa3_router)
+app.include_router(cie10_router)
 
 
 @app.get("/", include_in_schema=False)

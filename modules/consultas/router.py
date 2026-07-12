@@ -6,10 +6,11 @@ from typing import Optional, List
 from datetime import datetime, date, time
 
 from core.database import get_db
-from core.security import get_current_user
+from core.security import get_current_user, get_current_admin_user
 from modules.users.models import UserModel
 from modules.audit_log.service import registrar_acceso
 from modules.pacientes.models import PacienteModel
+from modules.consultas.models import ConsultaModel
 from modules.pacientes.schemas import PacienteSimple
 from .schemas import (
     ConsultaOut, ConsultaUpdate, RegistroConsultaCreate, RegistroConsultaOut,
@@ -176,6 +177,34 @@ def actualizar_consulta(
     current_user: UserModel = Depends(get_current_user)
 ):
     return service_actualizar_consulta(consulta_id, update_data, db, current_user)
+
+
+@router.patch("/{consulta_id}/reasignar-paciente", response_model=ConsultaOut)
+def reasignar_paciente(
+    consulta_id: int,
+    nuevo_paciente_id: int = Query(..., gt=0, description="ID del paciente correcto"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores pueden reasignar paciente")
+    consulta = db.get(ConsultaModel, consulta_id)
+    if not consulta:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+    paciente = db.get(PacienteModel, nuevo_paciente_id)
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    consulta.paciente_id = nuevo_paciente_id
+    if paciente.expediente:
+        consulta.expediente = paciente.expediente
+    db.commit()
+    db.refresh(consulta)
+    registrar_acceso(
+        db, current_user.username, "consultas",
+        f"/consultas/{consulta_id}/reasignar-paciente",
+        registro_id=consulta_id,
+    )
+    return consulta
 
 
 @router.post("/registro", response_model=RegistroConsultaOut, status_code=201)

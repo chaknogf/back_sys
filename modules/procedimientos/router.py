@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi_cache.decorator import cache
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, and_, or_, text
 from typing import List, Optional
@@ -30,6 +31,7 @@ router = APIRouter(
 
 
 @router.get("/catalogo", response_model=list[ProcedimientoOut])
+@cache(expire=900)
 def listar_procedimientos(
     abreviatura: Optional[str] = Query(None, description="Filtrar por abreviatura exacta"),
     nombre: Optional[str] = Query(None, description="Filtrar por nombre (búsqueda parcial)"),

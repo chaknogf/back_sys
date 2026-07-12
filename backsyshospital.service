@@ -1,0 +1,19 @@
+[Unit]
+Description=BackSys Hospital API
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/back_sys
+EnvironmentFile=/opt/back_sys/.env
+ExecStart=/opt/back_sys/env/bin/gunicorn main:app -c gunicorn.conf.py --access-logfile /var/log/back_sys/access.log --error-logfile /var/log/back_sys/error.log
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -9,7 +9,6 @@ env/
 .env/
 
 # Environment variables (real credentials)
-.env
 
 # IDE/editor folders
 .vscode/

@@ -16,6 +16,8 @@ from .schemas import (
     PacienteListResponse
 )
 from .service import buscar_pacientes, buscar_neonatales, buscar_personal_hospital, obtener_paciente, crear_paciente, agregar_evento, normalizar_metadatos
+from modules.defunciones.schemas import DefuncionCreate
+from modules.defunciones.service import crear_defuncion as crear_defuncion_svc
 
 
 router = APIRouter(prefix="/pacientes", tags=["Pacientes"])
@@ -174,6 +176,12 @@ def gestionar_paciente(
 
         datos_update.pop("metadatos", None)
 
+        cambio_a_fallecido = (
+            "estado" in datos_update
+            and datos_update["estado"] == "F"
+            and paciente.estado != "F"
+        )
+
         for key, value in datos_update.items():
             setattr(paciente, key, value)
 
@@ -186,6 +194,17 @@ def gestionar_paciente(
 
         db.commit()
         db.refresh(paciente)
+
+        if cambio_a_fallecido:
+            try:
+                crear_defuncion_svc(
+                    DefuncionCreate(paciente_id=paciente.id),
+                    registrador_id=getattr(current_user, "id", None),
+                    db=db,
+                )
+            except Exception:
+                pass
+
         normalizar_metadatos(paciente)
         return paciente
 

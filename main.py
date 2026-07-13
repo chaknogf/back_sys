@@ -68,6 +68,7 @@ from modules.censo_camas.router import router as censo_camas_router
 from modules.nacimientos.router import router as nacimientos_router
 from modules.sigsa3.router import router as sigsa3_router
 from modules.cie10.router import router as cie10_router
+from modules.defunciones.router import router as defunciones_router
 
 app = FastAPI(
     lifespan=lifespan,
@@ -159,6 +160,7 @@ app.include_router(censo_camas_router)
 app.include_router(nacimientos_router)
 app.include_router(sigsa3_router)
 app.include_router(cie10_router)
+app.include_router(defunciones_router)
 
 
 @app.get("/", include_in_schema=False)

@@ -70,6 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_defunciones_medico_id ON defunciones(medico_id);
 CREATE INDEX IF NOT EXISTS idx_defunciones_fecha ON defunciones(fecha_defuncion);
 CREATE INDEX IF NOT EXISTS idx_defunciones_es_fetal ON defunciones(es_fetal);
 CREATE INDEX IF NOT EXISTS idx_defunciones_mujer_fertil ON defunciones(mujer_edad_fertil);
+CREATE INDEX IF NOT EXISTS idx_defunciones_estado ON defunciones(estado);
 
 -- Trigger para updated_at
 CREATE OR REPLACE FUNCTION update_defunciones_updated_at()

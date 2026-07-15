@@ -1257,6 +1257,125 @@ class TestConstanciasNacimiento:
         assert r.status_code == 200
         created_ids["constancias"].remove(cid)
 
+    def test_constancia_actualiza_partos_madre(self, client, auth_headers):
+        """Crear constancias con madre_id debe actualizar datos_extra.partos de la madre."""
+        s = _sufijo()
+
+        # Crear madre
+        r = client.post(
+            "/pacientes/",
+            headers=auth_headers,
+            json={
+                "nombre": {
+                    "primer_nombre": f"Madre{s}",
+                    "primer_apellido": f"Partos{s}",
+                },
+                "sexo": "F",
+                "fecha_nacimiento": "1990-05-15",
+            },
+        )
+        assert r.status_code == 201
+        madre_id = r.json()["id"]
+        created_ids["pacientes"].append(madre_id)
+
+        # Crear hijo 1
+        r = client.post(
+            "/pacientes/",
+            headers=auth_headers,
+            json={
+                "nombre": {
+                    "primer_nombre": f"Hijo1{s}",
+                    "primer_apellido": f"Partos{s}",
+                },
+                "sexo": "M",
+                "fecha_nacimiento": "2026-07-15",
+            },
+        )
+        assert r.status_code == 201
+        hijo1_id = r.json()["id"]
+        created_ids["pacientes"].append(hijo1_id)
+
+        # Crear constancia para hijo1 con vivos=1, muertos=0
+        r = client.post(
+            "/constancias-nacimiento/",
+            headers=auth_headers,
+            json={
+                "paciente_id": hijo1_id,
+                "madre_id": madre_id,
+                "nombre_madre": f"MADRE PARTOS {s}",
+                "vivos": 1,
+                "muertos": 0,
+            },
+        )
+        assert r.status_code in (200, 201)
+        const1_id = r.json()["id"]
+        created_ids["constancias"].append(const1_id)
+
+        # Verificar madre: partos.nacidos_vivos=1, nacidos_muertos=0
+        r = client.get(f"/pacientes/{madre_id}", headers=auth_headers)
+        assert r.status_code == 200
+        madre = r.json()
+        partos = madre.get("datos_extra", {}).get("partos", {})
+        assert partos.get("nacidos_vivos") == 1, f"Esperado 1, obtenido {partos}"
+        assert partos.get("nacidos_muertos") == 0, f"Esperado 0, obtenido {partos}"
+
+        # Crear hijo 2
+        r = client.post(
+            "/pacientes/",
+            headers=auth_headers,
+            json={
+                "nombre": {
+                    "primer_nombre": f"Hijo2{s}",
+                    "primer_apellido": f"Partos{s}",
+                },
+                "sexo": "F",
+                "fecha_nacimiento": "2026-07-15",
+            },
+        )
+        assert r.status_code == 201
+        hijo2_id = r.json()["id"]
+        created_ids["pacientes"].append(hijo2_id)
+
+        # Crear constancia para hijo2 con vivos=0, muertos=1
+        r = client.post(
+            "/constancias-nacimiento/",
+            headers=auth_headers,
+            json={
+                "paciente_id": hijo2_id,
+                "madre_id": madre_id,
+                "nombre_madre": f"MADRE PARTOS {s}",
+                "vivos": 0,
+                "muertos": 1,
+            },
+        )
+        assert r.status_code in (200, 201)
+        const2_id = r.json()["id"]
+        created_ids["constancias"].append(const2_id)
+
+        # Verificar madre: nacidos_vivos=1, nacidos_muertos=1 (suma de ambas constancias)
+        r = client.get(f"/pacientes/{madre_id}", headers=auth_headers)
+        assert r.status_code == 200
+        madre = r.json()
+        partos = madre.get("datos_extra", {}).get("partos", {})
+        assert partos.get("nacidos_vivos") == 1, f"Esperado 1, obtenido {partos}"
+        assert partos.get("nacidos_muertos") == 1, f"Esperado 1, obtenido {partos}"
+
+        # Actualizar const1: cambiar vivos a 3
+        r = client.put(
+            f"/constancias-nacimiento/{const1_id}",
+            headers=auth_headers,
+            json={"vivos": 3, "muertos": 0},
+        )
+        assert r.status_code == 200
+
+        # Verificar madre: nacidos_vivos=3, nacidos_muertos=1 (3+0)
+        r = client.get(f"/pacientes/{madre_id}", headers=auth_headers)
+        assert r.status_code == 200
+        madre = r.json()
+        partos = madre.get("datos_extra", {}).get("partos", {})
+        assert partos.get("nacidos_vivos") == 3, f"Esperado 3, obtenido {partos}"
+        assert partos.get("nacidos_muertos") == 1, f"Esperado 1, obtenido {partos}"
+
 
 # =====================================================================
 # NACIMIENTOS LEGACY

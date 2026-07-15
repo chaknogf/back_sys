@@ -1,11 +1,10 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 from modules.pacientes.models import PacienteModel
 from modules.expediente.service import generar_constancia_nacimiento as generar_cn
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import inspect, desc, or_
+from sqlalchemy import inspect, desc, func, or_
 from sqlalchemy.orm import Session, joinedload
-from datetime import date, datetime
 from decimal import Decimal
 from core.database import get_db
 from core.security import get_current_user
@@ -30,6 +29,30 @@ def _serializar(v):
         return float(v)
     return v
 
+
+def _actualizar_partos_madre(madre_id: int, db: Session):
+    """Recalcula datos_extra.partos de la madre desde constancias_nacimiento."""
+    if not madre_id:
+        return
+    stats = db.query(
+        func.coalesce(func.sum(ConstanciaNacimientoModel.vivos), 0),
+        func.coalesce(func.sum(ConstanciaNacimientoModel.muertos), 0),
+    ).filter(
+        ConstanciaNacimientoModel.madre_id == madre_id
+    ).first()
+    madre = db.get(PacienteModel, madre_id)
+    if not madre:
+        return
+    if madre.datos_extra is None:
+        madre.datos_extra = {}
+    madre.datos_extra.setdefault("partos", {})
+    madre.datos_extra["partos"]["nacidos_vivos"] = int(stats[0]) if stats else 0
+    madre.datos_extra["partos"]["nacidos_muertos"] = int(stats[1]) if stats else 0
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(madre, "datos_extra")
+    db.commit()
+
+
 @router.post("/", response_model=ConstanciaNacimientoResponse)
 def crear_constancia(
     data: ConstanciaNacimientoCreate,
@@ -41,6 +64,8 @@ def crear_constancia(
     db.add(nueva)
     db.commit()
     db.refresh(nueva)
+    if nueva.madre_id:
+        _actualizar_partos_madre(nueva.madre_id, db)
     return nueva
 
 @router.get("/", response_model=ConstanciaNacimientoListResponse)
@@ -185,6 +210,9 @@ def actualizar_constancia(
 
     db.commit()
     db.refresh(constancia)
+
+    if constancia.madre_id:
+        _actualizar_partos_madre(constancia.madre_id, db)
 
     return constancia
 

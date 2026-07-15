@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS defunciones (
     -- Metadata
     registrador_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     observaciones TEXT,
+    estado VARCHAR(1) NOT NULL DEFAULT 'A',
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -84,3 +85,6 @@ CREATE TRIGGER trg_defunciones_updated_at
     BEFORE UPDATE ON defunciones
     FOR EACH ROW
     EXECUTE FUNCTION update_defunciones_updated_at();
+
+-- 2026-07-15: Added estado column (A=Activo, I=Inactivo)
+-- ALTER TABLE defunciones ADD COLUMN estado VARCHAR(1) NOT NULL DEFAULT 'A';

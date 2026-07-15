@@ -329,3 +329,112 @@ class TestDefunciones:
         assert r2.status_code == 200
         data = r2.json()
         assert data["total"] >= 1
+
+    def test_paciente_f_to_v_desactiva_defuncion(self, client, auth_headers):
+        """Cambiar paciente de F a V debe poner defuncion.estado = I"""
+        paciente = self._crear_paciente(client, auth_headers)
+        pid = paciente["id"]
+
+        # Marcar como fallecido → se crea defunción automática
+        r = client.patch(
+            f"/pacientes/{pid}",
+            headers=auth_headers,
+            json={"estado": "F"},
+            params={"accion": "mantener"},
+        )
+        assert r.status_code == 200
+
+        r2 = client.get(f"/defunciones/?paciente_id={pid}&estado=", headers=auth_headers)
+        assert r2.status_code == 200
+        assert r2.json()["total"] == 1
+        def_id = r2.json()["defunciones"][0]["id"]
+        assert r2.json()["defunciones"][0]["estado"] == "A"
+        created_ids["defunciones"].append(def_id)
+
+        # Cambiar de F a A (desfallecer) → defunción debe quedar I
+        r = client.patch(
+            f"/pacientes/{pid}",
+            headers=auth_headers,
+            json={"estado": "A"},
+            params={"accion": "mantener"},
+        )
+        assert r.status_code == 200
+
+        r3 = client.get(f"/defunciones/{def_id}", headers=auth_headers)
+        assert r3.status_code == 200
+        assert r3.json()["estado"] == "I"
+
+        # Ya no aparece en listado default (solo A)
+        r4 = client.get(f"/defunciones/?paciente_id={pid}", headers=auth_headers)
+        assert r4.json()["total"] == 0
+
+    def test_paciente_vuelve_a_f_reactiva_defuncion(self, client, auth_headers):
+        """Paciente con defunción inactiva que vuelve a F debe reactivarla (estado=A)"""
+        paciente = self._crear_paciente(client, auth_headers)
+        pid = paciente["id"]
+
+        # F → se crea defunción activa
+        client.patch(
+            f"/pacientes/{pid}",
+            headers=auth_headers,
+            json={"estado": "F"},
+            params={"accion": "mantener"},
+        )
+        r = client.get(f"/defunciones/?paciente_id={pid}&estado=", headers=auth_headers)
+        def_id = r.json()["defunciones"][0]["id"]
+        created_ids["defunciones"].append(def_id)
+
+        # F → A → defunción se desactiva
+        client.patch(
+            f"/pacientes/{pid}",
+            headers=auth_headers,
+            json={"estado": "A"},
+            params={"accion": "mantener"},
+        )
+
+        # A → F → defunción debe reactivarse
+        client.patch(
+            f"/pacientes/{pid}",
+            headers=auth_headers,
+            json={"estado": "F"},
+            params={"accion": "mantener"},
+        )
+
+        r2 = client.get(f"/defunciones/{def_id}", headers=auth_headers)
+        assert r2.status_code == 200
+        assert r2.json()["estado"] == "A"
+
+        # Aparece en listado default
+        r3 = client.get(f"/defunciones/?paciente_id={pid}", headers=auth_headers)
+        assert r3.json()["total"] == 1
+        assert r3.json()["defunciones"][0]["estado"] == "A"
+
+    def test_paciente_f_sin_defuncion_previa_crea_nueva(self, client, auth_headers):
+        """Paciente sin defunción previa que pasa a F debe crear un registro nuevo"""
+        paciente = self._crear_paciente(client, auth_headers)
+        pid = paciente["id"]
+
+        # Verificar que no tiene defunción
+        r0 = client.get(f"/defunciones/?paciente_id={pid}&estado=", headers=auth_headers)
+        assert r0.json()["total"] == 0
+
+        # Pasar a F
+        r = client.patch(
+            f"/pacientes/{pid}",
+            headers=auth_headers,
+            json={"estado": "F"},
+            params={"accion": "mantener"},
+        )
+        assert r.status_code == 200
+
+        # Debe tener defunción activa
+        r1 = client.get(f"/defunciones/?paciente_id={pid}&estado=", headers=auth_headers)
+        assert r1.json()["total"] == 1
+        d = r1.json()["defunciones"][0]
+        assert d["estado"] == "A"
+        assert d["paciente_id"] == pid
+        assert d["fecha_defuncion"] is not None, "La defunción autogenerada debe tener fecha"
+        assert d["paciente"] is not None, "Debe incluir datos del paciente vía JOIN"
+        assert d["paciente"]["nombre_completo"] is not None, "Debe mostrar nombre del paciente"
+        assert d["paciente"]["fecha_nacimiento"] is not None, "Debe mostrar fecha_nacimiento del paciente"
+        created_ids["defunciones"].append(d["id"])

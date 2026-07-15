@@ -30,6 +30,7 @@ class NeonatalesInfo(BaseModel):
     gemelo: Optional[str] = None
     hora_nacimiento: Optional[time] = None
     extrahospitalario: Optional[bool] = False
+    id_medico: Optional[int] = None
 
     @field_serializer('hora_nacimiento')
     def serialize_hora(self, hora: Optional[time], _info):

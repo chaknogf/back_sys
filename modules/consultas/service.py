@@ -528,6 +528,7 @@ def sincronizar_indicadores(db: Session, desde: date, hasta: date, current_user)
     consultas = (
         db.query(ConsultaModel)
         .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
+        .options(joinedload(ConsultaModel.paciente))
         .filter(ConsultaModel.fecha_consulta.between(desde, hasta))
         .all()
     )

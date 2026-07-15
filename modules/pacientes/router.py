@@ -11,13 +11,13 @@ from modules.users.models import UserModel
 from modules.audit_log.service import registrar_acceso
 from modules.expediente.service import generar_expediente
 from .models import PacienteModel
+from modules.constancias_nacimiento.models import ConstanciaNacimientoModel
 from .schemas import (
     PacienteCreate, PacienteOut, PacienteUpdate, PacienteContacto,
     PacienteListResponse
 )
 from .service import buscar_pacientes, buscar_neonatales, buscar_personal_hospital, obtener_paciente, crear_paciente, agregar_evento, normalizar_metadatos
-from modules.defunciones.schemas import DefuncionCreate
-from modules.defunciones.service import crear_defuncion as crear_defuncion_svc
+from modules.defunciones.service import actualizar_estado_por_paciente
 
 
 router = APIRouter(prefix="/pacientes", tags=["Pacientes"])
@@ -181,6 +181,11 @@ def gestionar_paciente(
             and datos_update["estado"] == "F"
             and paciente.estado != "F"
         )
+        cambio_desde_fallecido = (
+            "estado" in datos_update
+            and datos_update["estado"] != "F"
+            and paciente.estado == "F"
+        )
 
         for key, value in datos_update.items():
             setattr(paciente, key, value)
@@ -195,13 +200,25 @@ def gestionar_paciente(
         db.commit()
         db.refresh(paciente)
 
+        if "datos_extra" in datos_update:
+            neonatales = (paciente.datos_extra or {}).get("neonatales") or {}
+            nuevo_id_medico = neonatales.get("id_medico")
+            if nuevo_id_medico is not None:
+                constancia = db.query(ConstanciaNacimientoModel).filter(
+                    ConstanciaNacimientoModel.paciente_id == paciente.id
+                ).first()
+                if constancia and constancia.medico_id != nuevo_id_medico:
+                    constancia.medico_id = nuevo_id_medico
+                    db.commit()
+
         if cambio_a_fallecido:
             try:
-                crear_defuncion_svc(
-                    DefuncionCreate(paciente_id=paciente.id),
-                    registrador_id=getattr(current_user, "id", None),
-                    db=db,
-                )
+                actualizar_estado_por_paciente(paciente.id, "F", db)
+            except Exception:
+                pass
+        elif cambio_desde_fallecido:
+            try:
+                actualizar_estado_por_paciente(paciente.id, "V", db)
             except Exception:
                 pass
 

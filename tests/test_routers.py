@@ -385,21 +385,26 @@ class TestMadreHijo:
             f"/pacientes/madre-hijo/{TestMadreHijo.MADRE_ID}",
             headers=auth_headers,
             json={
-                "sexo": "M",
                 "fecha_nacimiento": TestMadreHijo._fecha(),
-                "datos_extra": {
-                    "peso_nacimiento": "3.5",
-                    "edad_gestacional": "39",
-                    "tipo_parto": "EUTOCICO",
-                    "gemelo": None,
-                },
+                "hijos": [
+                    {
+                        "sexo": "M",
+                        "datos_extra": {
+                            "peso_nacimiento": "3.5",
+                            "edad_gestacional": "39",
+                            "tipo_parto": "EUTOCICO",
+                        },
+                    }
+                ],
                 "estado": "V",
             },
         )
         assert r.status_code == 201
         data = r.json()
-        assert data["sexo"] == "M"
-        created_ids["pacientes"].append(data["id"])
+        assert len(data["pacientes"]) == 1
+        assert data["pacientes"][0]["sexo"] == "M"
+        assert data["total"] == 1
+        created_ids["pacientes"].append(data["pacientes"][0]["id"])
 
     def test_create_duplicate_hijo_returns_409(self, client, auth_headers):
         if not TestMadreHijo.MADRE_ID:
@@ -408,14 +413,17 @@ class TestMadreHijo:
             f"/pacientes/madre-hijo/{TestMadreHijo.MADRE_ID}",
             headers=auth_headers,
             json={
-                "sexo": "M",
                 "fecha_nacimiento": TestMadreHijo._fecha(),
-                "datos_extra": {
-                    "peso_nacimiento": "3.5",
-                    "edad_gestacional": "39",
-                    "tipo_parto": "EUTOCICO",
-                    "gemelo": None,
-                },
+                "hijos": [
+                    {
+                        "sexo": "M",
+                        "datos_extra": {
+                            "peso_nacimiento": "3.5",
+                            "edad_gestacional": "39",
+                            "tipo_parto": "EUTOCICO",
+                        },
+                    }
+                ],
                 "estado": "V",
             },
         )
@@ -428,19 +436,100 @@ class TestMadreHijo:
             f"/pacientes/madre-hijo/{TestMadreHijo.MADRE_ID}",
             headers=auth_headers,
             json={
-                "sexo": "F",
                 "fecha_nacimiento": TestMadreHijo._fecha(),
-                "datos_extra": {
-                    "peso_nacimiento": "2.8",
-                    "edad_gestacional": "39",
-                    "tipo_parto": "EUTOCICO",
-                    "gemelo": "Gemelo 2",
-                },
+                "hijos": [
+                    {
+                        "sexo": "F",
+                        "datos_extra": {
+                            "peso_nacimiento": "2.8",
+                            "edad_gestacional": "39",
+                            "tipo_parto": "EUTOCICO",
+                        },
+                    },
+                    {
+                        "sexo": "M",
+                        "datos_extra": {
+                            "peso_nacimiento": "3.0",
+                            "edad_gestacional": "39",
+                            "tipo_parto": "EUTOCICO",
+                        },
+                    },
+                ],
                 "estado": "V",
             },
         )
         assert r.status_code == 201
-        created_ids["pacientes"].append(r.json()["id"])
+        data = r.json()
+        assert len(data["pacientes"]) == 2
+        assert data["total"] == 2
+        assert "#1" in data["pacientes"][0]["nombre"]["otro_nombre"]
+        assert "#2" in data["pacientes"][1]["nombre"]["otro_nombre"]
+        for p in data["pacientes"]:
+            created_ids["pacientes"].append(p["id"])
+
+    def test_create_triplets_and_verify_constancias(self, client, auth_headers, db_session):
+        if not TestMadreHijo.MADRE_ID:
+            pytest.skip("No mother created")
+        fecha = date.today().isoformat()
+        r = client.post(
+            f"/pacientes/madre-hijo/{TestMadreHijo.MADRE_ID}",
+            headers=auth_headers,
+            json={
+                "fecha_nacimiento": fecha,
+                "hijos": [
+                    {
+                        "sexo": "M",
+                        "datos_extra": {
+                            "peso_nacimiento": "5 lb 8 onz",
+                            "edad_gestacional": "36",
+                            "tipo_parto": "CESAREA",
+                            "hora_nacimiento": "08:15:00",
+                        },
+                    },
+                    {
+                        "sexo": "F",
+                        "datos_extra": {
+                            "peso_nacimiento": "5 lb 2 onz",
+                            "edad_gestacional": "36",
+                            "tipo_parto": "CESAREA",
+                            "hora_nacimiento": "08:16:00",
+                        },
+                    },
+                    {
+                        "sexo": "M",
+                        "datos_extra": {
+                            "peso_nacimiento": "6 lb",
+                            "edad_gestacional": "36",
+                            "tipo_parto": "CESAREA",
+                            "hora_nacimiento": "08:17:00",
+                        },
+                    },
+                ],
+                "estado": "V",
+            },
+        )
+        assert r.status_code == 201
+        data = r.json()
+        assert len(data["pacientes"]) == 3
+        assert data["total"] == 3
+
+        for p in data["pacientes"]:
+            pid = p["id"]
+            created_ids["pacientes"].append(pid)
+
+            constancia = db_session.query(ConstanciaNacimientoModel).filter(
+                ConstanciaNacimientoModel.paciente_id == pid
+            ).first()
+            assert constancia is not None, f"Constancia no encontrada para paciente {pid}"
+            assert constancia.madre_id == TestMadreHijo.MADRE_ID
+            assert constancia.documento is not None
+
+            nacimiento = db_session.query(NacimientoModel).filter(
+                NacimientoModel.paciente_id == pid
+            ).first()
+            assert nacimiento is not None, f"Nacimiento no encontrado para paciente {pid}"
+            assert nacimiento.madre_id == TestMadreHijo.MADRE_ID
+            assert nacimiento.clasificacion_nacimiento is not None
 
 
 # =====================================================================

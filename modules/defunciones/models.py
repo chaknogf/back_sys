@@ -51,6 +51,7 @@ class DefuncionModel(Base):
 
     registrador_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     observaciones = Column(Text)
+    estado = Column(String(1), nullable=False, server_default=text("'A'"), default="A")
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"))
     updated_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"), onupdate=text("CURRENT_TIMESTAMP"))
 

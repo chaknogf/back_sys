@@ -41,7 +41,8 @@ _NEONATALES_SELECT = """
     p.datos_extra->'neonatales'->>'clase_parto' AS neonatales_clase_parto,
     p.datos_extra->'neonatales'->>'gemelo' AS neonatales_gemelo,
     p.datos_extra->'neonatales'->>'hora_nacimiento' AS neonatales_hora_nacimiento,
-    p.datos_extra->'neonatales'->>'extrahositalario' AS neonatales_extrahospitalario
+    p.datos_extra->'neonatales'->>'extrahositalario' AS neonatales_extrahospitalario,
+    CAST(p.datos_extra->'neonatales'->>'id_medico' AS INTEGER) AS neonatales_id_medico
 """
 
 _PACIENTE_SELECT = """
@@ -77,6 +78,9 @@ def _row_to_out(row: dict) -> dict:
     extra = row.get("neonatales_extrahospitalario")
     if extra is not None:
         neonatales["extrahospitalario"] = str(extra).lower() in ("true", "1", "yes")
+    id_medico = row.get("neonatales_id_medico")
+    if id_medico is not None:
+        neonatales["id_medico"] = int(id_medico)
 
     peso_gramos = None
     clasificacion_nacimiento = None
@@ -538,6 +542,20 @@ def recomputar_todos(db: Session) -> dict:
         ORDER BY n.id
     """)
 
+    paciente_ids = [r["paciente_id"] for r in rows if r["paciente_id"]]
+    if not paciente_ids:
+        return {"total_analizados": 0, "actualizados": 0, "sin_cambios": 0, "sin_datos_neonatales": 0, "detalles": []}
+
+    pac_rows = _fetchall(db, """
+        SELECT id, datos_extra FROM pacientes WHERE id = ANY(:ids)
+    """, {"ids": paciente_ids})
+    pac_map = {}
+    for pr in pac_rows:
+        de = pr.get("datos_extra") or {}
+        if isinstance(de, str):
+            de = json.loads(de)
+        pac_map[pr["id"]] = de
+
     actualizados = 0
     sin_datos = 0
     sin_cambios = 0
@@ -550,14 +568,11 @@ def recomputar_todos(db: Session) -> dict:
             sin_datos += 1
             continue
 
-        pac = _fetchone(db, "SELECT datos_extra FROM pacientes WHERE id = :id", {"id": paciente_id})
-        if not pac:
+        de = pac_map.get(paciente_id)
+        if not de:
             sin_datos += 1
             continue
 
-        de = pac.get("datos_extra") or {}
-        if isinstance(de, str):
-            de = json.loads(de)
         neonatales = de.get("neonatales") or {}
         
         if not neonatales:
@@ -695,6 +710,20 @@ def referenciar_legacy(
     data_sql += " LIMIT :limit OFFSET :offset"
     rows = db.execute(text(data_sql), {"limit": limit, "offset": offset}).mappings().all()
 
+    _MADRE_COLS = "id, expediente, nombre_completo, cui"
+
+    expedientes = [str(r["expediente"]) for r in rows if r.get("expediente")]
+    madres_por_exp = {}
+    if expedientes:
+        for r in _fetchall(db, f"SELECT {_MADRE_COLS} FROM pacientes WHERE expediente = ANY(:exps)", {"exps": expedientes}):
+            madres_por_exp[r["expediente"]] = r
+
+    cuis = [r["dpi"] for r in rows if r.get("dpi")]
+    madres_por_cui = {}
+    if cuis:
+        for r in _fetchall(db, f"SELECT {_MADRE_COLS} FROM pacientes WHERE cui = ANY(:cuis)", {"cuis": cuis}):
+            madres_por_cui[int(r["cui"])] = r
+
     referencias: list[LegacyReferenceOut] = []
     coincidencias = 0
     con_nacimiento = 0
@@ -719,6 +748,10 @@ def referenciar_legacy(
                     return h
         return hijos[0] if hijos else None
 
+    paciente_ids_a_buscar = set()
+    legacy_ids_a_buscar = set()
+    legs_data = []
+
     for leg in rows:
         madre = None
         match_tipo = "sin_match"
@@ -726,16 +759,9 @@ def referenciar_legacy(
         leg_dpi = leg.get("dpi")
 
         if leg_exp:
-            madre = _fetchone(db,
-                "SELECT id, expediente, nombre_completo FROM pacientes WHERE expediente = :exp",
-                {"exp": str(leg_exp)}
-            )
-
+            madre = madres_por_exp.get(str(leg_exp))
         if not madre and leg_dpi:
-            madre = _fetchone(db,
-                "SELECT id, expediente, nombre_completo FROM pacientes WHERE cui = :cui",
-                {"cui": leg_dpi}
-            )
+            madre = madres_por_cui.get(leg_dpi)
 
         hijo = None
         if madre:
@@ -753,15 +779,21 @@ def referenciar_legacy(
                        ORDER BY id""",
                     {"sexo": leg_sexo, "fecha": str(leg_fecha)}
                 )
+                madre_ids = [c["datos_extra"]["origen"]["paciente_id"]
+                            for c in candidatos
+                            if c.get("datos_extra") and isinstance(c["datos_extra"], dict)
+                            and c["datos_extra"].get("origen", {}).get("tipo") == "MADRE"
+                            and c["datos_extra"]["origen"].get("paciente_id")]
+                candidatas_madres = {}
+                if madre_ids:
+                    for rm in _fetchall(db, f"SELECT {_MADRE_COLS} FROM pacientes WHERE id = ANY(:ids)", {"ids": madre_ids}):
+                        candidatas_madres[rm["id"]] = rm
                 for c in candidatos:
                     de = c.get("datos_extra")
                     if de and isinstance(de, dict):
                         origen = de.get("origen", {})
                         if origen.get("tipo") == "MADRE" and origen.get("paciente_id"):
-                            m = _fetchone(db,
-                                "SELECT id, expediente, nombre_completo FROM pacientes WHERE id = :id",
-                                {"id": origen["paciente_id"]}
-                            )
+                            m = candidatas_madres.get(origen["paciente_id"])
                             if m and leg_madre.lower() in (m.get("nombre_completo", "") or "").lower():
                                 hijo = c
                                 madre = m
@@ -777,30 +809,37 @@ def referenciar_legacy(
                     match_tipo = "por_dpi"
                 else:
                     match_tipo = "por_madre_fecha_sexo"
-
             coincidencias += 1
-            n = _fetchone(db,
-                "SELECT id FROM nacimientos WHERE paciente_id = :pid",
-                {"pid": hijo["id"]}
-            )
-            if n:
-                nacimiento_id = n["id"]
+            paciente_ids_a_buscar.add(hijo["id"])
+        elif madre:
+            legacy_ids_a_buscar.add(leg["id"])
+
+        legs_data.append((leg, madre, hijo, match_tipo))
+
+    nacimiento_por_paciente = {}
+    if paciente_ids_a_buscar:
+        for r in _fetchall(db, "SELECT id, paciente_id FROM nacimientos WHERE paciente_id = ANY(:ids)", {"ids": list(paciente_ids_a_buscar)}):
+            nacimiento_por_paciente[r["paciente_id"]] = r["id"]
+
+    nacimiento_por_legacy = {}
+    if legacy_ids_a_buscar:
+        for r in _fetchall(db, "SELECT id, id_legacy FROM nacimientos WHERE id_legacy IS NOT NULL AND id_legacy = ANY(:ids)", {"ids": list(legacy_ids_a_buscar)}):
+            nacimiento_por_legacy[r["id_legacy"]] = r["id"]
+
+    for leg, madre, hijo, match_tipo in legs_data:
+        nacimiento_id = None
+        if hijo:
+            nacimiento_id = nacimiento_por_paciente.get(hijo["id"])
+            if nacimiento_id:
                 con_nacimiento += 1
             else:
                 sin_nacimiento += 1
-
-        if madre and not hijo:
-            n_legacy = _fetchone(db,
-                "SELECT id FROM nacimientos WHERE id_legacy = :lid",
-                {"lid": str(leg["id"])}
-            )
-            if n_legacy:
+        elif madre:
+            nacimiento_id = nacimiento_por_legacy.get(leg["id"])
+            if nacimiento_id:
                 con_nacimiento += 1
-                nacimiento_id = n_legacy["id"]
             else:
                 sin_nacimiento += 1
-
-        if madre and not hijo:
             madres_sin_hijo += 1
 
         referencias.append(LegacyReferenceOut(
@@ -877,35 +916,45 @@ def importar_desde_legacy(
     data_sql = f"SELECT * FROM nacimientos_legacy{where} ORDER BY id LIMIT :limit OFFSET :offset"
     rows = db.execute(text(data_sql), {"limit": limit, "offset": offset}).mappings().all()
 
+    leg_ids = [r["id"] for r in rows]
+    existentes_legacy = set()
+    if leg_ids:
+        for r in _fetchall(db, "SELECT id_legacy FROM nacimientos WHERE id_legacy IS NOT NULL"):
+            if r.get("id_legacy") is not None:
+                existentes_legacy.add(r["id_legacy"])
+
+    rows_a_procesar = [r for r in rows if r["id"] not in existentes_legacy]
+
+    expedientes = [str(r["expediente"]) for r in rows_a_procesar if r.get("expediente")]
+    madres_por_exp = {}
+    if expedientes:
+        for r in _fetchall(db, "SELECT id, expediente FROM pacientes WHERE expediente = ANY(:exps)", {"exps": expedientes}):
+            madres_por_exp[r["expediente"]] = r
+
+    cuis = [r["dpi"] for r in rows_a_procesar if r.get("dpi")]
+    madres_por_cui = {}
+    if cuis:
+        for r in _fetchall(db, "SELECT id, cui FROM pacientes WHERE cui = ANY(:cuis)", {"cuis": cuis}):
+            madres_por_cui[r["cui"]] = r
+
+    if not rows_a_procesar:
+        return {"total_legacy": total, "creados": 0, "saltados": len(existentes_legacy), "errores": []}
+
     creados = 0
-    saltados = 0
+    saltados = len(existentes_legacy)
     errores = []
 
-    for leg in rows:
+    for leg in rows_a_procesar:
         try:
             leg_id = leg["id"]
             leg_exp = leg.get("expediente")
             leg_dpi = leg.get("dpi")
 
-            ya_existe = _fetchone(db,
-                "SELECT id FROM nacimientos WHERE datos_extra->>'legacy_id' = :lid",
-                {"lid": str(leg_id)}
-            )
-            if ya_existe:
-                saltados += 1
-                continue
-
             madre = None
             if leg_exp:
-                madre = _fetchone(db,
-                    "SELECT id FROM pacientes WHERE expediente = :exp",
-                    {"exp": str(leg_exp)}
-                )
+                madre = madres_por_exp.get(str(leg_exp))
             if not madre and leg_dpi:
-                madre = _fetchone(db,
-                    "SELECT id FROM pacientes WHERE cui = :cui",
-                    {"cui": leg_dpi}
-                )
+                madre = madres_por_cui.get(leg_dpi)
 
             madre_id = madre["id"] if madre else None
             leg_fecha = leg.get("fecha_parto")

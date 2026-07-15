@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ _DEF_COLS = """
     d.es_fetal, d.embarazos_previvos_vivos, d.embarazos_previvos_muertos,
     d.fetal_sexo, d.fetal_murio_antes_parto, d.fetal_parto_tipo, d.fetal_clase_parto,
     d.fetal_via_parto, d.fetal_semanas_gestacion, d.fetal_causas_fetales, d.fetal_causas_maternas,
-    d.registrador_id, d.observaciones, d.created_at, d.updated_at
+    d.registrador_id, d.observaciones, d.estado, d.created_at, d.updated_at
 """
 
 
@@ -138,7 +138,7 @@ def _build_out(row: dict) -> dict:
         "es_fetal", "embarazos_previvos_vivos", "embarazos_previvos_muertos",
         "fetal_sexo", "fetal_murio_antes_parto", "fetal_parto_tipo", "fetal_clase_parto",
         "fetal_via_parto", "fetal_semanas_gestacion", "fetal_causas_fetales",
-        "fetal_causas_maternas", "registrador_id", "observaciones",
+        "fetal_causas_maternas", "registrador_id", "observaciones", "estado",
         "created_at", "updated_at",
     ]}
 
@@ -220,6 +220,96 @@ def _recalcular_edad(db: Session, defuncion_id: int):
         db.commit()
 
 
+def actualizar_estado_por_paciente(paciente_id: int, nuevo_estado: str, db: Session) -> dict | None:
+    """Sincroniza el estado de la defunción cuando cambia el estado del paciente.
+    
+    Si el paciente pasa a Fallecido (F): activa o crea la defunción.
+    Si el paciente sale de Fallecido: desactiva la defunción existente.
+    """
+    defuncion = db.query(DefuncionModel).filter(
+        DefuncionModel.paciente_id == paciente_id
+    ).first()
+
+    if nuevo_estado == "F":
+        if not defuncion:
+            ahora = datetime.now(timezone.utc)
+            paciente = db.execute(
+                text("SELECT fecha_nacimiento, datos_extra FROM pacientes WHERE id = :id"),
+                {"id": paciente_id}
+            ).mappings().first()
+            fecha_def = None
+            extra = {}
+            if paciente:
+                de = paciente["datos_extra"]
+                if de and isinstance(de, str):
+                    import json
+                    try: de = json.loads(de)
+                    except: de = None
+                if de and isinstance(de, dict):
+                    raw = de.get("defuncion")
+                    if isinstance(raw, str):
+                        # datos_extra.defuncion es un string datetime-local "YYYY-MM-DDTHH:mm"
+                        try:
+                            fecha_def = datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
+                        except Exception:
+                            pass
+                    elif isinstance(raw, dict):
+                        extra = raw
+                        if extra.get("fecha_defuncion"):
+                            try:
+                                fecha_def = datetime.fromisoformat(extra["fecha_defuncion"])
+                                if fecha_def.tzinfo is None:
+                                    fecha_def = fecha_def.replace(tzinfo=timezone.utc)
+                            except Exception:
+                                pass
+            data = DefuncionCreate(
+                paciente_id=paciente_id,
+                fecha_defuncion=fecha_def or ahora,
+                causa_a=extra.get("causa_a"),
+                causa_b=extra.get("causa_b"),
+                causa_c=extra.get("causa_c"),
+                causa_d=extra.get("causa_d"),
+                muerte_gestacion=extra.get("muerte_gestacion"),
+                es_fetal=extra.get("es_fetal", False),
+            )
+            defuncion = DefuncionModel(**data.model_dump(exclude_unset=True))
+            db.add(defuncion)
+            db.commit()
+            db.refresh(defuncion)
+            _recalcular_edad(db, defuncion.id)
+        else:
+            if defuncion.estado != "A":
+                defuncion.estado = "A"
+                if not defuncion.fecha_defuncion:
+                    paciente = db.execute(
+                        text("SELECT datos_extra FROM pacientes WHERE id = :id"),
+                        {"id": paciente_id}
+                    ).mappings().first()
+                    fecha_def = None
+                    if paciente:
+                        de = paciente["datos_extra"]
+                        if de and isinstance(de, str):
+                            import json
+                            try: de = json.loads(de)
+                            except: de = None
+                        if de and isinstance(de, dict):
+                            raw = de.get("defuncion")
+                            if isinstance(raw, str):
+                                try:
+                                    fecha_def = datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
+                                except Exception:
+                                    pass
+                    defuncion.fecha_defuncion = fecha_def or datetime.now(timezone.utc)
+                db.commit()
+                _recalcular_edad(db, defuncion.id)
+        return obtener_defuncion(defuncion.id, db)
+    else:
+        if defuncion and defuncion.estado == "A":
+            defuncion.estado = "I"
+            db.commit()
+        return None
+
+
 def crear_defuncion(data: DefuncionCreate, registrador_id: int | None, db: Session) -> dict:
     defuncion = DefuncionModel(
         registrador_id=registrador_id,
@@ -237,9 +327,12 @@ def crear_defuncion(data: DefuncionCreate, registrador_id: int | None, db: Sessi
 def listar_defunciones(
     db: Session,
     q: Optional[str] = None,
+    expediente: Optional[str] = None,
+    paciente_id: Optional[int] = None,
     fecha_desde: Optional[datetime] = None,
     fecha_hasta: Optional[datetime] = None,
     es_fetal: Optional[bool] = None,
+    estado: Optional[str] = "A",
     skip: int = 0,
     limit: int = 100,
 ) -> tuple[list[dict], int]:
@@ -249,6 +342,12 @@ def listar_defunciones(
     if q:
         where_clauses.append("(p.nombre_completo ILIKE :q OR m.nombre_completo ILIKE :q OR doc.nombre ILIKE :q)")
         params["q"] = f"%{q}%"
+    if expediente:
+        where_clauses.append("p.expediente ILIKE :expediente")
+        params["expediente"] = f"%{expediente}%"
+    if paciente_id is not None:
+        where_clauses.append("d.paciente_id = :paciente_id")
+        params["paciente_id"] = paciente_id
     if fecha_desde:
         where_clauses.append("d.fecha_defuncion >= :fecha_desde")
         params["fecha_desde"] = fecha_desde
@@ -258,6 +357,9 @@ def listar_defunciones(
     if es_fetal is not None:
         where_clauses.append("d.es_fetal = :es_fetal")
         params["es_fetal"] = es_fetal
+    if estado is not None:
+        where_clauses.append("d.estado = :estado")
+        params["estado"] = estado
 
     where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
 
@@ -435,3 +537,59 @@ def eliminar_defuncion(defuncion_id: int, db: Session) -> None:
             status_code=400,
             detail="No se puede eliminar, está relacionado con otros registros"
         )
+
+
+def sincronizar_defunciones(db: Session) -> dict:
+    """Recorre todos los pacientes y sincroniza el estado de las defunciones.
+    
+    - Pacientes con estado='F' sin defunción activa → crea o reactiva defunción
+    - Pacientes sin estado='F' con defunción activa → desactiva defunción
+    """
+    creadas = 0
+    reactivadas = 0
+    desactivadas = 0
+    errores = []
+
+    pacientes_f = db.execute(text(
+        "SELECT id, datos_extra FROM pacientes WHERE estado = 'F'"
+    )).mappings().all()
+
+    for p in pacientes_f:
+        try:
+            pid = p["id"]
+            def_existente = db.query(DefuncionModel).filter(
+                DefuncionModel.paciente_id == pid
+            ).first()
+            if not def_existente or def_existente.estado != "A":
+                actualizar_estado_por_paciente(pid, "F", db)
+                if not def_existente:
+                    creadas += 1
+                else:
+                    reactivadas += 1
+        except Exception as e:
+            errores.append({"paciente_id": p["id"], "error": str(e)})
+
+    activas_sin_f = db.execute(text(
+        """SELECT d.id, d.paciente_id FROM defunciones d
+           JOIN pacientes p ON p.id = d.paciente_id
+           WHERE d.estado = 'A' AND p.estado != 'F'"""
+    )).mappings().all()
+
+    for d in activas_sin_f:
+        try:
+            defuncion = db.query(DefuncionModel).filter(
+                DefuncionModel.id == d["id"]
+            ).first()
+            if defuncion:
+                defuncion.estado = "I"
+                db.commit()
+                desactivadas += 1
+        except Exception as e:
+            errores.append({"defuncion_id": d["id"], "error": str(e)})
+
+    return {
+        "creadas": creadas,
+        "reactivadas": reactivadas,
+        "desactivadas": desactivadas,
+        "errores": errores,
+    }

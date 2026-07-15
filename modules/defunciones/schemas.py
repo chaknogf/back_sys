@@ -32,6 +32,7 @@ class DefuncionCreate(BaseModel):
     fetal_causas_fetales: Optional[str] = None
     fetal_causas_maternas: Optional[str] = None
     observaciones: Optional[str] = None
+    estado: Optional[str] = None
 
 
 class DefuncionUpdate(BaseModel):
@@ -132,6 +133,7 @@ class DefuncionOut(BaseModel):
     fetal_causas_maternas: Optional[str] = None
     registrador_id: Optional[int] = None
     observaciones: Optional[str] = None
+    estado: str = "A"
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

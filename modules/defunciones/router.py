@@ -17,6 +17,7 @@ from modules.defunciones.service import (
     actualizar_defuncion as service_actualizar,
     eliminar_defuncion as service_eliminar,
     buscar_pacientes_fallecidos as service_buscar_fallecidos,
+    sincronizar_defunciones,
 )
 
 router = APIRouter(
@@ -62,18 +63,30 @@ def registrar_defuncion(
 @router.get("/", response_model=DefuncionListResponse)
 def listar_defunciones(
     q: Optional[str] = Query(None, description="Búsqueda por nombre del fallecido, madre o médico"),
+    expediente: Optional[str] = Query(None, description="Filtrar por expediente del fallecido"),
+    paciente_id: Optional[int] = Query(None, description="Filtrar por ID del paciente fallecido"),
     fecha_desde: Optional[datetime] = Query(None, description="Fecha defunción desde (YYYY-MM-DD)"),
     fecha_hasta: Optional[datetime] = Query(None, description="Fecha defunción hasta (YYYY-MM-DD)"),
     es_fetal: Optional[bool] = Query(None, description="Filtrar por defunción fetal"),
+    estado: Optional[str] = Query("A", description="Filtrar por estado (A=Activo, I=Inactivo, dejar vacío para todos)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
+    estado_filtro = estado if estado else None
     defunciones, total = service_listar(
-        db=db, q=q, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
-        es_fetal=es_fetal, skip=skip, limit=limit,
+        db=db, q=q, expediente=expediente, paciente_id=paciente_id, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+        es_fetal=es_fetal, estado=estado_filtro, skip=skip, limit=limit,
     )
     return DefuncionListResponse(total=total, defunciones=defunciones)
+
+
+@router.post("/sincronizar")
+def sincronizar(
+    db: Session = Depends(get_db),
+):
+    """Recorre pacientes y sincroniza defunciones según estado del paciente."""
+    return sincronizar_defunciones(db)
 
 
 @router.get("/pacientes", response_model=PacientesFallecidosResponse)

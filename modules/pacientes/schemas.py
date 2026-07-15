@@ -115,6 +115,7 @@ class Neonatales(BaseModel):
     gemelo: Optional[str] = None
     expediente_madre: Optional[str] = None
     id_madre: Optional[str] = None
+    id_medico: Optional[int] = None
     extrahositalario: Optional[bool] = False
     hora_nacimiento: Optional[time] = None
 
@@ -330,23 +331,37 @@ class PacienteListResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PacienteCreateDerivado(BaseModel):
-    """
-    Schema para crear un paciente derivado (hijo/a) a partir de la madre.
-    El frontend SOLO envía información propia del recién nacido.
-    Todo lo heredado o estructural lo gestiona el backend.
-    """
+class MadreHijoItem(BaseModel):
     sexo: Literal["M", "F"] = Field(..., description="Sexo del recién nacido")
-    fecha_nacimiento: date = Field(..., description="Fecha de nacimiento")
     datos_extra: Neonatales = Field(
         ...,
         description="Datos neonatales del recién nacido"
+    )
+
+
+class PacienteCreateDerivado(BaseModel):
+    """
+    Schema para crear pacientes derivados (hijos/as) a partir de la madre.
+    El frontend SOLO envía información propia del recién nacido.
+    Todo lo heredado o estructural lo gestiona el backend.
+    """
+    fecha_nacimiento: date = Field(..., description="Fecha de nacimiento")
+    hijos: list[MadreHijoItem] = Field(
+        ...,
+        min_length=1,
+        max_length=10,
+        description="Lista de recién nacidos (1=simple, 2=gemelar, 3=triple, etc.)"
     )
     estado: Optional[Literal["V", "F", "I"]] = "V"
 
     model_config = {
         "extra": "forbid"
     }
+
+
+class MadreHijoResponse(BaseModel):
+    pacientes: list[PacienteOut]
+    total: int
 
 class PacientesConConsultas(BaseModel):
     cui: Optional[int] = None

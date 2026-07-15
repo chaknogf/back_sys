@@ -9,7 +9,7 @@ from modules.constancias_nacimiento.models import ConstanciaNacimientoModel
 from modules.nacimientos.models import NacimientoModel
 from modules.nacimientos.service import _computar as _computar_nacimiento
 from .models import PacienteModel
-from .schemas import PacienteOut, PacienteCreateDerivado, Nombre, Referencia
+from .schemas import PacienteOut, PacienteCreateDerivado, MadreHijoResponse, Nombre, Referencia
 from .service import agregar_evento
 
 router = APIRouter(prefix="/pacientes", tags=["Pacientes"])
@@ -54,7 +54,7 @@ def construir_datos_extra_derivados(madre: PacienteModel) -> dict:
     return datos_extra
 
 
-@router.post("/madre-hijo/{madre_id}", response_model=PacienteOut, status_code=201)
+@router.post("/madre-hijo/{madre_id}", response_model=MadreHijoResponse, status_code=201)
 def crear_paciente_desde_madre(
     madre_id: int,
     payload: PacienteCreateDerivado,
@@ -72,32 +72,19 @@ def crear_paciente_desde_madre(
     if calcular_edad(madre.fecha_nacimiento) < 12:
         raise HTTPException(400, "Paciente no elegible como madre")
 
-    datos_extra = construir_datos_extra_derivados(madre)
-    datos_extra["origen"] = {
-        "tipo": "MADRE",
-        "paciente_id": madre.id,
-        "expediente": madre.expediente
-    }
-
-    if payload.datos_extra:
-        datos_extra["neonatales"] = payload.datos_extra.model_dump()
-
-    expediente = generar_expediente(db) if auto_expediente else None
-
     nombre_madre = madre.nombre or {}
     if not isinstance(nombre_madre, dict):
         nombre_madre = {}
 
-    nombre_hijo = Nombre(
-        primer_nombre="Hija de" if payload.sexo == "F" else "Hijo de",
-        segundo_nombre=nombre_madre.get("primer_nombre"),
-        otro_nombre=" ".join(
-            filter(None, [nombre_madre.get("segundo_nombre"), nombre_madre.get("otro_nombre")])
-        ) or None,
-        primer_apellido=nombre_madre.get("primer_apellido") or "PENDIENTE",
-        segundo_apellido=nombre_madre.get("segundo_apellido"),
-        apellido_casada=nombre_madre.get("apellido_casada"),
-    )
+    nombre_madre_str = madre.nombre_completo or " ".join(filter(None, [
+        nombre_madre.get("primer_nombre"),
+        nombre_madre.get("segundo_nombre"),
+        nombre_madre.get("primer_apellido"),
+        nombre_madre.get("segundo_apellido"),
+    ]))
+
+    madre_demo = (madre.datos_extra or {}).get("demografico", {})
+    vecindad_madre = madre_demo.get("vecindad") or madre_demo.get("municipio")
 
     referencia_hijo = Referencia(
         nombre=madre.nombre_completo,
@@ -110,73 +97,89 @@ def crear_paciente_desde_madre(
         responsable=True
     )
 
-    gemelo = payload.datos_extra.gemelo if payload.datos_extra else None
-    if not gemelo:
-        nombre_dict = nombre_hijo.model_dump()
-        for campo in ["primer_nombre", "segundo_nombre", "otro_nombre",
-                      "primer_apellido", "segundo_apellido", "apellido_casada"]:
-            if nombre_dict.get(campo):
-                nombre_dict[campo] = nombre_dict[campo].strip().title()
-        existente = db.query(PacienteModel).filter(
-            PacienteModel.nombre == nombre_dict,
-            PacienteModel.sexo == payload.sexo,
-            PacienteModel.fecha_nacimiento == payload.fecha_nacimiento
-        ).first()
-        if existente:
-            raise HTTPException(
-                status_code=409,
-                detail="Ya existe un paciente registrado con los mismos datos de la madre, sexo y fecha de nacimiento"
-            )
+    pacientes = []
+    total = len(payload.hijos)
+    for i, hijo in enumerate(payload.hijos, start=1):
+        datos_extra = construir_datos_extra_derivados(madre)
+        datos_extra["origen"] = {
+            "tipo": "MADRE",
+            "paciente_id": madre.id,
+            "expediente": madre.expediente
+        }
+        neonatales_dict = hijo.datos_extra.model_dump()
+        datos_extra["neonatales"] = neonatales_dict
 
-    nuevo = PacienteModel(
-        nombre=nombre_hijo.model_dump(),
-        sexo=payload.sexo,
-        fecha_nacimiento=payload.fecha_nacimiento,
-        contacto=madre.contacto,
-        expediente=expediente,
-        datos_extra=datos_extra,
-        estado=payload.estado,
-        referencias=[referencia_hijo.model_dump()]
-    )
+        expediente = generar_expediente(db) if auto_expediente else None
 
-    agregar_evento(nuevo, usuario=current_user.username, accion="CREADO")
+        nombre_hijo = Nombre(
+            primer_nombre="Hija de" if hijo.sexo == "F" else "Hijo de",
+            segundo_nombre=nombre_madre.get("primer_nombre"),
+            otro_nombre=(
+                f"#{i} {' '.join(filter(None, [nombre_madre.get('segundo_nombre'), nombre_madre.get('otro_nombre')]))}"
+                if total > 1
+                else " ".join(filter(None, [nombre_madre.get("segundo_nombre"), nombre_madre.get("otro_nombre")]))
+            ) or None,
+            primer_apellido=nombre_madre.get("primer_apellido") or "PENDIENTE",
+            segundo_apellido=nombre_madre.get("segundo_apellido"),
+            apellido_casada=nombre_madre.get("apellido_casada"),
+        )
 
-    db.add(nuevo)
-    db.flush()
+        if total == 1 and not neonatales_dict.get("gemelo"):
+            nombre_dict = nombre_hijo.model_dump()
+            for campo in ["primer_nombre", "segundo_nombre", "otro_nombre",
+                          "primer_apellido", "segundo_apellido", "apellido_casada"]:
+                if nombre_dict.get(campo):
+                    nombre_dict[campo] = nombre_dict[campo].strip().title()
+            existente = db.query(PacienteModel).filter(
+                PacienteModel.nombre == nombre_dict,
+                PacienteModel.sexo == hijo.sexo,
+                PacienteModel.fecha_nacimiento == payload.fecha_nacimiento
+            ).first()
+            if existente:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Ya existe un paciente registrado con los mismos datos de la madre, sexo y fecha de nacimiento"
+                )
 
-    nombre_madre_str = madre.nombre_completo or " ".join(filter(None, [
-        nombre_madre.get("primer_nombre"),
-        nombre_madre.get("segundo_nombre"),
-        nombre_madre.get("primer_apellido"),
-        nombre_madre.get("segundo_apellido"),
-    ]))
+        nuevo = PacienteModel(
+            nombre=nombre_hijo.model_dump(),
+            sexo=hijo.sexo,
+            fecha_nacimiento=payload.fecha_nacimiento,
+            contacto=madre.contacto,
+            expediente=expediente,
+            datos_extra=datos_extra,
+            estado=payload.estado,
+            referencias=[referencia_hijo.model_dump()]
+        )
 
-    madre_demo = (madre.datos_extra or {}).get("demografico", {})
-    vecindad_madre = madre_demo.get("vecindad") or madre_demo.get("municipio")
+        agregar_evento(nuevo, usuario=current_user.username, accion="CREADO")
+        db.add(nuevo)
+        db.flush()
 
-    constancia = ConstanciaNacimientoModel(
-        paciente_id=nuevo.id,
-        madre_id=madre.id,
-        registrador_id=current_user.id,
-        documento=generar_constancia_nacimiento(db),
-        nombre_madre=nombre_madre_str,
-        vecindad_madre=str(vecindad_madre) if vecindad_madre else None,
-    )
+        constancia = ConstanciaNacimientoModel(
+            paciente_id=nuevo.id,
+            madre_id=madre.id,
+            registrador_id=current_user.id,
+            medico_id=hijo.datos_extra.id_medico,
+            documento=generar_constancia_nacimiento(db),
+            nombre_madre=nombre_madre_str,
+            vecindad_madre=str(vecindad_madre) if vecindad_madre else None,
+        )
+        db.add(constancia)
 
-    db.add(constancia)
+        computado = _computar_nacimiento(neonatales_dict)
+        nacimiento = NacimientoModel(
+            paciente_id=nuevo.id,
+            madre_id=madre.id,
+            registrador_id=current_user.id,
+            peso_gramos=computado["peso_gramos"],
+            clasificacion_nacimiento=computado["clasificacion_nacimiento"],
+            trabajo_parto=computado["trabajo_parto"],
+        )
+        db.add(nacimiento)
+        db.refresh(nuevo)
+        pacientes.append(nuevo)
 
-    neonatales = payload.datos_extra.model_dump() if payload.datos_extra else {}
-    computado = _computar_nacimiento(neonatales)
-    nacimiento = NacimientoModel(
-        paciente_id=nuevo.id,
-        madre_id=madre.id,
-        registrador_id=current_user.id,
-        peso_gramos=computado["peso_gramos"],
-        clasificacion_nacimiento=computado["clasificacion_nacimiento"],
-        trabajo_parto=computado["trabajo_parto"],
-    )
-    db.add(nacimiento)
     db.commit()
-    db.refresh(nuevo)
 
-    return nuevo
+    return MadreHijoResponse(pacientes=pacientes, total=total)

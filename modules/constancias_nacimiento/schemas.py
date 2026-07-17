@@ -63,6 +63,13 @@ class ConstanciaNacimientoListResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
 
+class EstadoInformeUpdate(BaseModel):
+    estado_informe: str = Field(
+        ...,
+        pattern=r"^(creado|entregado|reimpreso|perdido|anulado)$"
+    )
+
+
 class ConstanciaNacimientoHistorialResponse(BaseModel):
     id: int
     constancia_id: int

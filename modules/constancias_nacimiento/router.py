@@ -4,7 +4,7 @@ from modules.pacientes.models import PacienteModel
 from modules.expediente.service import generar_constancia_nacimiento as generar_cn
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import inspect, desc, func, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, attributes
 from decimal import Decimal
 from core.database import get_db
 from core.security import get_current_user
@@ -16,7 +16,8 @@ from modules.constancias_nacimiento.schemas import (
     ConstanciaNacimientoHistorialResponse,
     ConstanciaNacimientoListResponse,
     ConstanciaNacimientoUpdate,
-    ConstanciaNacimientoResponse
+    ConstanciaNacimientoResponse,
+    EstadoInformeUpdate
 )
 
 router = APIRouter(prefix="/constancias-nacimiento", tags=["Constancias Nacimiento"])
@@ -61,6 +62,10 @@ def crear_constancia(
     data_dict = data.model_dump(exclude={"registrador_id"})
     nueva = ConstanciaNacimientoModel(**data_dict)
     nueva.registrador_id = current_user.id
+    nueva.metadatos = {
+        "registrador": current_user.username,
+        "estado_informe": "creado"
+    }
     db.add(nueva)
     db.commit()
     db.refresh(nueva)
@@ -215,6 +220,35 @@ def actualizar_constancia(
         _actualizar_partos_madre(constancia.madre_id, db)
 
     return constancia
+
+@router.patch("/{constancia_id}/estado-informe", response_model=ConstanciaNacimientoResponse)
+def actualizar_estado_informe(
+    constancia_id: int,
+    data: EstadoInformeUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    constancia = db.get(ConstanciaNacimientoModel, constancia_id)
+    if not constancia:
+        raise HTTPException(status_code=404, detail="Constancia no encontrada")
+
+    if constancia.metadatos is None:
+        constancia.metadatos = {}
+    constancia.metadatos["estado_informe"] = data.estado_informe
+    if "historial" not in constancia.metadatos:
+        constancia.metadatos["historial"] = []
+    constancia.metadatos["historial"].append({
+        "usuario": current_user.username,
+        "fecha_hora": datetime.now().isoformat(),
+        "estado_informe": data.estado_informe
+    })
+    attributes.flag_modified(constancia, "metadatos")
+    constancia.updated_at = datetime.now()
+
+    db.commit()
+    db.refresh(constancia)
+    return constancia
+
 
 @router.delete("/{constancia_id}")
 def eliminar_constancia(

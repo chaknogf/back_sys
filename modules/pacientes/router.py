@@ -236,6 +236,22 @@ def gestionar_paciente(
             raise HTTPException(status_code=400, detail="Datos duplicados o inválidos")
 
 
+@router.patch("/{paciente_id}/limpiar-cui", response_model=PacienteOut)
+def limpiar_cui(
+    paciente_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    paciente = db.get(PacienteModel, paciente_id)
+    if not paciente:
+        raise HTTPException(status_code=404, detail=f"Paciente con ID {paciente_id} no encontrado")
+    paciente.cui = None
+    agregar_evento(paciente, usuario=current_user.username, accion="ACTUALIZADO", detalle="CUI limpiado")
+    db.commit()
+    db.refresh(paciente)
+    return paciente
+
+
 @router.delete("/{paciente_id}/eliminar-permanente", status_code=204)
 def eliminar_paciente_permanente(
     paciente_id: int,

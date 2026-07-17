@@ -1257,6 +1257,40 @@ class TestConstanciasNacimiento:
         assert r.status_code == 200
         created_ids["constancias"].remove(cid)
 
+    def test_estado_informe(self, client, auth_headers):
+        if not created_ids["constancias"]:
+            pytest.skip("No constancia created")
+        cid = created_ids["constancias"][0]
+        # PATCH a entregado
+        r = client.patch(
+            f"/constancias-nacimiento/{cid}/estado-informe",
+            headers=auth_headers,
+            json={"estado_informe": "entregado"},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["metadatos"]["estado_informe"] == "entregado"
+        assert "historial" in data["metadatos"]
+        assert len(data["metadatos"]["historial"]) >= 1
+
+        # PATCH a reimpreso (verifica que historial crece)
+        r2 = client.patch(
+            f"/constancias-nacimiento/{cid}/estado-informe",
+            headers=auth_headers,
+            json={"estado_informe": "reimpreso"},
+        )
+        assert r2.status_code == 200
+        assert r2.json()["metadatos"]["estado_informe"] == "reimpreso"
+        assert len(r2.json()["metadatos"]["historial"]) >= 2
+
+        # estado inválido debe fallar
+        r3 = client.patch(
+            f"/constancias-nacimiento/{cid}/estado-informe",
+            headers=auth_headers,
+            json={"estado_informe": "invalido"},
+        )
+        assert r3.status_code == 422
+
     def test_constancia_actualiza_partos_madre(self, client, auth_headers):
         """Crear constancias con madre_id debe actualizar datos_extra.partos de la madre."""
         s = _sufijo()

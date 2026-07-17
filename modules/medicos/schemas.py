@@ -6,7 +6,7 @@ from datetime import datetime
 
 class MedicoBase(BaseModel):
     nombre: str = Field(..., max_length=200)
-    colegiado: Optional[int] 
+    colegiado: Optional[int] = None
     dpi: Optional[int]
     sexo: Optional[str] = Field(None, max_length=1)
     especialidad: Optional[str] = Field(None, max_length=100)

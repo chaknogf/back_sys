@@ -27,7 +27,7 @@ def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
             
             SELECT 'pacientes_activos' AS entidad, COUNT(*) AS total, 2 AS orden
             FROM pacientes
-            WHERE estado = 'ACTIVO'
+            WHERE estado = 'A'
             
             UNION ALL
             

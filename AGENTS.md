@@ -20,7 +20,7 @@ pytest tests/ -v
 - **Server**: Uvicorn 0.38
 - **Database**: PostgreSQL 18 (db: `hospital`)
 - **ORM**: SQLAlchemy 2.0 + psycopg2-binary
-- **Auth**: JWT (python-jose HS256) + Argon2 (passlib)
+- **Auth**: JWT (joserfc HS256) + Argon2 (passlib)
 - **Validation**: Pydantic 2.12
 - **Email**: FastAPI-Mail (SMTP Gmail) + Jinja2 templates
 - **Testing**: pytest 9 + FastAPI TestClient
@@ -38,7 +38,7 @@ back_sys/
 │   ├── dependencies.py        # FastAPI DI re-exports
 │   ├── exceptions.py          # Global error handlers (422, 409, 500)
 │   └── mail.py                # FastAPI-Mail config
-├── modules/                   # 25 domain modules
+├── modules/                   # 29 domain modules
 │   ├── auth/                  # POST /auth/login, GET /auth/me
 │   ├── users/                 # Full user CRUD
 │   ├── pacientes/             # Patient CRUD, duplicates (trigram/soundex), merge, neonates
@@ -62,6 +62,11 @@ back_sys/
 │   ├── laboratorios/          # Lab tests (models only)
 │   ├── rayos_x/               # X-rays (models only)
 │   ├── sigsa3/                # SIGSA-3 consultation registry
+│   ├── cie10/                 # CIE-10 catalog search + LLM
+│   ├── censo_camas/           # Bed census registry
+│   ├── defunciones/           # Death records
+│   ├── nacimientos_legacy/    # Legacy birth data
+│   ├── chat/                  # NL→SQL read-only chat assistant
 │   └── common/schemas.py      # Shared Pydantic schemas
 └── tests/                     # pytest tests
 ```
@@ -92,7 +97,10 @@ All routes under root path `/fah` (e.g., `https://host/fah/auth/login`).
 | Events | `/eventos` | `GET/POST`, `PATCH/DELETE /{id}` |
 | Procedures | `/procedimientos` | `/catalogo` (con filtros `abreviatura`, `nombre`), `/catalogo/*`, `/estadisticas/*`, `GET/POST /{id}` |
 | Correlatives | `/correlativos` | `POST /expediente`, `/emergencia`, `/constancia_nacimiento`, `/constancia_defuncion`, `/constancia_medica` |
-| Birth Certs | `/constancias-nacimiento` | `GET/POST`, `GET /{id}` |
+| Birth Certs | `/constancias-nacimiento` | `GET/POST`, `GET /{id}`, `/historial/{id}`, `PATCH /{id}/estado-informe` |
+| Deaths | `/defunciones` | `POST/GET`, `GET/PATCH/DELETE /{id}`, `/registrar/{paciente_id}`, `/sincronizar`, `/pacientes` |
+| Censo Camas | `/censo-camas` | `GET/POST`, `PUT/DELETE /{id}`, `/upsert`, `/bulk`, `/importar-csv`, `/resumen/{fecha}`, `/estadisticas` |
+| CIE-10 | `/cie10` | `GET /catalogo`, `GET /buscar`, `POST /sugerir` |
 | Loans | `/prestamos` | `GET/POST`, `GET/PUT/DELETE /{id}` |
 | Municipalities | `/municipios` | `GET /` (filtros: `q`, `codigo`, `municipio`, `departamento`, `vecindad`), `GET /departamentos` |
 | Births | `/nacimientos` | `GET/POST`, `GET/PATCH/DELETE /{id}`, `/desde-paciente/{id}`, `/sincronizar` (unifica madre-hijo + legacy), `/referenciar-legacy` (cruza con `nacimientos_legacy`). **Sin datos redundantes:** expediente, sexo, fecha_nac, neonatales se obtienen vía JOIN con `pacientes`. Columnas computadas: `peso_gramos`, `clasificacion_nacimiento` (EBP/MBP/BP/PN), `trabajo_parto` (Prematuro/a Termino/Prolongado) |
@@ -107,9 +115,10 @@ All routes under root path `/fah` (e.g., `https://host/fah/auth/login`).
 
 - **Name**: `hospital` (PostgreSQL)
 - **Extensions**: `pg_trgm`, `unaccent`
-- **Key tables**: `pacientes` (JSONB fields), `consultas`, `medicos`, `users`, `citas`, `ciclos_consulta`, `eventos_consulta`, `procedimientos`, `proce_medicos`, `constancia_nacimiento`, `prestamos`, `expediente_control`, `municipios`, `paises_iso`, `audit_log`, `laboratorios`, `rayos_x`, `encamamiento`, `nacimientos` (sin datos redundantes — solo `id`, `paciente_id`, `madre_id`, `registrador_id`, `peso_gramos`, `clasificacion_nacimiento`, `trabajo_parto`, timestamps), `nacimientos_legacy`, `sigsa3`
+- **Key tables**: `pacientes` (JSONB fields), `consultas`, `medicos`, `users`, `citas`, `ciclos_consulta`, `eventos_consulta`, `procedimientos`, `proce_medicos`, `constancia_nacimiento`, `prestamos`, `expediente_control`, `municipios`, `paises_iso`, `audit_log`, `laboratorios`, `rayos_x`, `encamamiento`, `nacimientos` (sin datos redundantes — solo `id`, `paciente_id`, `madre_id`, `registrador_id`, `peso_gramos`, `clasificacion_nacimiento`, `trabajo_parto`, timestamps), `nacimientos_legacy`, `sigsa3`, `censo_camas`, `defunciones`, `cie10_catalogo`, `personal_salud`
 - **Indexes**: GIN on JSONB, partial unique indexes, trigram GIN on `nombre_completo`
 - **Trigger**: `trg_set_nombre_completo` auto-generates full name from JSONB `nombre` before insert/update
+- **Tables with `personal_salud`**: Catalog of healthcare workers for SIGSA-3 association, linked to `medicos` table
 
 ## Full Endpoint Reference
 
@@ -128,9 +137,11 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Users | DELETE | `/users/{user_id}` | admin | 204 | Soft delete |
 | Pacientes | GET | `/pacientes/` | auth | `PacienteListResponse` | Search (15+ filtros: q, id, cui, expediente, nombre, sexo, estado, etc.) |
 | Pacientes | GET | `/pacientes/neonatales` | auth | `PacienteListResponse` | Neonatales |
+| Pacientes | GET | `/pacientes/personal-hospital` | auth | `PacienteListResponse` | Personal hospital (`datos_extra.socioeconomicos.personal_hospital=S`) |
 | Pacientes | GET | `/pacientes/{paciente_id}` | auth | `PacienteOut` | By ID |
 | Pacientes | POST | `/pacientes/` | auth | `PacienteOut` (201) | Create |
 | Pacientes | PATCH | `/pacientes/{paciente_id}` | auth | `PacienteOut\|dict` | Update/activar/desactivar/expediente |
+| Pacientes | PATCH | `/pacientes/{paciente_id}/limpiar-cui` | auth | `PacienteOut` | Limpiar CUI |
 | Pacientes | DELETE | `/pacientes/{paciente_id}/eliminar-permanente` | admin | 204 | Hard delete |
 | Pacientes | GET | `/pacientes/debug/count` | auth | dict | Conteo |
 | Pacientes | GET | `/pacientes/expediente/{expediente}` | auth | `PacienteContacto` | By expediente |
@@ -142,6 +153,7 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Consultas | GET | `/consultas/{consulta_id}` | auth | `ConsultaOut` | By ID |
 | Consultas | PATCH | `/consultas/sincronizar-indicadores` | auth | dict | Sync indicadores |
 | Consultas | PATCH | `/consultas/{consulta_id}` | auth | `ConsultaOut` | Update |
+| Consultas | PATCH | `/consultas/{consulta_id}/reasignar-paciente` | admin | `ConsultaOut` | Reasignar paciente |
 | Consultas | POST | `/consultas/registro` | auth | `RegistroConsultaOut` (201) | Nueva consulta |
 | Consultas | GET | `/consultas/pacienteId/{paciente_id}` | auth | `List[ConsultaHistoriaResumidaOut]` | By patient |
 | Consultas | DELETE | `/consultas/{consulta_id}` | auth | `ConsultaOut` | Desactivar |
@@ -168,6 +180,7 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Const. Nac. | GET | `/constancias-nacimiento/historial/{constancia_id}` | auth | `list[...HistorialResponse]` | Historial |
 | Const. Nac. | GET | `/constancias-nacimiento/{constancia_id}` | auth | `ConstanciaNacimientoResponse` | By ID |
 | Const. Nac. | PUT | `/constancias-nacimiento/{constancia_id}` | auth | `ConstanciaNacimientoResponse` | Update (guarda historial) |
+| Const. Nac. | PATCH | `/constancias-nacimiento/{constancia_id}/estado-informe` | auth | `ConstanciaNacimientoResponse` | Cambia estado_informe (entregado/reimpreso) |
 | Const. Nac. | DELETE | `/constancias-nacimiento/{constancia_id}` | admin | dict | Delete |
 | Correlativos | POST | `/correlativos/expediente` | auth | dict (201) | EXP-YYYY-###### |
 | Correlativos | POST | `/correlativos/emergencia` | auth | dict (201) | EMERG-###### |
@@ -215,7 +228,31 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Estadisticas | GET | `/estadisticas/consultas/mayores-a-7-dias` | auth | `ConsultaListResponse` | Consultas activas con >7 días desde fecha_consulta, incluye `dias_acumulados` (filtros: `skip`, `limit`) |
 | Estadisticas | GET | `/estadisticas/nacimientos` | auth | `NacimientosStatsResponse` | Estadísticas de nacimientos por sexo/estado, clase de parto, clasificación y trabajo de parto (req: `desde`, `hasta`) |
 | Totales | GET | `/totales/` | auth | `TotalesResponse` | KPIs dashboard (7 indicadores: pacientes totales/activos, consultas totales/día, COEX/hosp/emerg del día). Opcional: `fecha` |
+| Chat | POST | `/chat/consulta` | auth | `ChatResponse` | Consulta NL→SQL (read-only, LLM genera SELECT). Rate: 10/min |
+| Chat | GET | `/chat/tablas` | auth | `List[TablaInfo]` | Lista tablas disponibles con descripción |
+| Chat | GET | `/chat/tablas` | auth | `List[TablaInfo]` | Lista tablas disponibles con descripción |
 | Audit | GET | `/audit-log/` | admin | dict (paginated) | Logs (filtros: tabla, username, desde, hasta) |
+| Defunciones | POST | `/defunciones/` | auth | `DefuncionOut` (201) | Create |
+| Defunciones | POST | `/defunciones/registrar/{paciente_id}` | auth | `DefuncionOut` (201) | Registrar y marcar paciente F |
+| Defunciones | GET | `/defunciones/` | auth | `DefuncionListResponse` | List (filtros: q, expediente, paciente_id, fecha, es_fetal, estado) |
+| Defunciones | GET | `/defunciones/pacientes` | auth | `PacientesFallecidosResponse` | Buscar pacientes fallecidos |
+| Defunciones | POST | `/defunciones/sincronizar` | auth | dict | Sincronizar desde estado pacientes |
+| Defunciones | GET | `/defunciones/{defuncion_id}` | auth | `DefuncionOut` | By ID |
+| Defunciones | PATCH | `/defunciones/{defuncion_id}` | auth | `DefuncionOut` | Update |
+| Defunciones | DELETE | `/defunciones/{defuncion_id}` | auth | 204 | Delete |
+| Censo Camas | POST | `/censo-camas/` | auth | `CensoCamasOut` (201) | Create registro |
+| Censo Camas | POST | `/censo-camas/upsert` | auth | `CensoCamasOut` | Upsert |
+| Censo Camas | POST | `/censo-camas/bulk` | auth | dict (201) | Bulk create |
+| Censo Camas | POST | `/censo-camas/importar-csv` | auth | dict | Importar CSV |
+| Censo Camas | GET | `/censo-camas/` | auth | `CensoCamasListResponse` | List (filtros: fecha, servicio, sexo) |
+| Censo Camas | GET | `/censo-camas/resumen/{fecha}` | auth | `CensoDiarioResumen` | Resumen diario |
+| Censo Camas | GET | `/censo-camas/estadisticas` | auth | `CensoEstadisticasResponse` | Stats (desde, hasta) |
+| Censo Camas | GET | `/censo-camas/{registro_id}` | auth | `CensoCamasOut` | By ID |
+| Censo Camas | PUT | `/censo-camas/{registro_id}` | auth | `CensoCamasOut` | Update |
+| Censo Camas | DELETE | `/censo-camas/{registro_id}` | auth | 204 | Delete |
+| CIE-10 | GET | `/cie10/catalogo` | auth | dict | Descargar/asegurar catálogo |
+| CIE-10 | GET | `/cie10/buscar` | auth | dict | Buscar (q, nivel, limit, offset) |
+| CIE-10 | POST | `/cie10/sugerir` | auth | dict | Sugerir códigos con LLM |
 | Encamamiento | POST | `/encamamiento/` | public | `EncamamientoOut` (201) | Create servicio |
 | Encamamiento | GET | `/encamamiento/` | public | `List[EncamamientoOut]` | List (filtro: activo) |
 | Encamamiento | GET | `/encamamiento/{servicio_id}` | public | `EncamamientoOut` | By ID |
@@ -226,9 +263,11 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Nacimientos | GET | `/nacimientos/` | auth | `NacimientoListResponse` | List (6 filtros, JOIN con pacientes) |
 | Nacimientos | GET | `/nacimientos/{nacimiento_id}` | auth | `NacimientoOut` | By ID (incluye `neonatales` + `paciente` del JOIN) |
 | Nacimientos | PATCH | `/nacimientos/{nacimiento_id}` | auth | `NacimientoOut` | Update (solo `madre_id`) |
+| Nacimientos | PATCH | `/nacimientos/{nacimiento_id}/neonatales` | auth | `NacimientoOut` | Actualiza neonatales y recomputa |
 | Nacimientos | DELETE | `/nacimientos/{nacimiento_id}` | auth | 204 | Delete |
 | Nacimientos | POST | `/nacimientos/sincronizar` | auth | dict | Sincronizar madre-hijo + legacy |
 | Nacimientos | GET | `/nacimientos/referenciar-legacy` | auth | `LegacyReferenceResponse` | Referenciar legacy |
+| Nacimientos | POST | `/nacimientos/recomputar` | auth | dict | Recomputa peso_gramos, clasificacion, trabajo_parto |
 | SIGSA-3 | GET | `/sigsa3/` | auth | `List[Sigsa3Out]` | List (9 filtros: personal_salud, fecha_consulta, historia_clinica, nombre, sexo, tipo_consulta, especialidad, cie10, q) |
 | SIGSA-3 | GET | `/sigsa3/{id}` | auth | `Sigsa3Out` | By ID |
 | SIGSA-3 | POST | `/sigsa3/` | auth | `Sigsa3Out` (201) | Create |
@@ -377,4 +416,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES
 MAIL_USERNAME/PASSWORD/FROM/SERVER/PORT
 ENVIRONMENT
 FRONTEND_URL
+CHAT_LLM_PROVIDER/MODEL/API_KEY
+OPENCODE_SERVER_URL/PASSWORD  # Si usas opencode como gateway
 ```

@@ -38,5 +38,20 @@ CIE10_LLM_API_KEY = os.getenv("CIE10_LLM_API_KEY", "")
 CIE10_LLM_MODEL = os.getenv("CIE10_LLM_MODEL", "phi3:mini")
 CIE10_LLM_PROVIDER = os.getenv("CIE10_LLM_PROVIDER", "ollama")
 CIE10_LLM_BASE_URL = os.getenv("CIE10_LLM_BASE_URL", "https://api.openai.com/v1")
+
+# Chat Inteligente (NL→SQL)
+CHAT_LLM_API_KEY = os.getenv("CHAT_LLM_API_KEY", "")
+CHAT_LLM_MODEL = os.getenv("CHAT_LLM_MODEL", "phi3:mini")
+CHAT_LLM_PROVIDER = os.getenv("CHAT_LLM_PROVIDER", "ollama")
+CHAT_LLM_BASE_URL = os.getenv("CHAT_LLM_BASE_URL", "https://api.openai.com/v1")
+
+# Usuario read-only para chat (opcional, misma DB si no se configura)
+POSTGRES_RO_USER = os.getenv("POSTGRES_RO_USER", "")
+POSTGRES_RO_PASSWORD = os.getenv("POSTGRES_RO_PASSWORD", "")
+
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
+# Opencode server (gateway a modelos como Claude, GPT, Zen, etc.)
+OPENCODE_SERVER_URL = os.getenv("OPENCODE_SERVER_URL", "http://127.0.0.1:4096")
+OPENCODE_SERVER_PASSWORD = os.getenv("OPENCODE_SERVER_PASSWORD", "")
 

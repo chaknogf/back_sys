@@ -18,9 +18,6 @@ from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 
 
-FastAPICache.init(InMemoryBackend(), prefix="fah-cache")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if REDIS_URL:
@@ -69,6 +66,7 @@ from modules.nacimientos.router import router as nacimientos_router
 from modules.sigsa3.router import router as sigsa3_router
 from modules.cie10.router import router as cie10_router
 from modules.defunciones.router import router as defunciones_router
+from modules.chat.router import router as chat_router
 
 app = FastAPI(
     lifespan=lifespan,
@@ -161,6 +159,7 @@ app.include_router(nacimientos_router)
 app.include_router(sigsa3_router)
 app.include_router(cie10_router)
 app.include_router(defunciones_router)
+app.include_router(chat_router)
 
 
 @app.get("/", include_in_schema=False)

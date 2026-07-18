@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 
 from core.config import DB_POOL_SIZE, DB_MAX_OVERFLOW, DB_POOL_RECYCLE
+from core.config import POSTGRES_RO_USER, POSTGRES_RO_PASSWORD
 
 load_dotenv(override=True)
 
@@ -36,6 +37,27 @@ engine = create_engine(
     }
 )
 
+# ── Engine read-only (usuario con solo SELECT) ──
+_engine_ro = None
+if POSTGRES_RO_USER and POSTGRES_RO_PASSWORD:
+    DATABASE_URL_RO = (
+        f"postgresql+psycopg2://{POSTGRES_RO_USER}:"
+        f"{quote_plus(POSTGRES_RO_PASSWORD)}"
+        f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    )
+    _engine_ro = create_engine(
+        DATABASE_URL_RO,
+        echo=False,
+        pool_pre_ping=True,
+        pool_size=2,
+        max_overflow=4,
+        pool_recycle=DB_POOL_RECYCLE,
+        connect_args={
+            "connect_timeout": 10,
+            "options": "-c client_encoding=UTF8 -c statement_timeout=30000",
+        },
+    )
+
 try:
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
@@ -50,6 +72,23 @@ Base = declarative_base()
 
 def get_db() -> Session:
     db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+_SessionRO = None  # Lazy init
+
+
+def get_db_readonly() -> Session:
+    global _SessionRO
+    if _engine_ro:
+        if _SessionRO is None:
+            _SessionRO = sessionmaker(autocommit=False, autoflush=False, bind=_engine_ro)
+        db = _SessionRO()
+    else:
+        db = SessionLocal()
     try:
         yield db
     finally:

@@ -21,6 +21,11 @@ from .service import (
     asociar_paciente,
     listar_no_asociados,
     actualizar_especialidad_por_medico,
+    listar_personal_salud,
+    crear_personal_salud,
+    actualizar_personal_salud,
+    eliminar_personal_salud,
+    sincronizar_especialidad,
     dx_z34,
     dx_z10,
 )
@@ -106,7 +111,7 @@ def actualizar_especialidad(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Actualiza especialidad en registros SIGSA-3 usando personal_salud como referencia con la tabla medicos."""
+    """Actualiza especialidad en registros SIGSA-3 usando personal_salud como referencia."""
     return actualizar_especialidad_por_medico(data.personal_salud, db)
 
 
@@ -214,3 +219,78 @@ def asociar_todo_endpoint(
 ):
     """Pipeline completo: paciente_id (nombre+expediente, nombre contiene, expediente) y consulta_id (paciente+fecha+tipo, documento+fecha)."""
     return asociar_paciente_y_consulta(db)
+
+
+# ────────────────────────────────
+# PERSONAL_SALUD CRUD
+# ────────────────────────────────
+
+
+class PersonalSaludCreate(BaseModel):
+    nombre: str = Field(..., max_length=200)
+    especialidad: str | None = Field(None, max_length=100)
+    medico_id: int | None = None
+
+
+class PersonalSaludUpdate(BaseModel):
+    nombre: str | None = Field(None, max_length=200)
+    especialidad: str | None = Field(None, max_length=100)
+    medico_id: int | None = None
+
+
+class PersonalSaludOut(BaseModel):
+    id: int
+    nombre: str
+    especialidad: str | None
+    medico_id: int | None
+    created_at: str | None = None
+
+
+@router.get("/personal-salud", response_model=List[PersonalSaludOut], tags=["SIGSA-3", "Personal Salud"])
+def listar_personal_salud_endpoint(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Lista el catálogo de personal de salud."""
+    from modules.sigsa3.models import PersonalSaludModel
+    return db.query(PersonalSaludModel).order_by(PersonalSaludModel.nombre).all()
+
+
+@router.post("/personal-salud", response_model=PersonalSaludOut, status_code=201, tags=["SIGSA-3", "Personal Salud"])
+def crear_personal_salud_endpoint(
+    data: PersonalSaludCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Agrega una persona al catálogo personal_salud."""
+    return crear_personal_salud(data.nombre, data.especialidad, data.medico_id, db)
+
+
+@router.put("/personal-salud/{ps_id}", response_model=PersonalSaludOut, tags=["SIGSA-3", "Personal Salud"])
+def actualizar_personal_salud_endpoint(
+    ps_id: int,
+    data: PersonalSaludUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Actualiza un registro en personal_salud."""
+    return actualizar_personal_salud(ps_id, data.nombre, data.especialidad, data.medico_id, db)
+
+
+@router.delete("/personal-salud/{ps_id}", tags=["SIGSA-3", "Personal Salud"])
+def eliminar_personal_salud_endpoint(
+    ps_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Elimina un registro de personal_salud."""
+    return eliminar_personal_salud(ps_id, db)
+
+
+@router.post("/sincronizar-especialidad", tags=["SIGSA-3"])
+def sincronizar_especialidad_endpoint(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Sincroniza especialidad desde personal_salud → medicos y sigsa3."""
+    return sincronizar_especialidad(db)

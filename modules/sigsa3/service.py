@@ -378,8 +378,8 @@ def eliminar_por_periodo(desde: date, hasta: date, db: Session) -> dict:
 
 
 def asociar_medico(db: Session) -> dict:
-    """Asocia medico_id a registros SIGSA3 usando personal_salud con medicos.nombre."""
-    from modules.medicos.models import MedicoModel
+    """Asocia medico_id a registros SIGSA3 usando personal_salud."""
+    from modules.sigsa3.models import PersonalSaludModel
 
     registros = db.query(Sigsa3Model).filter(
         Sigsa3Model.medico_id.is_(None),
@@ -388,16 +388,25 @@ def asociar_medico(db: Session) -> dict:
     if not registros:
         return {"registros_encontrados": 0, "asociados": 0}
 
-    medicos_cache = {}
+    personal = db.query(PersonalSaludModel).filter(
+        PersonalSaludModel.medico_id.isnot(None)
+    ).all()
+    if not personal:
+        return {"registros_encontrados": len(registros), "asociados": 0}
+
+    nombre_to_medico = {p.nombre.strip().lower(): p.medico_id for p in personal}
+
     asociados = 0
     for reg in registros:
-        nombre = reg.personal_salud.strip()
-        if nombre not in medicos_cache:
-            medico = db.query(MedicoModel).filter(
-                MedicoModel.nombre.ilike(f"%{nombre}%")
-            ).first()
-            medicos_cache[nombre] = medico.id if medico else None
-        medico_id = medicos_cache[nombre]
+        nombre = reg.personal_salud.strip().lower() if reg.personal_salud else ""
+        if not nombre:
+            continue
+        medico_id = nombre_to_medico.get(nombre)
+        if not medico_id:
+            for ps_nombre, ps_medico_id in nombre_to_medico.items():
+                if ps_nombre in nombre or nombre in ps_nombre:
+                    medico_id = ps_medico_id
+                    break
         if medico_id:
             reg.medico_id = medico_id
             asociados += 1
@@ -435,8 +444,10 @@ def asociar_paciente_y_consulta(db: Session) -> dict:
         except (ValueError, IndexError):
             return None
 
-    # Cargar todos los registros SIGSA3
-    registros = db.query(Sigsa3Model).all()
+    # Cargar registros SIGSA3 no asociados
+    registros = db.query(Sigsa3Model).filter(
+        or_(Sigsa3Model.paciente_id.is_(None), Sigsa3Model.consulta_id.is_(None))
+    ).all()
     if not registros:
         return resultados
 
@@ -671,6 +682,110 @@ def dx_z10(db: Session, desde: str, hasta: str) -> dict:
     return dx_por_codigo_cie(db, desde, hasta, ["Z:10:4", "Z:10:5", "Z:10:6"])
 
 
+def listar_personal_salud(db: Session) -> list:
+    from modules.sigsa3.models import PersonalSaludModel
+    return db.query(PersonalSaludModel).order_by(PersonalSaludModel.nombre).all()
+
+
+def crear_personal_salud(nombre: str, especialidad: str | None, medico_id: int | None, db: Session) -> dict:
+    from modules.sigsa3.models import PersonalSaludModel
+    existente = db.query(PersonalSaludModel).filter(PersonalSaludModel.nombre == nombre).first()
+    if existente:
+        raise HTTPException(status_code=409, detail=f"'{nombre}' ya existe en personal_salud")
+    registro = PersonalSaludModel(nombre=nombre, especialidad=especialidad, medico_id=medico_id)
+    db.add(registro)
+    db.commit()
+    db.refresh(registro)
+    return {"id": registro.id, "nombre": registro.nombre, "especialidad": registro.especialidad, "medico_id": registro.medico_id}
+
+
+def actualizar_personal_salud(ps_id: int, nombre: str | None, especialidad: str | None, medico_id: int | None, db: Session) -> dict:
+    from modules.sigsa3.models import PersonalSaludModel
+    registro = db.query(PersonalSaludModel).filter(PersonalSaludModel.id == ps_id).first()
+    if not registro:
+        raise HTTPException(status_code=404, detail="Registro de personal_salud no encontrado")
+    if nombre is not None:
+        registro.nombre = nombre
+    if especialidad is not None:
+        registro.especialidad = especialidad
+    if medico_id is not None:
+        registro.medico_id = medico_id
+    db.commit()
+    db.refresh(registro)
+    return {"id": registro.id, "nombre": registro.nombre, "especialidad": registro.especialidad, "medico_id": registro.medico_id}
+
+
+def eliminar_personal_salud(ps_id: int, db: Session) -> dict:
+    from modules.sigsa3.models import PersonalSaludModel
+    registro = db.query(PersonalSaludModel).filter(PersonalSaludModel.id == ps_id).first()
+    if not registro:
+        raise HTTPException(status_code=404, detail="Registro de personal_salud no encontrado")
+    db.delete(registro)
+    db.commit()
+    return {"eliminado": True}
+
+
+def sincronizar_especialidad(db: Session) -> dict:
+    """Sincroniza especialidad desde personal_salud → medicos y sigsa3."""
+    from modules.sigsa3.models import PersonalSaludModel
+    from modules.medicos.models import MedicoModel
+
+    personal = db.query(PersonalSaludModel).filter(
+        PersonalSaludModel.medico_id.isnot(None),
+        PersonalSaludModel.especialidad.isnot(None),
+    ).all()
+
+    if not personal:
+        return {"medicos_actualizados": 0, "sigsa3_actualizados": 0}
+
+    medico_ids = [ps.medico_id for ps in personal]
+    medicos = {
+        m.id: m
+        for m in db.query(MedicoModel).filter(MedicoModel.id.in_(medico_ids)).all()
+    }
+
+    nombre_a_especialidad = {}
+    patrones = []
+    for ps in personal:
+        nombre_a_especialidad[ps.nombre.lower()] = ps.especialidad
+        patrones.append(f"%{ps.nombre}%")
+
+    condiciones = [
+        Sigsa3Model.personal_salud.ilike(p) for p in patrones
+    ]
+    sigsa3_rows = db.query(Sigsa3Model).filter(or_(*condiciones)).all()
+
+    medicos_actualizados = 0
+    sigsa3_actualizados = 0
+
+    for ps in personal:
+        if not ps.especialidad:
+            continue
+        medico = medicos.get(ps.medico_id)
+        if medico and medico.especialidad != ps.especialidad:
+            medico.especialidad = ps.especialidad
+            medicos_actualizados += 1
+
+    for reg in sigsa3_rows:
+        if reg.personal_salud:
+            key = reg.personal_salud.strip().lower()
+            target_esp = nombre_a_especialidad.get(key)
+            if not target_esp:
+                for ps_name, ps_esp in nombre_a_especialidad.items():
+                    if key.endswith(ps_name) or ps_name.endswith(key):
+                        target_esp = ps_esp
+                        break
+            if target_esp and reg.especialidad != target_esp:
+                reg.especialidad = target_esp
+                sigsa3_actualizados += 1
+
+    db.commit()
+    return {
+        "medicos_actualizados": medicos_actualizados,
+        "sigsa3_actualizados": sigsa3_actualizados,
+    }
+
+
 def listar_no_asociados(db: Session, limit: int = 100) -> list[Sigsa3Model]:
     return (
         db.query(Sigsa3Model)
@@ -681,44 +796,47 @@ def listar_no_asociados(db: Session, limit: int = 100) -> list[Sigsa3Model]:
     )
 
 
-def actualizar_especialidad_por_medico(personal_salud: str, db: Session) -> dict:
-    from modules.medicos.models import MedicoModel
+def actualizar_especialidad_por_medico(personal_salud_nombre: str, db: Session) -> dict:
+    from modules.sigsa3.models import PersonalSaludModel
 
-    medico = db.query(MedicoModel).filter(
-        MedicoModel.nombre.ilike(f"%{personal_salud}%")
+    ps = db.query(PersonalSaludModel).filter(
+        PersonalSaludModel.nombre.ilike(personal_salud_nombre)
     ).first()
-    if not medico:
+    if not ps:
+        ps = db.query(PersonalSaludModel).filter(
+            PersonalSaludModel.nombre.ilike(f"%{personal_salud_nombre}%")
+        ).first()
+    if not ps:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró médico con nombre '{personal_salud}'"
+            detail=f"No se encontró '{personal_salud_nombre}' en personal_salud"
         )
-    if not medico.especialidad:
+    if not ps.especialidad:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"El médico '{medico.nombre}' no tiene especialidad registrada"
+            detail=f"'{ps.nombre}' no tiene especialidad registrada en personal_salud"
         )
 
     registros = db.query(Sigsa3Model).filter(
-        Sigsa3Model.personal_salud == personal_salud
+        Sigsa3Model.personal_salud.ilike(f"%{ps.nombre}%")
     ).all()
     if not registros:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontraron registros SIGSA-3 con personal_salud '{personal_salud}'"
+            detail=f"No se encontraron registros SIGSA-3 con personal_salud que contenga '{ps.nombre}'"
         )
 
     actualizados = 0
     for reg in registros:
-        if reg.especialidad != medico.especialidad:
-            reg.especialidad = medico.especialidad
+        if reg.especialidad != ps.especialidad:
+            reg.especialidad = ps.especialidad
             actualizados += 1
 
     db.commit()
     return {
-        "personal_salud": personal_salud,
-        "medico_id": medico.id,
-        "medico_nombre": medico.nombre,
-        "especialidad": medico.especialidad,
+        "personal_salud": ps.nombre,
+        "especialidad": ps.especialidad,
+        "medico_id": ps.medico_id,
         "registros_encontrados": len(registros),
         "registros_actualizados": actualizados,
     }

@@ -99,6 +99,42 @@ def crear_paciente_desde_madre(
 
     pacientes = []
     total = len(payload.hijos)
+
+    _CLASE_PARTO_VALIDOS = {"Pes", "Cstp"}
+    tipo_parto_global = None
+    clase_parto_global = None
+    for hijo in payload.hijos:
+        nd = hijo.datos_extra
+        tp = nd.tipo_parto
+        cp = nd.clase_parto
+        if tp:
+            if tipo_parto_global is None:
+                tipo_parto_global = tp
+            elif tp != tipo_parto_global:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Todos los recién nacidos deben tener el mismo tipo de parto"
+                )
+        if cp:
+            if cp not in _CLASE_PARTO_VALIDOS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Clase de parto inválida: '{cp}'. Debe ser Pes o Cstp"
+                )
+            if clase_parto_global is None:
+                clase_parto_global = cp
+            elif cp != clase_parto_global:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Todos los recién nacidos deben tener la misma clase de parto"
+                )
+
+    if tipo_parto_global == "Simple" and total > 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Tipo de parto Simple no puede tener múltiples recién nacidos"
+        )
+
     for i, hijo in enumerate(payload.hijos, start=1):
         datos_extra = construir_datos_extra_derivados(madre)
         datos_extra["origen"] = {
@@ -124,7 +160,8 @@ def crear_paciente_desde_madre(
             apellido_casada=nombre_madre.get("apellido_casada"),
         )
 
-        if total == 1 and not neonatales_dict.get("gemelo"):
+        es_multiple = neonatales_dict.get("tipo_parto") == "Multiple"
+        if total == 1 and not es_multiple:
             nombre_dict = nombre_hijo.model_dump()
             for campo in ["primer_nombre", "segundo_nombre", "otro_nombre",
                           "primer_apellido", "segundo_apellido", "apellido_casada"]:

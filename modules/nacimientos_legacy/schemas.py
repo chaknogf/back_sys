@@ -4,38 +4,38 @@ from datetime import date, time, datetime
 
 
 class NacimientoLegacyBase(BaseModel):
-    fecha: Optional[date]
-    cor: Optional[int]
-    ao: Optional[int]
-    doc: Optional[str]
-    fecha_parto: Optional[date]
-    madre: Optional[str]
-    dpi: Optional[int]
-    passport: Optional[str]
-    libro: Optional[int]
-    folio: Optional[int]
-    partida: Optional[str]
-    muni: Optional[int]
-    edad: Optional[int]
-    vecindad: Optional[int]
-    sexo_rn: Optional[str]
-    lb: Optional[int]
-    onz: Optional[int]
-    hora: Optional[time]
-    medico: Optional[str]
-    colegiado: Optional[int]
-    dpi_medico: Optional[int]
-    hijos: Optional[int]
-    vivos: Optional[int]
-    muertos: Optional[int]
-    tipo_parto: Optional[int]
-    clase_parto: Optional[int]
-    certifica: Optional[str]
-    create_by: Optional[str]
-    depto: Optional[int]
-    expediente: Optional[int]
-    pais: Optional[str]
-    nacionalidad: Optional[str]
+    fecha: Optional[date] = None
+    cor: Optional[int] = None
+    ao: Optional[int] = None
+    doc: Optional[str] = None
+    fecha_parto: Optional[date] = None
+    madre: Optional[str] = None
+    dpi: Optional[int] = None
+    passport: Optional[str] = None
+    libro: Optional[int] = None
+    folio: Optional[int] = None
+    partida: Optional[str] = None
+    muni: Optional[int] = None
+    edad: Optional[int] = None
+    vecindad: Optional[int] = None
+    sexo_rn: Optional[str] = None
+    lb: Optional[int] = None
+    onz: Optional[int] = None
+    hora: Optional[time] = None
+    medico: Optional[str] = None
+    colegiado: Optional[int] = None
+    dpi_medico: Optional[int] = None
+    hijos: Optional[int] = None
+    vivos: Optional[int] = None
+    muertos: Optional[int] = None
+    tipo_parto: Optional[int] = None
+    clase_parto: Optional[int] = None
+    certifica: Optional[str] = None
+    create_by: Optional[str] = None
+    depto: Optional[int] = None
+    expediente: Optional[int] = None
+    pais: Optional[str] = None
+    nacionalidad: Optional[str] = None
 
 class NacimientoLegacyResponse(NacimientoLegacyBase):
     id: int

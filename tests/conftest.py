@@ -34,13 +34,14 @@ TEST_USER = {
 
 @pytest.fixture(scope="module")
 def auth_headers(db_session):
+    password = TEST_USER["password"]
     user = db_session.query(UserModel).filter(
         UserModel.username == TEST_USER["username"]
     ).first()
     if not user:
         user = UserModel(
             username=TEST_USER["username"],
-            password=hash_password(TEST_USER["password"]),
+            password=hash_password(password),
             nombre=TEST_USER["nombre"],
             email=TEST_USER["email"],
             role=TEST_USER["role"],
@@ -52,11 +53,16 @@ def auth_headers(db_session):
 
     response = TestClient(app).post(
         "/auth/login",
-        data={
-            "username": TEST_USER["username"],
-            "password": TEST_USER["password"],
-        },
+        data={"username": TEST_USER["username"], "password": password},
     )
+    if response.status_code != 200:
+        # Password might have been changed by recover test; restore it
+        user.password = hash_password(password)
+        db_session.commit()
+        response = TestClient(app).post(
+            "/auth/login",
+            data={"username": TEST_USER["username"], "password": password},
+        )
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 

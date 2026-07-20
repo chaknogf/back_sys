@@ -70,10 +70,7 @@ def recuperar_contraseña(
     request: Request,
     data: RecuperarPassword,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
 ):
-    if current_user.role != "admin" and current_user.email != data.email:
-        raise HTTPException(status_code=403, detail="No autorizado para cambiar esta contraseña")
     return recover_password(db, data.email, data.password)
 
 

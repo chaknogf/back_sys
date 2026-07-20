@@ -174,7 +174,7 @@ def personal_hospital(db: Session, desde: str, hasta: str, skip: int = 0, limit:
     limit = min(limit, 500)
 
     rows = db.execute(text("""
-        SELECT
+        SELECT DISTINCT ON (c.id)
             p.nombre,
             p.nombre_completo,
             p.expediente,
@@ -185,16 +185,16 @@ def personal_hospital(db: Session, desde: str, hasta: str, skip: int = 0, limit:
             c.especialidad,
             c.documento,
             c.paciente_id,
-            s.dx AS diagnostico
+            COALESCE(NULLIF(c.egreso#>>'{diagnosticos}', ''), s.dx) AS diagnostico
         FROM consultas c
         JOIN pacientes p ON p.id = c.paciente_id
-        LEFT JOIN sigsa3 s ON s.paciente_id = c.paciente_id
+        LEFT JOIN sigsa3 s ON s.consulta_id = c.id
         WHERE c.fecha_consulta BETWEEN :desde AND :hasta
           AND c.activo = true
           AND (
               p.datos_extra#>>'{socioeconomicos,personal_hospital}' = 'S'
           )
-        ORDER BY c.fecha_consulta, c.hora_consulta
+        ORDER BY c.id
         LIMIT :limit OFFSET :skip
     """), {"desde": f_desde, "hasta": f_hasta, "limit": limit, "skip": skip}).fetchall()
 

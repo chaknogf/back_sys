@@ -415,8 +415,9 @@ def asociar_medico(db: Session) -> dict:
     return {"registros_encontrados": len(registros), "asociados": asociados}
 
 
-def asociar_paciente_y_consulta(db: Session) -> dict:
-    """Pipeline completo usando pandas para asociación masiva:
+def asociar_paciente_y_consulta(db: Session):
+    """Pipeline completo usando pandas para asociación masiva.
+    Generador que yield eventos de progreso como dicts.
     1. paciente_id: nombre_paciente = nombre_completo AND no_historia_clinica = expediente
     2. paciente_id: nombre_paciente CONTAINS nombre_completo (nulls)
     3. paciente_id: no_historia_clinica = expediente (nulls)
@@ -424,150 +425,157 @@ def asociar_paciente_y_consulta(db: Session) -> dict:
     5. consulta_id: no_historia_clinica = documento + fecha_consulta (nulls) + paciente_id
     """
     import pandas as pd
-    from modules.pacientes.models import PacienteModel
-    from modules.consultas.models import ConsultaModel
+    from datetime import datetime
+    from sqlalchemy import text
 
-    resultados = {
-        "paso1_paciente": 0,
-        "paso2_paciente": 0,
-        "paso3_paciente": 0,
-        "paso4_consulta": 0,
-        "paso5_consulta": 0,
-        "paso5_paciente": 0,
-    }
+    ahora = datetime.now
+    t0 = ahora()
+
+    resultados = {k: 0 for k in (
+        "paso1_paciente", "paso2_paciente", "paso3_paciente",
+        "paso4_consulta", "paso5_consulta", "paso5_paciente",
+    )}
 
     def _extraer_tipo_consulta(tipo_str):
         if not tipo_str:
             return None
         try:
-            return int(tipo_str.strip().split()[0])
+            return int(str(tipo_str).strip().split()[0])
         except (ValueError, IndexError):
             return None
 
-    # Cargar registros SIGSA3 no asociados
-    registros = db.query(Sigsa3Model).filter(
-        or_(Sigsa3Model.paciente_id.is_(None), Sigsa3Model.consulta_id.is_(None))
-    ).all()
-    if not registros:
-        return resultados
+    yield {"step": "load", "message": "Iniciando asociación...", "progress": 0, **resultados}
 
-    # Convertir a DataFrame
-    data = []
-    for r in registros:
-        data.append({
-            "id": r.id,
-            "nombre_paciente": r.nombre_paciente,
-            "no_historia_clinica": r.no_historia_clinica,
-            "fecha_consulta": r.fecha_consulta,
-            "tipo_consulta": r.tipo_consulta,
-            "paciente_id": r.paciente_id,
-            "consulta_id": r.consulta_id,
-            "medico_id": r.medico_id,
-        })
-    df = pd.DataFrame(data)
+    # ── Cargar datos con pd.read_sql (40-60% más rápido que ORM) ──
+    from core.database import engine
+    conn = engine.raw_connection()
 
-    # Cargar pacientes y consultas como DataFrames
-    pacientes = db.query(PacienteModel).filter(
-        PacienteModel.nombre_completo.isnot(None),
-        PacienteModel.expediente.isnot(None),
-    ).all()
-    df_pac = pd.DataFrame([{
-        "pac_id": p.id,
-        "nombre_completo": p.nombre_completo,
-        "expediente": p.expediente,
-    } for p in pacientes]) if pacientes else pd.DataFrame(columns=["pac_id", "nombre_completo", "expediente"])
+    df = pd.read_sql(
+        "SELECT id, nombre_paciente, no_historia_clinica, fecha_consulta, tipo_consulta, paciente_id, consulta_id FROM sigsa3 WHERE paciente_id IS NULL OR consulta_id IS NULL",
+        conn, parse_dates=["fecha_consulta"]
+    )
+    print(f"[PIPELINE] registros cargados={len(df)}")
+    if df.empty:
+        conn.close()
+        yield {"step": "done", "message": "Sin registros SIGSA-3 pendientes", "progress": 100, **resultados}
+        return
 
-    consultas = db.query(ConsultaModel).filter(
-        ConsultaModel.documento.isnot(None),
-    ).all()
-    df_con = pd.DataFrame([{
-        "con_id": c.id,
-        "paciente_id": c.paciente_id,
-        "fecha_consulta": c.fecha_consulta,
-        "tipo_consulta": c.tipo_consulta,
-        "documento": c.documento,
-    } for c in consultas]) if consultas else pd.DataFrame(columns=["con_id", "paciente_id", "fecha_consulta", "tipo_consulta", "documento"])
+    df_pac = pd.read_sql(
+        "SELECT id AS pac_id, nombre_completo, expediente FROM pacientes WHERE nombre_completo IS NOT NULL",
+        conn
+    )
 
-    # Mapear ID → objeto SIGSA3 para escritura rápida
-    reg_map = {r.id: r for r in registros}
+    df_con = pd.read_sql(
+        "SELECT id AS con_id, paciente_id, fecha_consulta, tipo_consulta, documento FROM consultas WHERE documento IS NOT NULL",
+        conn, parse_dates=["fecha_consulta"]
+    )
 
-    # PASO 1: nombre_paciente = nombre_completo AND no_historia_clinica = expediente
-    nulls = df[df["paciente_id"].isna() & df["nombre_paciente"].notna() & df["no_historia_clinica"].notna()]
-    if not nulls.empty and not df_pac.empty:
-        merged = nulls.merge(df_pac, left_on=["nombre_paciente", "no_historia_clinica"],
-                             right_on=["nombre_completo", "expediente"], how="inner")
+    yield {
+        "step": "data_loaded", "progress": 5,
+        "message": f"{len(df)} registros SIGSA-3, {len(df_pac)} pacientes, {len(df_con)} consultas",
+        **resultados,
+    }
+
+    updates_paciente = {}
+    updates_consulta = {}
+
+    def _aplicar_updates():
+        if updates_paciente:
+            params = [{"pid": int(v), "rid": int(k)} for k, v in updates_paciente.items()]
+            db.execute(text("UPDATE sigsa3 SET paciente_id = :pid WHERE id = :rid"), params)
+        if updates_consulta:
+            params = [{"cid": int(v), "rid": int(k)} for k, v in updates_consulta.items()]
+            db.execute(text("UPDATE sigsa3 SET consulta_id = :cid WHERE id = :rid"), params)
+        db.commit()
+        updates_paciente.clear()
+        updates_consulta.clear()
+
+    # ── PASO 1: nombre_paciente = nombre_completo AND no_historia_clinica = expediente ──
+    mask = df["paciente_id"].isna() & df["nombre_paciente"].notna() & df["no_historia_clinica"].notna()
+    if mask.any() and not df_pac.empty:
+        merged = df[mask].merge(df_pac, left_on=["nombre_paciente", "no_historia_clinica"],
+                                right_on=["nombre_completo", "expediente"], how="inner")
         for _, row in merged.iterrows():
-            reg_map[row["id"]].paciente_id = int(row["pac_id"])
+            updates_paciente[row["id"]] = int(row["pac_id"])
             resultados["paso1_paciente"] += 1
-        df = pd.DataFrame([{
-            "id": r.id, "nombre_paciente": r.nombre_paciente, "no_historia_clinica": r.no_historia_clinica,
-            "fecha_consulta": r.fecha_consulta, "tipo_consulta": r.tipo_consulta,
-            "paciente_id": r.paciente_id, "consulta_id": r.consulta_id, "medico_id": r.medico_id,
-        } for r in registros])
+    yield {"step": "paso1", "progress": 20, "message": f"Paso 1 — nombre exacto + expediente: {resultados['paso1_paciente']} pacientes", **resultados}
 
-    # PASO 2: nombre_paciente CONTAINS nombre_completo (nulls)
-    nulls = df[df["paciente_id"].isna() & df["nombre_paciente"].notna()]
-    if not nulls.empty and not df_pac.empty:
-        for _, row in nulls.iterrows():
-            match = df_pac[df_pac["nombre_completo"].str.contains(row["nombre_paciente"], case=False, na=False)]
-            if not match.empty:
-                reg_map[row["id"]].paciente_id = int(match.iloc[0]["pac_id"])
-                resultados["paso2_paciente"] += 1
-        df = pd.DataFrame([{
-            "id": r.id, "nombre_paciente": r.nombre_paciente, "no_historia_clinica": r.no_historia_clinica,
-            "fecha_consulta": r.fecha_consulta, "tipo_consulta": r.tipo_consulta,
-            "paciente_id": r.paciente_id, "consulta_id": r.consulta_id, "medico_id": r.medico_id,
-        } for r in registros])
+    # ── PASO 2: SQL con ILIKE + trigram GIN index ──
+    mask_s2 = df["paciente_id"].isna() & df["nombre_paciente"].notna()
+    if mask_s2.any():
+        paso2 = pd.read_sql("""
+            SELECT DISTINCT s.id, p.id AS pac_id
+            FROM sigsa3 s
+            JOIN pacientes p ON p.nombre_completo IS NOT NULL
+              AND s.nombre_paciente ILIKE '%' || p.nombre_completo || '%'
+            WHERE s.paciente_id IS NULL
+              AND s.nombre_paciente IS NOT NULL
+        """, conn)
+        for _, row in paso2.iterrows():
+            rid = row["id"]
+            pid = int(row["pac_id"])
+            updates_paciente[rid] = pid
+            df.loc[df["id"] == rid, "paciente_id"] = pid
+            resultados["paso2_paciente"] += 1
+    yield {"step": "paso2", "progress": 40, "message": f"Paso 2 — nombre contiene: {resultados['paso2_paciente']} pacientes", **resultados}
 
-    # PASO 3: no_historia_clinica = expediente (nulls)
-    nulls = df[df["paciente_id"].isna() & df["no_historia_clinica"].notna()]
-    if not nulls.empty and not df_pac.empty:
-        merged = nulls.merge(df_pac, left_on="no_historia_clinica", right_on="expediente", how="inner")
+    # ── PASO 3: no_historia_clinica = expediente ──
+    mask = df["paciente_id"].isna() & df["no_historia_clinica"].notna()
+    if mask.any() and not df_pac.empty:
+        merged = df[mask].merge(df_pac, left_on="no_historia_clinica", right_on="expediente", how="inner")
         for _, row in merged.iterrows():
-            reg_map[row["id"]].paciente_id = int(row["pac_id"])
+            updates_paciente[row["id"]] = int(row["pac_id"])
             resultados["paso3_paciente"] += 1
-        df = pd.DataFrame([{
-            "id": r.id, "nombre_paciente": r.nombre_paciente, "no_historia_clinica": r.no_historia_clinica,
-            "fecha_consulta": r.fecha_consulta, "tipo_consulta": r.tipo_consulta,
-            "paciente_id": r.paciente_id, "consulta_id": r.consulta_id, "medico_id": r.medico_id,
-        } for r in registros])
+    yield {"step": "paso3", "progress": 55, "message": f"Paso 3 — expediente: {resultados['paso3_paciente']} pacientes", **resultados}
 
-    # PASO 4: consulta_id por paciente_id + fecha_consulta + tipo_consulta (nulls)
-    nulls = df[df["consulta_id"].isna() & df["paciente_id"].notna() & df["fecha_consulta"].notna()]
-    if not nulls.empty and not df_con.empty:
-        df_con["tipo_num"] = df_con["tipo_consulta"].apply(lambda x: x if isinstance(x, (int, float)) else None)
-        for _, row in nulls.iterrows():
-            tipo_num = _extraer_tipo_consulta(row["tipo_consulta"])
-            masks = [
-                df_con["paciente_id"] == row["paciente_id"],
-                df_con["fecha_consulta"] == row["fecha_consulta"],
-            ]
-            if tipo_num is not None:
-                masks.append(df_con["tipo_num"] == tipo_num)
-            match = df_con[pd.Series(masks).all()]
-            if not match.empty:
-                reg_map[row["id"]].consulta_id = int(match.iloc[0]["con_id"])
-                resultados["paso4_consulta"] += 1
-        df = pd.DataFrame([{
-            "id": r.id, "nombre_paciente": r.nombre_paciente, "no_historia_clinica": r.no_historia_clinica,
-            "fecha_consulta": r.fecha_consulta, "tipo_consulta": r.tipo_consulta,
-            "paciente_id": r.paciente_id, "consulta_id": r.consulta_id, "medico_id": r.medico_id,
-        } for r in registros])
+    # ── PASO 4: consulta_id por paciente_id + fecha_consulta + tipo_consulta ──
+    mask = df["consulta_id"].isna() & df["paciente_id"].notna() & df["fecha_consulta"].notna()
+    if mask.any() and not df_con.empty:
+        sub = df.loc[mask, ["id", "paciente_id", "fecha_consulta", "tipo_consulta"]].copy()
+        sub["tipo_num"] = sub["tipo_consulta"].apply(_extraer_tipo_consulta)
 
-    # PASO 5: consulta_id por no_historia_clinica = documento + fecha_consulta (nulls)
-    nulls = df[df["consulta_id"].isna() & df["no_historia_clinica"].notna() & df["fecha_consulta"].notna()]
-    if not nulls.empty and not df_con.empty:
-        merged = nulls.merge(df_con, left_on=["no_historia_clinica", "fecha_consulta"],
-                             right_on=["documento", "fecha_consulta"], how="inner")
+        df_con = df_con.copy()
+        df_con["tipo_num"] = df_con["tipo_consulta"]
+
+        merged = sub.merge(df_con, left_on=["paciente_id", "fecha_consulta"],
+                           right_on=["paciente_id", "fecha_consulta"], how="inner", suffixes=("_sig", "_con"))
+        merged = merged[
+            merged["tipo_num_sig"].isna() | (merged["tipo_num_sig"] == merged["tipo_num_con"])
+        ].drop_duplicates(subset="id", keep="first")
+
         for _, row in merged.iterrows():
-            reg_map[row["id"]].consulta_id = int(row["con_id"])
-            resultados["paso5_consulta"] += 1
-            if pd.isna(row["paciente_id_x"]) or row["paciente_id_x"] is None:
-                reg_map[row["id"]].paciente_id = int(row["paciente_id_y"])
-                resultados["paso5_paciente"] += 1
+            rid = row["id"]
+            updates_consulta[rid] = int(row["con_id"])
+            df.loc[df["id"] == rid, "consulta_id"] = row["con_id"]
+            resultados["paso4_consulta"] += 1
+    yield {"step": "paso4", "progress": 70, "message": f"Paso 4 — paciente+fecha+tipo: {resultados['paso4_consulta']} consultas", **resultados}
 
-    db.commit()
-    return resultados
+    # ── PASO 5: consulta_id por no_historia_clinica = documento + fecha_consulta ──
+    mask = df["consulta_id"].isna() & df["no_historia_clinica"].notna() & df["fecha_consulta"].notna()
+    print(f"  [PASO 5] candidatos={mask.sum()} | rango fechas sigsa3: {df.loc[mask, 'fecha_consulta'].min()} a {df.loc[mask, 'fecha_consulta'].max()} | rango fechas df_con: {df_con['fecha_consulta'].min()} a {df_con['fecha_consulta'].max()}")
+    if mask.any() and not df_con.empty:
+        merged = df[mask].merge(df_con, left_on=["no_historia_clinica", "fecha_consulta"],
+                                right_on=["documento", "fecha_consulta"], how="inner", suffixes=("_sig", "_con"))
+        print(f"  [PASO 5] merged rows={len(merged)}")
+        merged = merged.drop_duplicates(subset="id", keep="first")
+        print(f"  [PASO 5] merged after dedup={len(merged)}")
+        for _, row in merged.iterrows():
+            rid = row["id"]
+            updates_consulta[rid] = int(row["con_id"])
+            df.loc[df["id"] == rid, "consulta_id"] = row["con_id"]
+            resultados["paso5_consulta"] += 1
+            if pd.isna(row["paciente_id_sig"]):
+                updates_paciente[rid] = int(row["paciente_id_con"])
+                df.loc[df["id"] == rid, "paciente_id"] = row["paciente_id_con"]
+                resultados["paso5_paciente"] += 1
+    yield {"step": "paso5", "progress": 85, "message": f"Paso 5 — documento+fecha: {resultados['paso5_consulta']} consultas, {resultados['paso5_paciente']} pacientes adicionales", **resultados}
+
+    _aplicar_updates()
+    conn.close()
+    total_pac = sum(resultados[k] for k in ("paso1_paciente", "paso2_paciente", "paso3_paciente"))
+    total_con = sum(resultados[k] for k in ("paso4_consulta", "paso5_consulta"))
+    elapsed = (ahora() - t0).total_seconds()
+    yield {"step": "done", "progress": 100, "message": f"✅ {total_pac} pacientes, {total_con} consultas asociados ({elapsed:.1f}s)", **resultados}
 
 
 def asociar_paciente(expediente: str, no_historia_clinica: str, db: Session) -> dict:

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, Integer, String, Text, Date, ForeignKey, TIMESTAMP, text
+from sqlalchemy import Column, BigInteger, Integer, String, Text, Date, ForeignKey, TIMESTAMP, Index, text
 from core.database import Base
 
 
@@ -33,3 +33,11 @@ class Sigsa3Model(Base):
     codigo_cie_10 = Column(String(30), nullable=True)
     dx = Column(Text, nullable=True)
     especialidad = Column(String(100), nullable=True)
+
+    __table_args__ = (
+        Index("ix_sigsa3_nombre_paciente", "nombre_paciente"),
+        Index("ix_sigsa3_no_historia_clinica", "no_historia_clinica"),
+        Index("ix_sigsa3_fecha_consulta", "fecha_consulta"),
+        Index("ix_sigsa3_paciente_fecha", "paciente_id", "fecha_consulta"),
+        Index("ix_sigsa3_nhc_fecha", "no_historia_clinica", "fecha_consulta"),
+    )

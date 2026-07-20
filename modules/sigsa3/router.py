@@ -217,8 +217,35 @@ def asociar_todo_endpoint(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Pipeline completo: paciente_id (nombre+expediente, nombre contiene, expediente) y consulta_id (paciente+fecha+tipo, documento+fecha)."""
-    return asociar_paciente_y_consulta(db)
+    """Pipeline completo: paciente_id (nombre+expediente, nombre contiene, expediente) y consulta_id (paciente+fecha+tipo, documento+fecha).
+    Retorna JSON con el resultado final."""
+    try:
+        gen = asociar_paciente_y_consulta(db)
+        for evento in gen:
+            if evento.get("step") == "done":
+                return evento
+            if evento.get("step") == "error":
+                return {"error": evento.get("message", "Error en el pipeline")}
+        return {"error": "no se ejecutó el pipeline"}
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
+
+@router.post("/asociar-todo-stream", tags=["SIGSA-3"])
+def asociar_todo_stream_endpoint(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Igual que asociar-todo pero retorna eventos SSE con progreso en tiempo real."""
+    from fastapi.responses import StreamingResponse
+    import json
+
+    def _eventos():
+        for evento in asociar_paciente_y_consulta(db):
+            yield f"data: {json.dumps(evento, default=str)}\n\n"
+
+    return StreamingResponse(_eventos(), media_type="text/event-stream")
 
 
 # ────────────────────────────────

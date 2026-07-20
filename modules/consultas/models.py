@@ -35,5 +35,6 @@ class ConsultaModel(Base):
         Index("idx_consulta_fecha_desc", text("fecha_consulta DESC")),
         Index("idx_consulta_tipo_especialidad", "tipo_consulta", "especialidad"),
         Index("idx_consulta_servicio_documento", "servicio", "documento"),
+        Index("idx_consulta_documento_fecha", "documento", "fecha_consulta"),
         Index("idx_consulta_ultimo_estado", "ultimo_estado"),
     )

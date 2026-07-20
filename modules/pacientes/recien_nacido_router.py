@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from datetime import date
+from datetime import date, datetime
 from core.database import get_db
 from core.security import get_current_user
 from modules.users.models import UserModel
@@ -201,6 +201,16 @@ def crear_paciente_desde_madre(
             documento=generar_constancia_nacimiento(db),
             nombre_madre=nombre_madre_str,
             vecindad_madre=str(vecindad_madre) if vecindad_madre else None,
+            metadatos={
+                "historial": [
+                    {
+                        "usuario": current_user.username,
+                        "fecha_hora": datetime.now().isoformat(),
+                        "estado_informe": "creado",
+                    }
+                ],
+                "estado_informe": "creado",
+            },
         )
         db.add(constancia)
 

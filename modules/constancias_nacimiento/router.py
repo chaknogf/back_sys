@@ -63,8 +63,14 @@ def crear_constancia(
     nueva = ConstanciaNacimientoModel(**data_dict)
     nueva.registrador_id = current_user.id
     nueva.metadatos = {
-        "registrador": current_user.username,
-        "estado_informe": "creado"
+        "historial": [
+            {
+                "usuario": current_user.username,
+                "fecha_hora": datetime.now().isoformat(),
+                "estado_informe": "creado",
+            }
+        ],
+        "estado_informe": "creado",
     }
     db.add(nueva)
     db.commit()

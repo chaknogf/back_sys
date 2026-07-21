@@ -8,7 +8,7 @@ class MedicoBase(BaseModel):
     nombre: str = Field(..., max_length=200)
     colegiado: Optional[str] = Field(None, max_length=20)
     pasaporte: Optional[str] = Field(None, max_length=20)
-    dpi: Optional[int]
+    dpi: Optional[int] = None
     sexo: Optional[str] = Field(None, max_length=1)
     especialidad: Optional[str] = Field(None, max_length=100)
     activo: Optional[bool] = True

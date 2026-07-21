@@ -9,7 +9,8 @@ class MedicoModel(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(200), nullable=False, index=True)
-    colegiado = Column(Integer, index=True)
+    colegiado = Column(String(20), unique=True, index=True)
+    pasaporte = Column(String(20), index=True)
     dpi = Column(BigInteger, index=True)
     sexo = Column(String(1))
     especialidad = Column(String(100), index=True)
@@ -22,6 +23,7 @@ class MedicoModel(Base):
     __table_args__ = (
         Index("idx_medicos_activo", "activo"),
         Index("idx_medicos_colegiado", "colegiado"),
+        Index("idx_medicos_pasaporte", "pasaporte"),
         Index("idx_medicos_dpi", "dpi"),
         Index("idx_medicos_especialidad", "especialidad"),
         Index("idx_medicos_nombre", "nombre"),

@@ -26,6 +26,7 @@ def listar_medicos(
     activo: bool | None = None,
     nombre: str | None = None,
     colegiado: str | None = None,
+    pasaporte: str | None = None,
     especialidad: str | None = None,
     skip: int = 0,
     limit: int = 50,
@@ -49,6 +50,9 @@ def listar_medicos(
 
     if colegiado:
         query = query.filter(MedicoModel.colegiado.ilike(f"%{colegiado}%"))
+
+    if pasaporte:
+        query = query.filter(MedicoModel.pasaporte.ilike(f"%{pasaporte}%"))
 
     if especialidad:
         query = query.filter(MedicoModel.especialidad.ilike(f"%{especialidad}%"))

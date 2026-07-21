@@ -6,7 +6,8 @@ from datetime import datetime
 
 class MedicoBase(BaseModel):
     nombre: str = Field(..., max_length=200)
-    colegiado: Optional[int] = None
+    colegiado: Optional[str] = Field(None, max_length=20)
+    pasaporte: Optional[str] = Field(None, max_length=20)
     dpi: Optional[int]
     sexo: Optional[str] = Field(None, max_length=1)
     especialidad: Optional[str] = Field(None, max_length=100)
@@ -19,7 +20,8 @@ class MedicoCreate(MedicoBase):
 
 class MedicoUpdate(BaseModel):
     nombre: Optional[str] = Field(None, max_length=200)
-    colegiado: Optional[int] = None
+    colegiado: Optional[str] = Field(None, max_length=20)
+    pasaporte: Optional[str] = Field(None, max_length=20)
     dpi: Optional[int] = None
     sexo: Optional[str] = Field(None, max_length=1)
     especialidad: Optional[str] = Field(None, max_length=100)

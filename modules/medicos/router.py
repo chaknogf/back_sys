@@ -1,12 +1,12 @@
 # modules/medicos/router.py
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import Optional
 
 from core.database import get_db
 from .models import MedicoModel
-from .schemas import MedicoCreate, MedicoUpdate, MedicoOut
+from .schemas import MedicoCreate, MedicoUpdate, MedicoOut, MedicoListResponse
 from .service import (
     crear_medico as service_crear_medico,
     listar_medicos as service_listar_medicos,
@@ -26,14 +26,15 @@ def crear_medico(data: MedicoCreate, db: Session = Depends(get_db)):
     return service_crear_medico(data, db)
 
 
-@router.get("/", response_model=List[MedicoOut])
+@router.get("/", response_model=MedicoListResponse)
 def listar_medicos(
     id: Optional[int] = None,
     activo: Optional[bool] = None,
     nombre: Optional[str] = None,
     colegiado: Optional[str] = None,
     especialidad: Optional[str] = None,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db)
 ):
     return service_listar_medicos(
@@ -43,6 +44,7 @@ def listar_medicos(
         nombre=nombre,
         colegiado=colegiado,
         especialidad=especialidad,
+        skip=skip,
         limit=limit,
     )
 

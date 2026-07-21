@@ -4,7 +4,12 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from modules.medicos.models import MedicoModel
-from modules.medicos.schemas import MedicoCreate, MedicoUpdate, MedicoOut
+from modules.medicos.schemas import (
+    MedicoCreate,
+    MedicoUpdate,
+    MedicoOut,
+    MedicoListResponse,
+)
 
 
 def crear_medico(data: MedicoCreate, db: Session):
@@ -22,13 +27,19 @@ def listar_medicos(
     nombre: str | None = None,
     colegiado: str | None = None,
     especialidad: str | None = None,
-    limit: int = 100,
+    skip: int = 0,
+    limit: int = 50,
 ):
     query = db.query(MedicoModel)
 
     if id is not None:
         query = query.filter(MedicoModel.id == id)
-        return query.all()
+        medico = query.first()
+        total = 1 if medico else 0
+        return MedicoListResponse(
+            total=total,
+            medicos=[medico] if medico else []
+        )
 
     if activo is not None:
         query = query.filter(MedicoModel.activo == activo)
@@ -42,14 +53,17 @@ def listar_medicos(
     if especialidad:
         query = query.filter(MedicoModel.especialidad.ilike(f"%{especialidad}%"))
 
-    limit = min(limit, 500)
+    total = query.count()
 
-    return (
+    medicos = (
         query
         .order_by(MedicoModel.nombre)
+        .offset(skip)
         .limit(limit)
         .all()
     )
+
+    return MedicoListResponse(total=total, medicos=medicos)
 
 
 def obtener_medico(medico_id: int, db: Session):

@@ -1,7 +1,7 @@
 # modules/medicos/schemas.py
 
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
 
 class MedicoBase(BaseModel):
@@ -29,5 +29,12 @@ class MedicoUpdate(BaseModel):
 class MedicoOut(MedicoBase):
     id: int
     created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MedicoListResponse(BaseModel):
+    total: int
+    medicos: List[MedicoOut]
 
     model_config = ConfigDict(from_attributes=True)

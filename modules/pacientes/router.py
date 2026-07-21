@@ -16,7 +16,7 @@ from .schemas import (
     PacienteCreate, PacienteOut, PacienteUpdate, PacienteContacto,
     PacienteListResponse
 )
-from .service import buscar_pacientes, buscar_neonatales, buscar_personal_hospital, obtener_paciente, crear_paciente, agregar_evento, normalizar_metadatos
+from .service import buscar_pacientes, buscar_neonatales, buscar_personal_hospital, buscar_pacientes_con_consultas_recientes, buscar_pacientes_sin_consultas_recientes, obtener_paciente, crear_paciente, agregar_evento, normalizar_metadatos
 from modules.defunciones.service import actualizar_estado_por_paciente
 
 
@@ -97,6 +97,32 @@ def listar_personal_hospital(
     }.items() if v is not None}
     resultado = buscar_personal_hospital(db, filters, skip, limit)
     return resultado
+
+
+@router.get("/con-consultas-recientes", response_model=PacienteListResponse)
+def pacientes_con_consultas_recientes(
+    q: Optional[str] = Query(None, description="Búsqueda por nombre o expediente"),
+    expediente_desde: Optional[str] = Query(None, description="Inicio de rango de expediente"),
+    expediente_hasta: Optional[str] = Query(None, description="Fin de rango de expediente"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return buscar_pacientes_con_consultas_recientes(db, q, skip, limit, expediente_desde, expediente_hasta)
+
+
+@router.get("/sin-consultas-recientes", response_model=PacienteListResponse)
+def pacientes_sin_consultas_recientes(
+    q: Optional[str] = Query(None, description="Búsqueda por nombre o expediente"),
+    expediente_desde: Optional[str] = Query(None, description="Inicio de rango de expediente"),
+    expediente_hasta: Optional[str] = Query(None, description="Fin de rango de expediente"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return buscar_pacientes_sin_consultas_recientes(db, q, skip, limit, expediente_desde, expediente_hasta)
 
 
 @router.get("/{paciente_id}", response_model=PacienteOut)

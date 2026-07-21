@@ -1,5 +1,5 @@
 import unicodedata
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy.orm import Session, load_only
 from sqlalchemy import and_, func, cast, String, or_, desc, case
@@ -271,3 +271,131 @@ def crear_paciente(db: Session, paciente_in: PacienteCreate, auto_expediente: bo
             raise HTTPException(status_code=400, detail=f"Ya existe un paciente con el expediente: {data.get('expediente')}")
         else:
             raise HTTPException(status_code=400, detail="Datos duplicados o inválidos")
+
+
+def _build_ultima_consulta_subquery(db: Session):
+    from modules.consultas.models import ConsultaModel
+    return (
+        db.query(
+            ConsultaModel.paciente_id,
+            func.max(ConsultaModel.fecha_consulta).label("ultima_fecha"),
+        )
+        .filter(ConsultaModel.activo.is_(True))
+        .group_by(ConsultaModel.paciente_id)
+        .subquery()
+    )
+
+
+_LIST_COLS = [
+    PacienteModel.id, PacienteModel.cui, PacienteModel.expediente,
+    PacienteModel.pasaporte, PacienteModel.nombre, PacienteModel.nombre_completo,
+    PacienteModel.sexo, PacienteModel.fecha_nacimiento, PacienteModel.estado,
+    PacienteModel.datos_extra,
+]
+
+
+def _apply_q_filter(query, q):
+    if not q:
+        return query
+    palabras = [quitar_tildes(p) for p in q.split() if p.strip()]
+    filtros_nombre = [nombre_completo_col.ilike(f"%{palabra}%") for palabra in palabras]
+    return query.filter(
+        or_(
+            PacienteModel.expediente.ilike(f"%{q.strip()}%"),
+            and_(*filtros_nombre),
+        )
+    )
+
+
+def _apply_expediente_range(query, desde: Optional[str], hasta: Optional[str]):
+    if desde:
+        query = query.filter(PacienteModel.expediente >= desde)
+    if hasta:
+        query = query.filter(PacienteModel.expediente <= hasta)
+    return query
+
+
+def _exec_expedientes_query(
+    db: Session,
+    ultima_consulta,
+    join_type: str,
+    extra_filter,
+    q: Optional[str],
+    skip: int,
+    limit: int,
+    expediente_desde: Optional[str] = None,
+    expediente_hasta: Optional[str] = None,
+):
+    hace_un_anio = date(date.today().year - 1, date.today().month, date.today().day)
+
+    count_query = (
+        db.query(PacienteModel.id)
+        .join(ultima_consulta, PacienteModel.id == ultima_consulta.c.paciente_id)
+        .filter(PacienteModel.estado != "I")
+        .filter(PacienteModel.expediente.isnot(None))
+        .filter(PacienteModel.expediente != "")
+    )
+    count_query = _apply_expediente_range(count_query, expediente_desde, expediente_hasta)
+    if extra_filter == "reciente":
+        count_query = count_query.filter(ultima_consulta.c.ultima_fecha > hace_un_anio)
+    else:
+        count_query = count_query.filter(
+            or_(
+                ultima_consulta.c.ultima_fecha.is_(None),
+                ultima_consulta.c.ultima_fecha <= hace_un_anio,
+            )
+        )
+    count_query = _apply_q_filter(count_query, q)
+    total = count_query.count()
+
+    data_query = (
+        db.query(PacienteModel, ultima_consulta.c.ultima_fecha)
+        .options(load_only(*_LIST_COLS))
+        .join(ultima_consulta, PacienteModel.id == ultima_consulta.c.paciente_id)
+        .filter(PacienteModel.estado != "I")
+        .filter(PacienteModel.expediente.isnot(None))
+        .filter(PacienteModel.expediente != "")
+    )
+    data_query = _apply_expediente_range(data_query, expediente_desde, expediente_hasta)
+    if extra_filter == "reciente":
+        data_query = data_query.filter(ultima_consulta.c.ultima_fecha > hace_un_anio)
+    else:
+        data_query = data_query.filter(
+            or_(
+                ultima_consulta.c.ultima_fecha.is_(None),
+                ultima_consulta.c.ultima_fecha <= hace_un_anio,
+            )
+        )
+    data_query = _apply_q_filter(data_query, q)
+    rows = data_query.order_by(desc(PacienteModel.id)).offset(skip).limit(limit).all()
+
+    pacientes = []
+    for paciente, ultima_fecha in rows:
+        paciente.ultima_consulta = ultima_fecha
+        pacientes.append(paciente)
+
+    return PacienteListResponse(total=total, pacientes=pacientes)
+
+
+def buscar_pacientes_con_consultas_recientes(
+    db: Session,
+    q: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    expediente_desde: Optional[str] = None,
+    expediente_hasta: Optional[str] = None,
+):
+    ultima_consulta = _build_ultima_consulta_subquery(db)
+    return _exec_expedientes_query(db, ultima_consulta, "inner", "reciente", q, skip, limit, expediente_desde, expediente_hasta)
+
+
+def buscar_pacientes_sin_consultas_recientes(
+    db: Session,
+    q: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    expediente_desde: Optional[str] = None,
+    expediente_hasta: Optional[str] = None,
+):
+    ultima_consulta = _build_ultima_consulta_subquery(db)
+    return _exec_expedientes_query(db, ultima_consulta, "outer", "no_reciente", q, skip, limit, expediente_desde, expediente_hasta)

@@ -265,6 +265,7 @@ class PacientesResumen(BaseModel):
     estado: Optional[str] = None
     defuncion: Optional[str] = None
     personal_hospital: Optional[str] = None
+    ultima_consulta: Optional[date] = None
 
     @model_validator(mode="before")
     @classmethod

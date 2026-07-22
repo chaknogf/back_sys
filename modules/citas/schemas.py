@@ -1,6 +1,6 @@
 # modules/citas/schemas.py
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from datetime import date, datetime
 from typing import Optional, Dict, Any
 from modules.pacientes.schemas import PacientesNombre
@@ -36,7 +36,14 @@ class CitasPorFechaRazon(BaseModel):
 class CitaResponse(CitaBase):
     id: int
     created_by: str
-    paciente: PacientesNombre
+    paciente: Optional[PacientesNombre] = None
+
+    @field_validator("created_by", mode="before")
+    @classmethod
+    def coerce_created_by(cls, v):
+        if isinstance(v, int):
+            return str(v)
+        return v
 
     model_config = ConfigDict(from_attributes=True)
         

@@ -344,7 +344,7 @@ def asociar_todo_stream_endpoint(
     return StreamingResponse(_eventos(), media_type="text/event-stream")
 
 
-# ────────────────────────────────@router.post("/sincronizar-especialidad", tags=["SIGSA-3"])
+@router.post("/sincronizar-especialidad", tags=["SIGSA-3"])
 def sincronizar_especialidad_endpoint(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),

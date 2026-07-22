@@ -23,7 +23,7 @@ DIAS_ES = {
 
 def crear_cita(cita: CitaCreate, current_user, db: Session):
     nueva_cita = CitaModel(
-        created_by=current_user.id,
+        created_by=current_user.username,
         fecha_registro=cita.fecha_registro,
         expediente=cita.expediente,
         paciente_id=cita.paciente_id,
@@ -51,7 +51,7 @@ def listar_citas(
     query = db.query(CitaModel).outerjoin(
         PacienteModel, CitaModel.paciente_id == PacienteModel.id
     )
-    if fecha_cita is None:
+    if fecha_cita is None and id is None and paciente_id is None:
         fecha_cita = date.today()
     if id is not None:
         query = query.filter(CitaModel.id == id)

@@ -28,6 +28,7 @@ EXCEL_COLUMN_MAP = {
     "semana gestacional": "semana_gestacional",
     "codigo cie-10": "codigo_cie_10",
     "descripcion de diagnostico/control": "descripcion_diagnostico",
+    "tipo consulta": "tipo_consulta",
     "especialidad": "especialidad",
     "paciente_id": "paciente_id",
     "medico_id": "medico_id",
@@ -51,27 +52,50 @@ MESES_ES = {
 
 
 def _parse_fecha_excel(fecha_str: str) -> Opt[date]:
-    """Parsea formato '22-jun' a date (asume año actual)."""
+    """Parsea fecha en formato 'dd-mmm' (22-jun) o 'DD/MM/YYYY' (1/01/2020)."""
     if not fecha_str:
         return None
     fecha_str = fecha_str.strip().lower()
-    match = re.match(r"(\d{1,2})[-/](\w+)", fecha_str)
-    if not match:
-        return None
-    dia = int(match.group(1))
-    mes_str = match.group(2)[:3]
-    mes = MESES_ES.get(mes_str)
-    if not mes:
-        return None
-    anio = date.today().year
-    try:
-        return date(anio, mes, dia)
-    except ValueError:
-        return None
+
+    match_ymd = re.match(r"(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$", fecha_str)
+    if match_ymd:
+        dia, mes, anio = int(match_ymd.group(1)), int(match_ymd.group(2)), int(match_ymd.group(3))
+        if anio < 100:
+            anio += 2000
+        try:
+            return date(anio, mes, dia)
+        except ValueError:
+            return None
+
+    match_mmm = re.match(r"(\d{1,2})[-/](\w+)", fecha_str)
+    if match_mmm:
+        dia = int(match_mmm.group(1))
+        mes_str = match_mmm.group(2)[:3]
+        mes = MESES_ES.get(mes_str)
+        if mes:
+            anio = date.today().year
+            try:
+                return date(anio, mes, dia)
+            except ValueError:
+                return None
+
+    return None
 
 
 def _determinar_tipo_consulta(row: dict) -> str:
-    """Determina tipo_consulta basado en las columnas con 'X'."""
+    """Determina tipo_consulta: columna 'Tipo Consulta' directa o columnas con 'X'."""
+    tipo_directo = row.get("tipo_consulta")
+    if tipo_directo and tipo_directo.strip():
+        val = tipo_directo.strip()
+        if val[0].isdigit():
+            return val
+        if val.upper() == "PRIMERA" or val.upper() == "NUEVA":
+            return "1 Primera"
+        if val.upper() == "RECONSULTA":
+            return "2 Reconsulta"
+        if val.upper() == "EMERGENCIA":
+            return "3 Emergencia"
+        return val
     if (row.get("consulta_nueva") or "").strip().upper() == "X":
         return "1 Primera"
     if (row.get("consulta_primera") or "").strip().upper() == "X":
@@ -792,6 +816,39 @@ def sincronizar_especialidad(db: Session) -> dict:
         "medicos_actualizados": medicos_actualizados,
         "sigsa3_actualizados": sigsa3_actualizados,
     }
+
+
+def truncate_tabla(db: Session) -> dict:
+    db.execute(text("TRUNCATE TABLE sigsa3 RESTART IDENTITY CASCADE"))
+    db.commit()
+    return {"truncado": True, "tabla": "sigsa3"}
+
+
+def exportar_csv(db: Session) -> str:
+    import csv
+    import io
+
+    registros = db.query(Sigsa3Model).order_by(Sigsa3Model.id).all()
+    if not registros:
+        return ""
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    columns = [
+        "id", "paciente_id", "medico_id", "consulta_id", "personal_salud",
+        "fecha_consulta", "no_historia_clinica", "nombre_paciente", "sexo",
+        "edad_dias", "edad_meses", "edad_anios", "tipo_consulta", "control",
+        "semana_gestacional", "codigo_cie_10", "dx", "especialidad",
+    ]
+    writer.writerow(columns)
+    for r in registros:
+        writer.writerow([
+            r.id, r.paciente_id, r.medico_id, r.consulta_id, r.personal_salud,
+            r.fecha_consulta, r.no_historia_clinica, r.nombre_paciente, r.sexo,
+            r.edad_dias, r.edad_meses, r.edad_anios, r.tipo_consulta, r.control,
+            r.semana_gestacional, r.codigo_cie_10, r.dx, r.especialidad,
+        ])
+    return output.getvalue()
 
 
 def listar_no_asociados(db: Session, limit: int = 100) -> list[Sigsa3Model]:

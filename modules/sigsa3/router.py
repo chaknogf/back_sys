@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, status, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date, datetime
 from pydantic import BaseModel, Field
+import io
 
-from core.dependencies import get_db, get_current_user
+from core.dependencies import get_db, get_current_user, get_current_admin_user
 from modules.users.models import UserModel
 from .schemas import Sigsa3Create, Sigsa3Update, Sigsa3Out
 from .service import (
@@ -28,6 +30,8 @@ from .service import (
     sincronizar_especialidad,
     dx_z34,
     dx_z10,
+    truncate_tabla,
+    exportar_csv,
 )
 
 router = APIRouter(
@@ -202,6 +206,31 @@ def eliminar_personal_salud_endpoint(
 ):
     """Elimina un registro de personal_salud."""
     return eliminar_personal_salud(ps_id, db)
+
+
+@router.post("/truncate", tags=["SIGSA-3"])
+def truncar_tabla(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_admin_user),
+):
+    """TRUNCATE la tabla sigsa3 (solo admin). Elimina todos los registros permanentemente."""
+    return truncate_tabla(db)
+
+
+@router.get("/exportar-csv", tags=["SIGSA-3"])
+def exportar_csv_endpoint(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Exporta todos los registros SIGSA-3 como archivo CSV."""
+    csv_content = exportar_csv(db)
+    if not csv_content:
+        return StreamingResponse(io.StringIO(""), media_type="text/csv", headers={
+            "Content-Disposition": "attachment; filename=sigsa3.csv",
+        })
+    return StreamingResponse(io.StringIO(csv_content), media_type="text/csv", headers={
+        "Content-Disposition": "attachment; filename=sigsa3.csv",
+    })
 
 
 @router.get("/{registro_id}", response_model=Sigsa3Out)

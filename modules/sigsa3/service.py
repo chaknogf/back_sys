@@ -138,7 +138,7 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
 
     for encoding in ("utf-8-sig", "utf-8", "latin-1", "cp1252"):
         try:
-            text = content.decode(encoding)
+            csv_text = content.decode(encoding)
             break
         except UnicodeDecodeError:
             continue
@@ -148,15 +148,15 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
             detail="No se pudo decodificar el archivo. Use UTF-8 o Latin-1",
         )
 
-    if text.startswith("\ufeff"):
-        text = text[1:]
+    if csv_text.startswith("\ufeff"):
+        csv_text = csv_text[1:]
 
     try:
-        dialect = csv.Sniffer().sniff(text[:8192])
+        dialect = csv.Sniffer().sniff(csv_text[:8192])
     except csv.Error:
         dialect = csv.excel
 
-    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+    reader = csv.DictReader(io.StringIO(csv_text), dialect=dialect)
 
     if not reader.fieldnames:
         raise HTTPException(
@@ -234,15 +234,47 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
             detail="No se encontraron registros válidos en el archivo",
         )
 
+    existing_pacientes = set()
+    existing_medicos = set()
+    existing_consultas = set()
+
+    ids_paciente = {r.paciente_id for r in registros if r.paciente_id is not None}
+    ids_medico = {r.medico_id for r in registros if r.medico_id is not None}
+    ids_consulta = {r.consulta_id for r in registros if r.consulta_id is not None}
+
+    if ids_paciente:
+        rows = db.execute(text("SELECT id FROM pacientes WHERE id = ANY(:ids)"), {"ids": list(ids_paciente)}).fetchall()
+        existing_pacientes = {r[0] for r in rows}
+    if ids_medico:
+        rows = db.execute(text("SELECT id FROM medicos WHERE id = ANY(:ids)"), {"ids": list(ids_medico)}).fetchall()
+        existing_medicos = {r[0] for r in rows}
+    if ids_consulta:
+        rows = db.execute(text("SELECT id FROM consultas WHERE id = ANY(:ids)"), {"ids": list(ids_consulta)}).fetchall()
+        existing_consultas = {r[0] for r in rows}
+
+    for r in registros:
+        if r.paciente_id is not None and r.paciente_id not in existing_pacientes:
+            errores.append({"fila": "N/A", "error": f"paciente_id={r.paciente_id} no existe, se asignó NULL"})
+            r.paciente_id = None
+        if r.medico_id is not None and r.medico_id not in existing_medicos:
+            errores.append({"fila": "N/A", "error": f"medico_id={r.medico_id} no existe, se asignó NULL"})
+            r.medico_id = None
+        if r.consulta_id is not None and r.consulta_id not in existing_consultas:
+            errores.append({"fila": "N/A", "error": f"consulta_id={r.consulta_id} no existe, se asignó NULL"})
+            r.consulta_id = None
+
     try:
         objs = [Sigsa3Model(**r.model_dump()) for r in registros]
         db.add_all(objs)
         db.commit()
-    except Exception:
+    except Exception as e:
         db.rollback()
+        error_msg = str(e)
+        import logging
+        logging.error(f"Error insertando registros SIGSA-3: {error_msg}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al insertar los registros en la base de datos",
+            detail=f"Error al insertar los registros en la base de datos: {error_msg}",
         )
 
     return {"insertados": len(registros), "errores": errores}

@@ -18,6 +18,7 @@ class Sigsa3Base(BaseModel):
     codigo_cie_10: Optional[str] = Field(None, max_length=30)
     dx: Optional[str] = None
     especialidad: Optional[str] = Field(None, max_length=100)
+    paciente_id: Optional[int] = None
     medico_id: Optional[int] = None
     consulta_id: Optional[int] = None
 

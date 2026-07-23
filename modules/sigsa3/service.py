@@ -31,7 +31,6 @@ EXCEL_COLUMN_MAP = {
     "tipo consulta": "tipo_consulta",
     "especialidad": "especialidad",
     "paciente_id": "paciente_id",
-    "medico_id": "medico_id",
     "consulta_id": "consulta_id",
 }
 
@@ -170,6 +169,11 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
         if normalized in EXCEL_COLUMN_MAP:
             col_map[col] = EXCEL_COLUMN_MAP[normalized]
 
+    ps_rows = db.execute(
+        text("SELECT nombre, medico_id FROM personal_salud WHERE medico_id IS NOT NULL")
+    ).fetchall()
+    nombre_a_medico = {r[0].strip().lower(): r[1] for r in ps_rows}
+
     registros = []
     errores = []
     for i, row in enumerate(reader, start=2):
@@ -196,8 +200,9 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
             descripcion_diag = mapped.get("descripcion_diagnostico")
             especialidad = mapped.get("especialidad")
             paciente_id = _parse_int_safe(mapped.get("paciente_id"))
-            medico_id = _parse_int_safe(mapped.get("medico_id"))
             consulta_id = _parse_int_safe(mapped.get("consulta_id"))
+
+            medico_id = nombre_a_medico.get(personal_salud.strip().lower()) if personal_salud else None
 
             dx = None
             if codigo_cie_10 and descripcion_diag:
@@ -235,32 +240,21 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
         )
 
     existing_pacientes = set()
-    existing_medicos = set()
     existing_consultas = set()
 
     ids_paciente = {r.paciente_id for r in registros if r.paciente_id is not None}
-    ids_medico = {r.medico_id for r in registros if r.medico_id is not None}
     ids_consulta = {r.consulta_id for r in registros if r.consulta_id is not None}
 
     if ids_paciente:
         rows = db.execute(text("SELECT id FROM pacientes WHERE id = ANY(:ids)"), {"ids": list(ids_paciente)}).fetchall()
         existing_pacientes = {r[0] for r in rows}
-    if ids_medico:
-        rows = db.execute(text("SELECT id FROM medicos WHERE id = ANY(:ids)"), {"ids": list(ids_medico)}).fetchall()
-        existing_medicos = {r[0] for r in rows}
     if ids_consulta:
         rows = db.execute(text("SELECT id FROM consultas WHERE id = ANY(:ids)"), {"ids": list(ids_consulta)}).fetchall()
         existing_consultas = {r[0] for r in rows}
-
     for r in registros:
         if r.paciente_id is not None and r.paciente_id not in existing_pacientes:
-            errores.append({"fila": "N/A", "error": f"paciente_id={r.paciente_id} no existe, se asignó NULL"})
             r.paciente_id = None
-        if r.medico_id is not None and r.medico_id not in existing_medicos:
-            errores.append({"fila": "N/A", "error": f"medico_id={r.medico_id} no existe, se asignó NULL"})
-            r.medico_id = None
         if r.consulta_id is not None and r.consulta_id not in existing_consultas:
-            errores.append({"fila": "N/A", "error": f"consulta_id={r.consulta_id} no existe, se asignó NULL"})
             r.consulta_id = None
 
     try:

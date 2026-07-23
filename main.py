@@ -64,6 +64,8 @@ from modules.encamamiento.router import router as encamamiento_router
 from modules.censo_camas.router import router as censo_camas_router
 from modules.nacimientos.router import router as nacimientos_router
 from modules.sigsa3.router import router as sigsa3_router
+from modules.sigsa3.gestor_router import router as sigsa3_gestor_router
+from modules.personal_salud.router import router as personal_salud_router
 from modules.cie10.router import router as cie10_router
 from modules.defunciones.router import router as defunciones_router
 from modules.chat.router import router as chat_router
@@ -156,6 +158,8 @@ app.include_router(audit_log_router)
 app.include_router(encamamiento_router)
 app.include_router(censo_camas_router)
 app.include_router(nacimientos_router)
+app.include_router(personal_salud_router)
+app.include_router(sigsa3_gestor_router)
 app.include_router(sigsa3_router)
 app.include_router(cie10_router)
 app.include_router(defunciones_router)

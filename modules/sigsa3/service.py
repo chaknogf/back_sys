@@ -401,52 +401,74 @@ def eliminar_por_periodo(desde: date, hasta: date, db: Session) -> dict:
     return {"eliminados": eliminados, "desde": desde.isoformat(), "hasta": hasta.isoformat()}
 
 
-def asociar_medico(db: Session) -> dict:
-    """Asocia medico_id a registros SIGSA3 usando personal_salud."""
-    from modules.sigsa3.models import PersonalSaludModel
+def sincronizar_sigsa3(db: Session) -> dict:
+    """Paso 1: asocia medico_id en SIGSA-3 por nombre (personal_salud → personal_salud.medico_id).
+    Paso 2: actualiza especialidad en SIGSA-3 desde medicos.especialidad según medico_id."""
+    from modules.personal_salud.models import PersonalSaludModel
+    from modules.medicos.models import MedicoModel
 
     registros = db.query(Sigsa3Model).filter(
-        Sigsa3Model.medico_id.is_(None),
         Sigsa3Model.personal_salud.isnot(None),
     ).all()
     if not registros:
-        return {"registros_encontrados": 0, "asociados": 0}
+        return {"asociados": 0, "especialidades_actualizadas": 0}
 
     personal = db.query(PersonalSaludModel).filter(
         PersonalSaludModel.medico_id.isnot(None)
     ).all()
-    if not personal:
-        return {"registros_encontrados": len(registros), "asociados": 0}
+    nombre_to_medico = {p.nombre.strip().lower(): (p.medico_id, p.nombre) for p in personal}
 
-    nombre_to_medico = {p.nombre.strip().lower(): p.medico_id for p in personal}
-
+    medico_ids = set()
     asociados = 0
     for reg in registros:
         nombre = reg.personal_salud.strip().lower() if reg.personal_salud else ""
         if not nombre:
             continue
-        medico_id = nombre_to_medico.get(nombre)
-        if not medico_id:
-            for ps_nombre, ps_medico_id in nombre_to_medico.items():
+        match = nombre_to_medico.get(nombre)
+        if not match:
+            for ps_nombre, (ps_mid, ps_name) in nombre_to_medico.items():
                 if ps_nombre in nombre or nombre in ps_nombre:
-                    medico_id = ps_medico_id
+                    match = (ps_mid, ps_name)
                     break
-        if medico_id:
-            reg.medico_id = medico_id
-            asociados += 1
+        if match:
+            medico_id, _ = match
+            if reg.medico_id != medico_id:
+                reg.medico_id = medico_id
+                asociados += 1
+            medico_ids.add(medico_id)
+
+    if medico_ids:
+        medicos = {
+            m.id: m
+            for m in db.query(MedicoModel).filter(MedicoModel.id.in_(list(medico_ids))).all()
+        }
+        especialidades_actualizadas = 0
+        for reg in registros:
+            if reg.medico_id and reg.medico_id in medicos:
+                esp_medico = medicos[reg.medico_id].especialidad
+                if esp_medico and reg.especialidad != esp_medico:
+                    reg.especialidad = esp_medico
+                    especialidades_actualizadas += 1
+    else:
+        especialidades_actualizadas = 0
 
     db.commit()
-    return {"registros_encontrados": len(registros), "asociados": asociados}
+    return {
+        "asociados": asociados,
+        "especialidades_actualizadas": especialidades_actualizadas,
+    }
 
 
 def asociar_paciente_y_consulta(db: Session):
     """Pipeline completo usando pandas para asociación masiva.
     Generador que yield eventos de progreso como dicts.
-    1. paciente_id: nombre_paciente = nombre_completo AND no_historia_clinica = expediente
-    2. paciente_id: nombre_paciente CONTAINS nombre_completo (nulls)
-    3. paciente_id: no_historia_clinica = expediente (nulls)
-    4. consulta_id: paciente_id + fecha_consulta + tipo_consulta (nulls)
-    5. consulta_id: no_historia_clinica = documento + fecha_consulta (nulls) + paciente_id
+    1. nombre_paciente = nombre_completo AND no_historia_clinica = expediente → paciente_id
+    2. no_historia_clinica = expediente (tipo 1/2) o = documento + fecha (tipo 3) → paciente_id / consulta_id
+    3. nombre_paciente vs nombre_completo: trigram similarity >0.3 o ILIKE bidireccional ≥4 chars → paciente_id
+    4. paciente_id + fecha ±1d + tipo coincidente → consulta_id
+    5. no_historia_clinica = documento + fecha ±1d → consulta_id (+ paciente_id si faltaba)
+    6a. paciente_id + fecha ±1d (cualquier tipo) → consulta_id (rezagados)
+    6b. nombre_paciente vs nombre_completo: trigram similarity >0.2 → paciente_id (rezagados)
     """
     import pandas as pd
     from datetime import datetime
@@ -456,49 +478,39 @@ def asociar_paciente_y_consulta(db: Session):
     t0 = ahora()
 
     resultados = {k: 0 for k in (
-        "paso1_paciente", "paso2_paciente", "paso3_paciente",
+        "paso1_paciente", "paso2_paciente", "paso2_consulta", "paso3_paciente",
         "paso4_consulta", "paso5_consulta", "paso5_paciente",
+        "paso6a_consulta", "paso6b_paciente",
     )}
-
-    def _extraer_tipo_consulta(tipo_str):
-        if not tipo_str:
-            return None
-        try:
-            return int(str(tipo_str).strip().split()[0])
-        except (ValueError, IndexError):
-            return None
-
     yield {"step": "load", "message": "Iniciando asociación...", "progress": 0, **resultados}
 
     # ── Cargar datos con pd.read_sql (40-60% más rápido que ORM) ──
     from core.database import engine
-    conn = engine.raw_connection()
 
     df = pd.read_sql(
         "SELECT id, nombre_paciente, no_historia_clinica, fecha_consulta, tipo_consulta, paciente_id, consulta_id FROM sigsa3 WHERE paciente_id IS NULL OR consulta_id IS NULL",
-        conn, parse_dates=["fecha_consulta"]
+        engine, parse_dates=["fecha_consulta"]
     )
     print(f"[PIPELINE] registros cargados={len(df)}")
     if df.empty:
-        conn.close()
         yield {"step": "done", "message": "Sin registros SIGSA-3 pendientes", "progress": 100, **resultados}
         return
 
-    df_pac = pd.read_sql(
-        "SELECT id AS pac_id, nombre_completo, expediente FROM pacientes WHERE nombre_completo IS NOT NULL",
-        conn
-    )
-
-    df_con = pd.read_sql(
-        "SELECT id AS con_id, paciente_id, fecha_consulta, tipo_consulta, documento FROM consultas WHERE documento IS NOT NULL",
-        conn, parse_dates=["fecha_consulta"]
-    )
-
     yield {
         "step": "data_loaded", "progress": 5,
-        "message": f"{len(df)} registros SIGSA-3, {len(df_pac)} pacientes, {len(df_con)} consultas",
+        "message": f"{len(df)} registros SIGSA-3 pendientes",
         **resultados,
     }
+
+    # Cargar pacientes y consultas para pasos basados en pandas (4, 5, 6a)
+    df_pac = pd.read_sql(
+        "SELECT id AS pac_id, nombre_completo, expediente FROM pacientes WHERE nombre_completo IS NOT NULL",
+        engine
+    )
+    df_con = pd.read_sql(
+        "SELECT id AS con_id, paciente_id, fecha_consulta, tipo_consulta, documento FROM consultas",
+        engine, parse_dates=["fecha_consulta"]
+    )
 
     updates_paciente = {}
     updates_consulta = {}
@@ -515,74 +527,179 @@ def asociar_paciente_y_consulta(db: Session):
         updates_consulta.clear()
 
     # ── PASO 1: nombre_paciente = nombre_completo AND no_historia_clinica = expediente ──
-    mask = df["paciente_id"].isna() & df["nombre_paciente"].notna() & df["no_historia_clinica"].notna()
-    if mask.any() and not df_pac.empty:
-        merged = df[mask].merge(df_pac, left_on=["nombre_paciente", "no_historia_clinica"],
-                                right_on=["nombre_completo", "expediente"], how="inner")
-        for _, row in merged.iterrows():
-            updates_paciente[row["id"]] = int(row["pac_id"])
-            resultados["paso1_paciente"] += 1
+    rows = db.execute(text("""
+        SELECT s.id, p.id AS pac_id
+        FROM sigsa3 s
+        JOIN pacientes p ON s.nombre_paciente = p.nombre_completo
+          AND s.no_historia_clinica = p.expediente
+        WHERE s.paciente_id IS NULL
+          AND s.nombre_paciente IS NOT NULL
+          AND s.no_historia_clinica IS NOT NULL
+    """)).fetchall()
+    for sigsa3_id, pac_id in rows:
+        updates_paciente[int(sigsa3_id)] = int(pac_id)
+        resultados["paso1_paciente"] += 1
+    _aplicar_updates()
     yield {"step": "paso1", "progress": 20, "message": f"Paso 1 — nombre exacto + expediente: {resultados['paso1_paciente']} pacientes", **resultados}
 
-    # ── PASO 2: SQL con ILIKE + trigram GIN index ──
-    mask_s2 = df["paciente_id"].isna() & df["nombre_paciente"].notna()
-    if mask_s2.any():
-        paso2 = pd.read_sql("""
-            SELECT DISTINCT s.id, p.id AS pac_id
-            FROM sigsa3 s
-            JOIN pacientes p ON p.nombre_completo IS NOT NULL
-              AND s.nombre_paciente ILIKE '%' || p.nombre_completo || '%'
-            WHERE s.paciente_id IS NULL
-              AND s.nombre_paciente IS NOT NULL
-        """, conn)
-        for _, row in paso2.iterrows():
-            rid = row["id"]
+    # ── PASO 2: no_historia_clinica = expediente (cualquier tipo) o documento (tipo 3) ──
+    # 2a: match contra pacientes.expediente (todos los tipos, incluido 3)
+    rows = db.execute(text("""
+        SELECT s.id, p.id AS pac_id
+        FROM sigsa3 s
+        JOIN pacientes p ON s.no_historia_clinica = p.expediente
+        WHERE s.paciente_id IS NULL
+          AND s.no_historia_clinica IS NOT NULL
+    """)).fetchall()
+    for sigsa3_id, pac_id in rows:
+        updates_paciente[int(sigsa3_id)] = int(pac_id)
+        resultados["paso2_paciente"] += 1
+
+    # 2b: tipo = 3 → match contra consultas.documento + fecha
+    rows = db.execute(text("""
+        SELECT s.id, c.id AS con_id, c.paciente_id
+        FROM sigsa3 s
+        JOIN consultas c ON s.no_historia_clinica = c.documento
+          AND s.fecha_consulta = c.fecha_consulta
+        WHERE s.paciente_id IS NULL
+          AND s.no_historia_clinica IS NOT NULL
+          AND s.tipo_consulta ~ '^3'
+    """)).fetchall()
+    for sigsa3_id, con_id, pac_id in rows:
+        cid = int(con_id)
+        pid = int(pac_id)
+        updates_consulta[int(sigsa3_id)] = cid
+        updates_paciente[int(sigsa3_id)] = pid
+        resultados["paso2_consulta"] += 1
+    yield {"step": "paso2", "progress": 40, "message": f"Paso 2 — expediente/doc: {resultados['paso2_paciente']} pacientes, {resultados['paso2_consulta']} consultas", **resultados}
+
+    # Commit parcial: paso 2 escrito en DB + refrescar df
+    _aplicar_updates()
+    df = pd.read_sql(
+        "SELECT id, nombre_paciente, no_historia_clinica, fecha_consulta, tipo_consulta, paciente_id, consulta_id FROM sigsa3 WHERE paciente_id IS NULL OR consulta_id IS NULL",
+        engine, parse_dates=["fecha_consulta"]
+    )
+
+    # ── PASO 3a: last-2-words key JOIN + trigram similarity > 0.3 ──
+    mask = df["paciente_id"].isna() & df["nombre_paciente"].notna()
+    if mask.any():
+        paso3a = pd.read_sql(text("""\
+            SELECT DISTINCT ON (s.id) s.id, p.id AS pac_id
+            FROM (
+                SELECT id, nombre_paciente,
+                       CASE WHEN nombre_paciente LIKE '% % %'
+                           THEN SUBSTRING(nombre_paciente FROM '\\S+\\s+(\\S+\\s+\\S+)$')
+                           ELSE SUBSTRING(nombre_paciente FROM '(\\S+)$')
+                       END AS key
+                FROM sigsa3
+                WHERE paciente_id IS NULL AND nombre_paciente IS NOT NULL AND nombre_paciente <> ''
+            ) s
+            JOIN (
+                SELECT id, nombre_completo,
+                       CASE WHEN nombre_completo LIKE '% % %'
+                           THEN SUBSTRING(nombre_completo FROM '\\S+\\s+(\\S+\\s+\\S+)$')
+                           ELSE SUBSTRING(nombre_completo FROM '(\\S+)$')
+                       END AS key
+                FROM pacientes
+                WHERE nombre_completo IS NOT NULL AND nombre_completo <> ''
+            ) p ON s.key = p.key
+              AND similarity(s.nombre_paciente, p.nombre_completo) > 0.3
+            ORDER BY s.id,
+              similarity(s.nombre_paciente, p.nombre_completo) DESC
+        """), engine)
+        for _, row in paso3a.iterrows():
+            rid = int(row["id"])
             pid = int(row["pac_id"])
             updates_paciente[rid] = pid
             df.loc[df["id"] == rid, "paciente_id"] = pid
-            resultados["paso2_paciente"] += 1
-    yield {"step": "paso2", "progress": 40, "message": f"Paso 2 — nombre contiene: {resultados['paso2_paciente']} pacientes", **resultados}
-
-    # ── PASO 3: no_historia_clinica = expediente ──
-    mask = df["paciente_id"].isna() & df["no_historia_clinica"].notna()
-    if mask.any() and not df_pac.empty:
-        merged = df[mask].merge(df_pac, left_on="no_historia_clinica", right_on="expediente", how="inner")
-        for _, row in merged.iterrows():
-            updates_paciente[row["id"]] = int(row["pac_id"])
             resultados["paso3_paciente"] += 1
-    yield {"step": "paso3", "progress": 55, "message": f"Paso 3 — expediente: {resultados['paso3_paciente']} pacientes", **resultados}
 
-    # ── PASO 4: consulta_id por paciente_id + fecha_consulta + tipo_consulta ──
+    # Commit paso 3a
+    _aplicar_updates()
+
+    # ── PASO 3b: last-word key JOIN + trigram similarity > 0.3 (SQL, leftovers) ──
+    mask = df["paciente_id"].isna() & df["nombre_paciente"].notna()
+    if mask.any():
+        paso3b = pd.read_sql(text("""\
+            WITH sig AS MATERIALIZED (
+                SELECT id, nombre_paciente,
+                       SUBSTRING(nombre_paciente FROM '(\\S+)$') AS key1
+                FROM sigsa3
+                WHERE paciente_id IS NULL AND nombre_paciente IS NOT NULL AND nombre_paciente <> ''
+            ),
+            pac AS MATERIALIZED (
+                SELECT id, nombre_completo,
+                       SUBSTRING(nombre_completo FROM '(\\S+)$') AS key1
+                FROM pacientes
+                WHERE nombre_completo IS NOT NULL AND nombre_completo <> ''
+            )
+            SELECT DISTINCT ON (s.id) s.id, p.id AS pac_id
+            FROM sig s
+            JOIN pac p ON s.key1 = p.key1
+              AND similarity(s.nombre_paciente, p.nombre_completo) > 0.3
+            ORDER BY s.id,
+              similarity(s.nombre_paciente, p.nombre_completo) DESC
+        """), engine)
+        for _, row in paso3b.iterrows():
+            rid = int(row["id"])
+            pid = int(row["pac_id"])
+            updates_paciente[rid] = pid
+            df.loc[df["id"] == rid, "paciente_id"] = pid
+            resultados["paso3_paciente"] += 1
+
+    # Commit paso 3
+    _aplicar_updates()
+    yield {"step": "paso3", "progress": 55, "message": f"Paso 3 — clave (apellidos) + trigram: {resultados['paso3_paciente']} pacientes", **resultados}
+
+    # ── PASO 4: consulta_id por paciente_id + fecha_consulta ±1d + tipo_consulta ──
     mask = df["consulta_id"].isna() & df["paciente_id"].notna() & df["fecha_consulta"].notna()
     if mask.any() and not df_con.empty:
         sub = df.loc[mask, ["id", "paciente_id", "fecha_consulta", "tipo_consulta"]].copy()
-        sub["tipo_num"] = sub["tipo_consulta"].apply(_extraer_tipo_consulta)
+        sub["tipo_num"] = pd.to_numeric(
+            sub["tipo_consulta"].astype(str).str.strip().str.split(n=1).str[0],
+            errors="coerce"
+        )
+        sub_exp = pd.concat([
+            sub.assign(_match_date=sub["fecha_consulta"] - pd.Timedelta(days=1), _dist=1),
+            sub.assign(_match_date=sub["fecha_consulta"], _dist=0),
+            sub.assign(_match_date=sub["fecha_consulta"] + pd.Timedelta(days=1), _dist=1),
+        ])
 
         df_con = df_con.copy()
         df_con["tipo_num"] = df_con["tipo_consulta"]
 
-        merged = sub.merge(df_con, left_on=["paciente_id", "fecha_consulta"],
-                           right_on=["paciente_id", "fecha_consulta"], how="inner", suffixes=("_sig", "_con"))
+        merged = sub_exp.merge(df_con, left_on=["paciente_id", "_match_date"],
+                               right_on=["paciente_id", "fecha_consulta"],
+                               how="inner", suffixes=("_sig", "_con"))
         merged = merged[
             merged["tipo_num_sig"].isna() | (merged["tipo_num_sig"] == merged["tipo_num_con"])
-        ].drop_duplicates(subset="id", keep="first")
+        ]
+        # Best match per sigsa3: exact date (_dist=0) preferred over ±1
+        merged = merged.loc[merged.groupby("id")["_dist"].idxmin()]
+        merged = merged.drop_duplicates(subset="id", keep="first")
 
         for _, row in merged.iterrows():
             rid = row["id"]
             updates_consulta[rid] = int(row["con_id"])
             df.loc[df["id"] == rid, "consulta_id"] = row["con_id"]
             resultados["paso4_consulta"] += 1
-    yield {"step": "paso4", "progress": 70, "message": f"Paso 4 — paciente+fecha+tipo: {resultados['paso4_consulta']} consultas", **resultados}
+    yield {"step": "paso4", "progress": 70, "message": f"Paso 4 — paciente+fecha±1d+tipo: {resultados['paso4_consulta']} consultas", **resultados}
 
-    # ── PASO 5: consulta_id por no_historia_clinica = documento + fecha_consulta ──
+    # ── PASO 5: consulta_id por no_historia_clinica = documento + fecha_consulta ±1d ──
     mask = df["consulta_id"].isna() & df["no_historia_clinica"].notna() & df["fecha_consulta"].notna()
-    print(f"  [PASO 5] candidatos={mask.sum()} | rango fechas sigsa3: {df.loc[mask, 'fecha_consulta'].min()} a {df.loc[mask, 'fecha_consulta'].max()} | rango fechas df_con: {df_con['fecha_consulta'].min()} a {df_con['fecha_consulta'].max()}")
     if mask.any() and not df_con.empty:
-        merged = df[mask].merge(df_con, left_on=["no_historia_clinica", "fecha_consulta"],
-                                right_on=["documento", "fecha_consulta"], how="inner", suffixes=("_sig", "_con"))
-        print(f"  [PASO 5] merged rows={len(merged)}")
+        sub = df.loc[mask, ["id", "no_historia_clinica", "fecha_consulta", "paciente_id"]].copy()
+        sub_exp = pd.concat([
+            sub.assign(_match_date=sub["fecha_consulta"] - pd.Timedelta(days=1), _dist=1),
+            sub.assign(_match_date=sub["fecha_consulta"], _dist=0),
+            sub.assign(_match_date=sub["fecha_consulta"] + pd.Timedelta(days=1), _dist=1),
+        ])
+        merged = sub_exp.merge(df_con, left_on=["no_historia_clinica", "_match_date"],
+                               right_on=["documento", "fecha_consulta"],
+                               how="inner", suffixes=("_sig", "_con"))
+        # Best match per sigsa3: exact date preferred
+        merged = merged.loc[merged.groupby("id")["_dist"].idxmin()]
         merged = merged.drop_duplicates(subset="id", keep="first")
-        print(f"  [PASO 5] merged after dedup={len(merged)}")
         for _, row in merged.iterrows():
             rid = row["id"]
             updates_consulta[rid] = int(row["con_id"])
@@ -592,12 +709,72 @@ def asociar_paciente_y_consulta(db: Session):
                 updates_paciente[rid] = int(row["paciente_id_con"])
                 df.loc[df["id"] == rid, "paciente_id"] = row["paciente_id_con"]
                 resultados["paso5_paciente"] += 1
-    yield {"step": "paso5", "progress": 85, "message": f"Paso 5 — documento+fecha: {resultados['paso5_consulta']} consultas, {resultados['paso5_paciente']} pacientes adicionales", **resultados}
+    yield {"step": "paso5", "progress": 85, "message": f"Paso 5 — documento+fecha±1d: {resultados['paso5_consulta']} consultas, {resultados['paso5_paciente']} pacientes adicionales", **resultados}
+
+    # Commit parcial: pasos 3-5 escritos en DB para que paso 6 vea estado actualizado
+    _aplicar_updates()
+
+    # ── PASO 6: barrido final para rezagados ──
+    # 6a: paciente_id sin consulta_id → buscar por paciente_id + fecha ±1d (cualquier tipo)
+    mask = df["consulta_id"].isna() & df["paciente_id"].notna() & df["fecha_consulta"].notna()
+    if mask.any() and not df_con.empty:
+        sub = df.loc[mask, ["id", "paciente_id", "fecha_consulta"]].copy()
+        sub_exp = pd.concat([
+            sub.assign(_match_date=sub["fecha_consulta"] - pd.Timedelta(days=1), _dist=1),
+            sub.assign(_match_date=sub["fecha_consulta"], _dist=0),
+            sub.assign(_match_date=sub["fecha_consulta"] + pd.Timedelta(days=1), _dist=1),
+        ])
+        merged = sub_exp.merge(df_con, left_on=["paciente_id", "_match_date"],
+                               right_on=["paciente_id", "fecha_consulta"],
+                               how="inner", suffixes=("_sig", "_con"))
+        if not merged.empty:
+            merged = merged.loc[merged.groupby("id")["_dist"].idxmin()]
+            merged = merged.drop_duplicates(subset="id", keep="first")
+        for _, row in merged.iterrows():
+            rid = row["id"]
+            updates_consulta[rid] = int(row["con_id"])
+            df.loc[df["id"] == rid, "consulta_id"] = row["con_id"]
+            resultados["paso6a_consulta"] += 1
+    yield {"step": "paso6a", "progress": 90, "message": f"Paso 6a — paciente+fecha±1d (cualquier tipo): {resultados['paso6a_consulta']} consultas", **resultados}
+
+    # 6b: sin paciente_id → key JOIN + trigram similarity > 0.2 (rezagados)
+    mask = df["paciente_id"].isna() & df["nombre_paciente"].notna()
+    if mask.any():
+        paso6b = pd.read_sql(text("""\
+            SELECT DISTINCT ON (s.id) s.id, p.id AS pac_id
+            FROM (
+                SELECT id, nombre_paciente,
+                       CASE WHEN nombre_paciente LIKE '% % %'
+                           THEN SUBSTRING(nombre_paciente FROM '\\S+\\s+(\\S+\\s+\\S+)$')
+                           ELSE SUBSTRING(nombre_paciente FROM '(\\S+)$')
+                       END AS key
+                FROM sigsa3
+                WHERE paciente_id IS NULL AND nombre_paciente IS NOT NULL AND nombre_paciente <> ''
+            ) s
+            JOIN (
+                SELECT id, nombre_completo,
+                       CASE WHEN nombre_completo LIKE '% % %'
+                           THEN SUBSTRING(nombre_completo FROM '\\S+\\s+(\\S+\\s+\\S+)$')
+                           ELSE SUBSTRING(nombre_completo FROM '(\\S+)$')
+                       END AS key
+                FROM pacientes
+                WHERE nombre_completo IS NOT NULL AND nombre_completo <> ''
+            ) p ON s.key = p.key
+              AND similarity(s.nombre_paciente, p.nombre_completo) > 0.2
+            ORDER BY s.id,
+              similarity(s.nombre_paciente, p.nombre_completo) DESC
+        """), engine)
+        for _, row in paso6b.iterrows():
+            rid = int(row["id"])
+            pid = int(row["pac_id"])
+            updates_paciente[rid] = pid
+            df.loc[df["id"] == rid, "paciente_id"] = pid
+            resultados["paso6b_paciente"] += 1
+    yield {"step": "paso6b", "progress": 95, "message": f"Paso 6b — clave + trigram >0.2: {resultados['paso6b_paciente']} pacientes", **resultados}
 
     _aplicar_updates()
-    conn.close()
-    total_pac = sum(resultados[k] for k in ("paso1_paciente", "paso2_paciente", "paso3_paciente"))
-    total_con = sum(resultados[k] for k in ("paso4_consulta", "paso5_consulta"))
+    total_pac = sum(resultados[k] for k in ("paso1_paciente", "paso2_paciente", "paso3_paciente", "paso6b_paciente"))
+    total_con = sum(resultados[k] for k in ("paso2_consulta", "paso4_consulta", "paso5_consulta", "paso6a_consulta"))
     elapsed = (ahora() - t0).total_seconds()
     yield {"step": "done", "progress": 100, "message": f"✅ {total_pac} pacientes, {total_con} consultas asociados ({elapsed:.1f}s)", **resultados}
 
@@ -714,108 +891,7 @@ def dx_z10(db: Session, desde: str, hasta: str) -> dict:
     return dx_por_codigo_cie(db, desde, hasta, ["Z:10:4", "Z:10:5", "Z:10:6"])
 
 
-def listar_personal_salud(db: Session) -> list:
-    from modules.sigsa3.models import PersonalSaludModel
-    return db.query(PersonalSaludModel).order_by(PersonalSaludModel.nombre).all()
 
-
-def crear_personal_salud(nombre: str, especialidad: str | None, medico_id: int | None, db: Session) -> dict:
-    from modules.sigsa3.models import PersonalSaludModel
-    existente = db.query(PersonalSaludModel).filter(PersonalSaludModel.nombre == nombre).first()
-    if existente:
-        raise HTTPException(status_code=409, detail=f"'{nombre}' ya existe en personal_salud")
-    registro = PersonalSaludModel(nombre=nombre, especialidad=especialidad, medico_id=medico_id)
-    db.add(registro)
-    db.commit()
-    db.refresh(registro)
-    return {"id": registro.id, "nombre": registro.nombre, "especialidad": registro.especialidad, "medico_id": registro.medico_id}
-
-
-def actualizar_personal_salud(ps_id: int, nombre: str | None, especialidad: str | None, medico_id: int | None, db: Session) -> dict:
-    from modules.sigsa3.models import PersonalSaludModel
-    registro = db.query(PersonalSaludModel).filter(PersonalSaludModel.id == ps_id).first()
-    if not registro:
-        raise HTTPException(status_code=404, detail="Registro de personal_salud no encontrado")
-    if nombre is not None:
-        registro.nombre = nombre
-    if especialidad is not None:
-        registro.especialidad = especialidad
-    if medico_id is not None:
-        registro.medico_id = medico_id
-    db.commit()
-    db.refresh(registro)
-    return {"id": registro.id, "nombre": registro.nombre, "especialidad": registro.especialidad, "medico_id": registro.medico_id}
-
-
-def eliminar_personal_salud(ps_id: int, db: Session) -> dict:
-    from modules.sigsa3.models import PersonalSaludModel
-    registro = db.query(PersonalSaludModel).filter(PersonalSaludModel.id == ps_id).first()
-    if not registro:
-        raise HTTPException(status_code=404, detail="Registro de personal_salud no encontrado")
-    db.delete(registro)
-    db.commit()
-    return {"eliminado": True}
-
-
-def sincronizar_especialidad(db: Session) -> dict:
-    """Sincroniza especialidad desde personal_salud → medicos y sigsa3."""
-    from modules.sigsa3.models import PersonalSaludModel
-    from modules.medicos.models import MedicoModel
-
-    personal = db.query(PersonalSaludModel).filter(
-        PersonalSaludModel.medico_id.isnot(None),
-        PersonalSaludModel.especialidad.isnot(None),
-    ).all()
-
-    if not personal:
-        return {"medicos_actualizados": 0, "sigsa3_actualizados": 0}
-
-    medico_ids = [ps.medico_id for ps in personal]
-    medicos = {
-        m.id: m
-        for m in db.query(MedicoModel).filter(MedicoModel.id.in_(medico_ids)).all()
-    }
-
-    nombre_a_especialidad = {}
-    patrones = []
-    for ps in personal:
-        nombre_a_especialidad[ps.nombre.lower()] = ps.especialidad
-        patrones.append(f"%{ps.nombre}%")
-
-    condiciones = [
-        Sigsa3Model.personal_salud.ilike(p) for p in patrones
-    ]
-    sigsa3_rows = db.query(Sigsa3Model).filter(or_(*condiciones)).all()
-
-    medicos_actualizados = 0
-    sigsa3_actualizados = 0
-
-    for ps in personal:
-        if not ps.especialidad:
-            continue
-        medico = medicos.get(ps.medico_id)
-        if medico and medico.especialidad != ps.especialidad:
-            medico.especialidad = ps.especialidad
-            medicos_actualizados += 1
-
-    for reg in sigsa3_rows:
-        if reg.personal_salud:
-            key = reg.personal_salud.strip().lower()
-            target_esp = nombre_a_especialidad.get(key)
-            if not target_esp:
-                for ps_name, ps_esp in nombre_a_especialidad.items():
-                    if key.endswith(ps_name) or ps_name.endswith(key):
-                        target_esp = ps_esp
-                        break
-            if target_esp and reg.especialidad != target_esp:
-                reg.especialidad = target_esp
-                sigsa3_actualizados += 1
-
-    db.commit()
-    return {
-        "medicos_actualizados": medicos_actualizados,
-        "sigsa3_actualizados": sigsa3_actualizados,
-    }
 
 
 def truncate_tabla(db: Session) -> dict:
@@ -824,13 +900,13 @@ def truncate_tabla(db: Session) -> dict:
     return {"truncado": True, "tabla": "sigsa3"}
 
 
-def exportar_csv(db: Session) -> str:
+def exportar_csv(db: Session) -> bytes:
     import csv
     import io
 
     registros = db.query(Sigsa3Model).order_by(Sigsa3Model.id).all()
     if not registros:
-        return ""
+        return b""
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -848,7 +924,7 @@ def exportar_csv(db: Session) -> str:
             r.edad_dias, r.edad_meses, r.edad_anios, r.tipo_consulta, r.control,
             r.semana_gestacional, r.codigo_cie_10, r.dx, r.especialidad,
         ])
-    return output.getvalue()
+    return ("\ufeff" + output.getvalue()).encode("utf-8")
 
 
 def listar_no_asociados(db: Session, limit: int = 100) -> list[Sigsa3Model]:
@@ -861,47 +937,3 @@ def listar_no_asociados(db: Session, limit: int = 100) -> list[Sigsa3Model]:
     )
 
 
-def actualizar_especialidad_por_medico(personal_salud_nombre: str, db: Session) -> dict:
-    from modules.sigsa3.models import PersonalSaludModel
-
-    ps = db.query(PersonalSaludModel).filter(
-        PersonalSaludModel.nombre.ilike(personal_salud_nombre)
-    ).first()
-    if not ps:
-        ps = db.query(PersonalSaludModel).filter(
-            PersonalSaludModel.nombre.ilike(f"%{personal_salud_nombre}%")
-        ).first()
-    if not ps:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró '{personal_salud_nombre}' en personal_salud"
-        )
-    if not ps.especialidad:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"'{ps.nombre}' no tiene especialidad registrada en personal_salud"
-        )
-
-    registros = db.query(Sigsa3Model).filter(
-        Sigsa3Model.personal_salud.ilike(f"%{ps.nombre}%")
-    ).all()
-    if not registros:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontraron registros SIGSA-3 con personal_salud que contenga '{ps.nombre}'"
-        )
-
-    actualizados = 0
-    for reg in registros:
-        if reg.especialidad != ps.especialidad:
-            reg.especialidad = ps.especialidad
-            actualizados += 1
-
-    db.commit()
-    return {
-        "personal_salud": ps.nombre,
-        "especialidad": ps.especialidad,
-        "medico_id": ps.medico_id,
-        "registros_encontrados": len(registros),
-        "registros_actualizados": actualizados,
-    }

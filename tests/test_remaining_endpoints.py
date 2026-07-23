@@ -27,7 +27,8 @@ def cleanup():
     try:
         # Order matters: child tables first
         from modules.censo_camas.models import CensoCamas
-        from modules.sigsa3.models import Sigsa3Model, PersonalSalud
+        from modules.sigsa3.models import Sigsa3Model
+        from modules.personal_salud.models import PersonalSaludModel as PersonalSalud
         from modules.encamamiento.models import EncamamientoModel
 
         for cc_id in created_ids["censo_camas"]:
@@ -632,11 +633,11 @@ class TestSigsa3Extra:
         )
         assert r.status_code in (200, 204, 404)
 
-    def test_asociar_medico(self, client, auth_headers):
+    def test_sincronizar_medico_especialidad(self, client, auth_headers):
         if not TestSigsa3Extra.SIGSA_ID:
             pytest.skip("No sigsa3 created")
         r = client.post(
-            "/sigsa3/asociar-medico",
+            "/sigsa3/sincronizar-medico-especialidad",
             headers=auth_headers,
         )
         assert r.status_code == 200
@@ -652,31 +653,12 @@ class TestSigsa3Extra:
         assert r.status_code in (200, 404)
 
     @pytest.mark.slow
-    def test_asociar_todo(self, client, auth_headers):
+    def test_asociar_pacientes_masivo(self, client, auth_headers):
         r = client.post(
-            "/sigsa3/asociar-todo",
+            "/sigsa3/asociar-pacientes-masivo",
             headers=auth_headers,
         )
         assert r.status_code == 200
-
-    def test_actualizar_especialidad(self, client, auth_headers):
-        r = client.post(
-            "/sigsa3/actualizar-especialidad",
-            headers=auth_headers,
-            json={"personal_salud": "DR. TEST"},
-        )
-        # 200 if personal_salud found and updated; 404 if name not in DB
-        assert r.status_code in (200, 404)
-        if r.status_code == 200:
-            assert isinstance(r.json(), dict)
-
-    def test_sincronizar_especialidad(self, client, auth_headers):
-        r = client.post(
-            "/sigsa3/sincronizar-especialidad",
-            headers=auth_headers,
-        )
-        assert r.status_code == 200
-        assert isinstance(r.json(), dict)
 
     def test_eliminar_por_ids(self, client, auth_headers):
         if not created_ids["sigsa3"]:

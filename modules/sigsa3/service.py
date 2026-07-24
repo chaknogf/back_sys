@@ -556,7 +556,7 @@ def asociar_paciente_y_consulta(db: Session):
     rows = db.execute(text("""
         SELECT s.id, p.id AS pac_id
         FROM sigsa3 s
-        JOIN pacientes p ON s.nombre_paciente = p.nombre_completo
+        JOIN pacientes p ON unaccent(s.nombre_paciente) = unaccent(p.nombre_completo)
           AND s.no_historia_clinica = p.expediente
         WHERE s.paciente_id IS NULL
           AND s.nombre_paciente IS NOT NULL
@@ -613,25 +613,25 @@ def asociar_paciente_y_consulta(db: Session):
             SELECT DISTINCT ON (s.id) s.id, p.id AS pac_id
             FROM (
                 SELECT id, nombre_paciente,
-                       CASE WHEN nombre_paciente LIKE '% % %'
-                           THEN SUBSTRING(nombre_paciente FROM '\\S+\\s+(\\S+\\s+\\S+)$')
-                           ELSE SUBSTRING(nombre_paciente FROM '(\\S+)$')
+                       CASE WHEN unaccent(nombre_paciente) LIKE '% % %'
+                           THEN SUBSTRING(unaccent(nombre_paciente) FROM '\\S+\\s+(\\S+\\s+\\S+)$')
+                           ELSE SUBSTRING(unaccent(nombre_paciente) FROM '(\\S+)$')
                        END AS key
                 FROM sigsa3
                 WHERE paciente_id IS NULL AND nombre_paciente IS NOT NULL AND nombre_paciente <> ''
             ) s
             JOIN (
                 SELECT id, nombre_completo,
-                       CASE WHEN nombre_completo LIKE '% % %'
-                           THEN SUBSTRING(nombre_completo FROM '\\S+\\s+(\\S+\\s+\\S+)$')
-                           ELSE SUBSTRING(nombre_completo FROM '(\\S+)$')
+                       CASE WHEN unaccent(nombre_completo) LIKE '% % %'
+                           THEN SUBSTRING(unaccent(nombre_completo) FROM '\\S+\\s+(\\S+\\s+\\S+)$')
+                           ELSE SUBSTRING(unaccent(nombre_completo) FROM '(\\S+)$')
                        END AS key
                 FROM pacientes
                 WHERE nombre_completo IS NOT NULL AND nombre_completo <> ''
             ) p ON s.key = p.key
-              AND similarity(s.nombre_paciente, p.nombre_completo) > 0.3
+              AND similarity(unaccent(s.nombre_paciente), unaccent(p.nombre_completo)) > 0.3
             ORDER BY s.id,
-              similarity(s.nombre_paciente, p.nombre_completo) DESC
+              similarity(unaccent(s.nombre_paciente), unaccent(p.nombre_completo)) DESC
         """), engine)
         for _, row in paso3a.iterrows():
             rid = int(row["id"])
@@ -649,22 +649,22 @@ def asociar_paciente_y_consulta(db: Session):
         paso3b = pd.read_sql(text("""\
             WITH sig AS MATERIALIZED (
                 SELECT id, nombre_paciente,
-                       SUBSTRING(nombre_paciente FROM '(\\S+)$') AS key1
+                       SUBSTRING(unaccent(nombre_paciente) FROM '(\\S+)$') AS key1
                 FROM sigsa3
                 WHERE paciente_id IS NULL AND nombre_paciente IS NOT NULL AND nombre_paciente <> ''
             ),
             pac AS MATERIALIZED (
                 SELECT id, nombre_completo,
-                       SUBSTRING(nombre_completo FROM '(\\S+)$') AS key1
+                       SUBSTRING(unaccent(nombre_completo) FROM '(\\S+)$') AS key1
                 FROM pacientes
                 WHERE nombre_completo IS NOT NULL AND nombre_completo <> ''
             )
             SELECT DISTINCT ON (s.id) s.id, p.id AS pac_id
             FROM sig s
             JOIN pac p ON s.key1 = p.key1
-              AND similarity(s.nombre_paciente, p.nombre_completo) > 0.3
+              AND similarity(unaccent(s.nombre_paciente), unaccent(p.nombre_completo)) > 0.3
             ORDER BY s.id,
-              similarity(s.nombre_paciente, p.nombre_completo) DESC
+              similarity(unaccent(s.nombre_paciente), unaccent(p.nombre_completo)) DESC
         """), engine)
         for _, row in paso3b.iterrows():
             rid = int(row["id"])
@@ -770,25 +770,25 @@ def asociar_paciente_y_consulta(db: Session):
             SELECT DISTINCT ON (s.id) s.id, p.id AS pac_id
             FROM (
                 SELECT id, nombre_paciente,
-                       CASE WHEN nombre_paciente LIKE '% % %'
-                           THEN SUBSTRING(nombre_paciente FROM '\\S+\\s+(\\S+\\s+\\S+)$')
-                           ELSE SUBSTRING(nombre_paciente FROM '(\\S+)$')
+                       CASE WHEN unaccent(nombre_paciente) LIKE '% % %'
+                           THEN SUBSTRING(unaccent(nombre_paciente) FROM '\\S+\\s+(\\S+\\s+\\S+)$')
+                           ELSE SUBSTRING(unaccent(nombre_paciente) FROM '(\\S+)$')
                        END AS key
                 FROM sigsa3
                 WHERE paciente_id IS NULL AND nombre_paciente IS NOT NULL AND nombre_paciente <> ''
             ) s
             JOIN (
                 SELECT id, nombre_completo,
-                       CASE WHEN nombre_completo LIKE '% % %'
-                           THEN SUBSTRING(nombre_completo FROM '\\S+\\s+(\\S+\\s+\\S+)$')
-                           ELSE SUBSTRING(nombre_completo FROM '(\\S+)$')
+                       CASE WHEN unaccent(nombre_completo) LIKE '% % %'
+                           THEN SUBSTRING(unaccent(nombre_completo) FROM '\\S+\\s+(\\S+\\s+\\S+)$')
+                           ELSE SUBSTRING(unaccent(nombre_completo) FROM '(\\S+)$')
                        END AS key
                 FROM pacientes
                 WHERE nombre_completo IS NOT NULL AND nombre_completo <> ''
             ) p ON s.key = p.key
-              AND similarity(s.nombre_paciente, p.nombre_completo) > 0.2
+              AND similarity(unaccent(s.nombre_paciente), unaccent(p.nombre_completo)) > 0.2
             ORDER BY s.id,
-              similarity(s.nombre_paciente, p.nombre_completo) DESC
+              similarity(unaccent(s.nombre_paciente), unaccent(p.nombre_completo)) DESC
         """), engine)
         for _, row in paso6b.iterrows():
             rid = int(row["id"])

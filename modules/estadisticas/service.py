@@ -247,7 +247,7 @@ def estudiante_publico(db: Session, desde: str, hasta: str) -> dict:
     f_desde, f_hasta = _parse_fechas(desde, hasta)
 
     rows = db.execute(text("""
-        SELECT
+        SELECT DISTINCT ON (c.id)
             p.nombre,
             p.nombre_completo,
             p.expediente,
@@ -257,17 +257,17 @@ def estudiante_publico(db: Session, desde: str, hasta: str) -> dict:
             c.fecha_consulta,
             c.especialidad,
             c.documento,
-            c.fecha_consulta,
             c.paciente_id,
-            c.egreso#>>'{diagnosticos}' AS diagnostico
+            COALESCE(NULLIF(c.egreso#>>'{diagnosticos}', ''), s.dx) AS diagnostico
         FROM consultas c
         JOIN pacientes p ON p.id = c.paciente_id
+        LEFT JOIN sigsa3 s ON s.consulta_id = c.id
         WHERE c.fecha_consulta BETWEEN :desde AND :hasta
           AND c.activo = true
           AND (
               p.datos_extra#>>'{socioeconomicos,estudiante_publico}' = 'S'
           )
-        ORDER BY c.fecha_consulta, c.hora_consulta
+        ORDER BY c.id
     """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
 
     datos = []

@@ -2,7 +2,7 @@ import unicodedata
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy.orm import Session, load_only
-from sqlalchemy import and_, func, cast, String, or_, desc, case
+from sqlalchemy import and_, func, cast, Integer, String, or_, desc, case
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 
@@ -307,11 +307,26 @@ def _apply_q_filter(query, q):
     )
 
 
+def _extract_num(val: str) -> Optional[int]:
+    import re
+    m = re.search(r'(\d+)$', val)
+    return int(m.group(1)) if m else None
+
+
 def _apply_expediente_range(query, desde: Optional[str], hasta: Optional[str]):
+    if not desde and not hasta:
+        return query
+
+    num_part = cast(func.substring(PacienteModel.expediente, r'(\d+)$'), Integer)
+
     if desde:
-        query = query.filter(PacienteModel.expediente >= desde)
+        d_num = _extract_num(desde)
+        if d_num is not None:
+            query = query.filter(num_part >= d_num)
     if hasta:
-        query = query.filter(PacienteModel.expediente <= hasta)
+        h_num = _extract_num(hasta)
+        if h_num is not None:
+            query = query.filter(num_part <= h_num)
     return query
 
 

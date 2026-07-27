@@ -105,7 +105,7 @@ def pacientes_con_consultas_recientes(
     expediente_desde: Optional[str] = Query(None, description="Inicio de rango de expediente"),
     expediente_hasta: Optional[str] = Query(None, description="Fin de rango de expediente"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(500, ge=1, le=5000),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
@@ -118,7 +118,7 @@ def pacientes_sin_consultas_recientes(
     expediente_desde: Optional[str] = Query(None, description="Inicio de rango de expediente"),
     expediente_hasta: Optional[str] = Query(None, description="Fin de rango de expediente"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(500, ge=1, le=5000),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):

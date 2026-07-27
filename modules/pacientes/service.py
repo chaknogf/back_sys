@@ -397,7 +397,8 @@ def _exec_expedientes_query(
             )
         )
     data_query = _apply_q_filter(data_query, q)
-    rows = data_query.order_by(desc(PacienteModel.id)).offset(skip).limit(limit).all()
+    order_col = PacienteModel.expediente if (expediente_desde or expediente_hasta) else desc(PacienteModel.id)
+    rows = data_query.order_by(order_col).offset(skip).limit(limit).all()
 
     pacientes = []
     for paciente, ultima_fecha in rows:

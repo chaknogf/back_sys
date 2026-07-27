@@ -1,3 +1,4 @@
+import re
 import unicodedata
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
@@ -307,10 +308,15 @@ def _apply_q_filter(query, q):
     )
 
 
-def _extract_num(val: str) -> Optional[int]:
-    import re
+def _parse_expediente_ref(val: str):
+    """'25A-10' → (25, 10), '105' → (None, 105)"""
+    m = re.match(r'^(\d{2})[A-Z]-(\d+)$', val)
+    if m:
+        return int(m.group(1)), int(m.group(2))
     m = re.search(r'(\d+)$', val)
-    return int(m.group(1)) if m else None
+    if m:
+        return None, int(m.group(1))
+    return None, None
 
 
 def _apply_expediente_range(query, desde: Optional[str], hasta: Optional[str]):
@@ -318,15 +324,24 @@ def _apply_expediente_range(query, desde: Optional[str], hasta: Optional[str]):
         return query
 
     num_part = cast(func.substring(PacienteModel.expediente, r'(\d+)$'), Integer)
+    anio_part = cast(func.substring(PacienteModel.expediente, r'^(\d{2})A-'), Integer)
 
     if desde:
-        d_num = _extract_num(desde)
+        d_anio, d_num = _parse_expediente_ref(desde)
         if d_num is not None:
-            query = query.filter(num_part >= d_num)
+            cond = [num_part >= d_num]
+            if d_anio is not None:
+                cond.append(or_(anio_part.is_(None), anio_part == d_anio))
+            query = query.filter(and_(*cond))
+
     if hasta:
-        h_num = _extract_num(hasta)
+        h_anio, h_num = _parse_expediente_ref(hasta)
         if h_num is not None:
-            query = query.filter(num_part <= h_num)
+            cond = [num_part <= h_num]
+            if h_anio is not None:
+                cond.append(or_(anio_part.is_(None), anio_part == h_anio))
+            query = query.filter(and_(*cond))
+
     return query
 
 

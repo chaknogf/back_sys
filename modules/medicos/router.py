@@ -34,6 +34,7 @@ def listar_medicos(
     colegiado: Optional[str] = None,
     pasaporte: Optional[str] = None,
     especialidad: Optional[str] = None,
+    especialidad_id: Optional[int] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db)
@@ -46,6 +47,7 @@ def listar_medicos(
         colegiado=colegiado,
         pasaporte=pasaporte,
         especialidad=especialidad,
+        especialidad_id=especialidad_id,
         skip=skip,
         limit=limit,
     )

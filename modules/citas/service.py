@@ -28,6 +28,7 @@ def crear_cita(cita: CitaCreate, current_user, db: Session):
         expediente=cita.expediente,
         paciente_id=cita.paciente_id,
         especialidad=cita.especialidad,
+        especialidad_id=cita.especialidad_id,
         fecha_cita=cita.fecha_cita,
         datos_extra=cita.datos_extra
     )
@@ -44,6 +45,7 @@ def listar_citas(
     expediente: Optional[str] = None,
     paciente_id: Optional[int] = None,
     especialidad: Optional[str] = None,
+    especialidad_id: Optional[int] = None,
     fecha_cita: Optional[date] = None,
     limit: int = 200,
     skip: int = 0,
@@ -61,6 +63,8 @@ def listar_citas(
         query = query.filter(CitaModel.paciente_id == paciente_id)
     if especialidad is not None:
         query = query.filter(CitaModel.especialidad == especialidad)
+    if especialidad_id is not None:
+        query = query.filter(CitaModel.especialidad_id == especialidad_id)
     if fecha_cita is not None:
         query = query.filter(CitaModel.fecha_cita == fecha_cita)
     total = query.count()
@@ -97,8 +101,6 @@ def obtener_citas_por_paciente(
 def citas_por_especialidad(especialidad: str, db: Session):
     fecha_inicio = date.today() + timedelta(days=1)
 
-    razon = CitaModel.datos_extra['razon_consulta'].astext
-
     dia_semana = func.trim(
         func.to_char(CitaModel.fecha_cita, 'Day')
     ).label("dia_semana")
@@ -106,7 +108,7 @@ def citas_por_especialidad(especialidad: str, db: Session):
     resultados = (
         db.query(
             CitaModel.fecha_cita,
-            razon.label("razon_consulta"),
+            CitaModel.razon_consulta,
             dia_semana,
             func.count(CitaModel.id).label("total")
         )
@@ -116,7 +118,7 @@ def citas_por_especialidad(especialidad: str, db: Session):
         )
         .group_by(
             CitaModel.fecha_cita,
-            razon,
+            CitaModel.razon_consulta,
             dia_semana
         )
         .order_by(

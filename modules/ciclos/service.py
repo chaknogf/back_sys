@@ -61,6 +61,7 @@ def crear_ciclo(data: CicloConsultaBase, db: Session, current_user):
         registro=datetime.utcnow(),
         usuario=current_user.username,
         especialidad=data.especialidad,
+        especialidad_id=data.especialidad_id,
         servicio=data.servicio,
         contenido=data.contenido,
         datos_medicos=data.datos_medicos

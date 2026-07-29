@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from typing import List, Optional as Opt
 from datetime import date, datetime
 
-from modules.sigsa3.models import Sigsa3Model
-from modules.sigsa3.schemas import Sigsa3Create, Sigsa3Update
+from modules.sigsa3.models import Sigsa3Model, Sigsa3RegistroModel
+from modules.sigsa3.schemas import Sigsa3Create, Sigsa3Update, Sigsa3RegistroOut
 
 # Mapeo de columnas Excel → campos SIGSA-3
 EXCEL_COLUMN_MAP = {
@@ -285,6 +285,7 @@ def listar_registros(
     sexo: Opt[str] = None,
     tipo_consulta: Opt[str] = None,
     especialidad: Opt[str] = None,
+    especialidad_id: Opt[int] = None,
     codigo_cie_10: Opt[str] = None,
     q: Opt[str] = None,
     limit: int = 100,
@@ -305,6 +306,8 @@ def listar_registros(
         query = query.filter(Sigsa3Model.tipo_consulta.ilike(f"%{tipo_consulta}%"))
     if especialidad:
         query = query.filter(Sigsa3Model.especialidad.ilike(f"%{especialidad}%"))
+    if especialidad_id is not None:
+        query = query.filter(Sigsa3Model.especialidad_id == especialidad_id)
     if codigo_cie_10:
         query = query.filter(Sigsa3Model.codigo_cie_10.ilike(f"%{codigo_cie_10}%"))
     if q:
@@ -429,9 +432,8 @@ def eliminar_por_periodo(desde: date, hasta: date, db: Session) -> dict:
 
 def sincronizar_sigsa3(db: Session) -> dict:
     """Paso 1: asocia medico_id en SIGSA-3 por nombre (personal_salud → personal_salud.medico_id).
-    Paso 2: actualiza especialidad en SIGSA-3 desde medicos.especialidad según medico_id."""
+    Paso 2: actualiza especialidad + especialidad_id en SIGSA-3 desde medicos."""
     from modules.personal_salud.models import PersonalSaludModel
-    from modules.medicos.models import MedicoModel
 
     registros = db.query(Sigsa3Model).filter(
         Sigsa3Model.personal_salud.isnot(None),
@@ -442,7 +444,7 @@ def sincronizar_sigsa3(db: Session) -> dict:
     personal = db.query(PersonalSaludModel).filter(
         PersonalSaludModel.medico_id.isnot(None)
     ).all()
-    nombre_to_medico = {p.nombre.strip().lower(): (p.medico_id, p.nombre) for p in personal}
+    nombre_to_medico = {p.nombre.strip().lower(): (p.medico_id, p.nombre, p.especialidad_id) for p in personal}
 
     medico_ids = set()
     asociados = 0
@@ -452,36 +454,23 @@ def sincronizar_sigsa3(db: Session) -> dict:
             continue
         match = nombre_to_medico.get(nombre)
         if not match:
-            for ps_nombre, (ps_mid, ps_name) in nombre_to_medico.items():
+            for ps_nombre, (ps_mid, ps_name, ps_esp_id) in nombre_to_medico.items():
                 if ps_nombre in nombre or nombre in ps_nombre:
-                    match = (ps_mid, ps_name)
+                    match = (ps_mid, ps_name, ps_esp_id)
                     break
         if match:
-            medico_id, _ = match
+            medico_id, _, personal_esp_id = match
             if reg.medico_id != medico_id:
                 reg.medico_id = medico_id
                 asociados += 1
+            if personal_esp_id and reg.especialidad_id != personal_esp_id:
+                reg.especialidad_id = personal_esp_id
             medico_ids.add(medico_id)
-
-    if medico_ids:
-        medicos = {
-            m.id: m
-            for m in db.query(MedicoModel).filter(MedicoModel.id.in_(list(medico_ids))).all()
-        }
-        especialidades_actualizadas = 0
-        for reg in registros:
-            if reg.medico_id and reg.medico_id in medicos:
-                esp_medico = medicos[reg.medico_id].especialidad
-                if esp_medico and reg.especialidad != esp_medico:
-                    reg.especialidad = esp_medico
-                    especialidades_actualizadas += 1
-    else:
-        especialidades_actualizadas = 0
 
     db.commit()
     return {
         "asociados": asociados,
-        "especialidades_actualizadas": especialidades_actualizadas,
+        "especialidades_actualizadas": asociados,
     }
 
 
@@ -961,5 +950,148 @@ def listar_no_asociados(db: Session, limit: int = 100) -> list[Sigsa3Model]:
         .limit(min(limit, 500))
         .all()
     )
+
+
+# =====================================================================
+# NORMALIZACIÓN: sigsa3 (staging) → sigsa3_registros
+# =====================================================================
+
+def _normalizar_codigo_cie10(codigo: str) -> str:
+    """Convierte código CIE-10 del formato SIGSA-3 (Z:34, O:82:9) a formato estándar (Z34, O82.9)."""
+    if not codigo:
+        return ""
+    c = codigo.strip().upper()
+    c = c.replace(":", "")
+    if len(c) > 3 and c[3] != ".":
+        c = c[:3] + "." + c[3:]
+    return c
+
+
+def _resolver_cie10_id(db: Session, codigo_sigsa3: str, cie10_cache: dict) -> int | None:
+    """Resuelve código CIE-10 string → FK a cie10_catalogo.id usando caché en memoria."""
+    if not codigo_sigsa3:
+        return None
+    if codigo_sigsa3 in cie10_cache:
+        return cie10_cache[codigo_sigsa3]
+    estandar = _normalizar_codigo_cie10(codigo_sigsa3)
+    if estandar in cie10_cache:
+        return cie10_cache[estandar]
+    # Buscar en DB
+    row = db.execute(
+        text("SELECT id FROM cie10_catalogo WHERE codigo = :c OR codigo = :e LIMIT 1"),
+        {"c": codigo_sigsa3, "e": estandar},
+    ).first()
+    if row:
+        cid = row[0]
+        cie10_cache[codigo_sigsa3] = cid
+        cie10_cache[estandar] = cid
+        return cid
+    cie10_cache[codigo_sigsa3] = None
+    return None
+
+
+def _resolver_especialidad_id(db: Session, especialidad: str, esp_cache: dict) -> int | None:
+    """Resuelve especialidad string → FK a especialidades.id."""
+    if not especialidad:
+        return None
+    key = especialidad.strip().lower()
+    if key in esp_cache:
+        return esp_cache[key]
+    row = db.execute(
+        text("SELECT id FROM especialidades WHERE LOWER(nombre) = :n OR LOWER(abreviatura) = :n LIMIT 1"),
+        {"n": key},
+    ).first()
+    if row:
+        eid = row[0]
+        esp_cache[key] = eid
+        return eid
+    esp_cache[key] = None
+    return None
+
+
+def _resolver_tipo_consulta_id(tipo_str: str | None) -> int | None:
+    """Resuelve tipo_consulta string ('1 Primera', '3 Emergencia') → id."""
+    if not tipo_str:
+        return None
+    t = tipo_str.strip()
+    num = t.split()[0] if " " in t else t
+    try:
+        n = int(num)
+        if n in (1, 2, 3):
+            return n
+    except ValueError:
+        return None
+    return None
+
+
+def normalizar(db: Session, batch_size: int = 1000) -> dict:
+    """Migra registros de sigsa3 (staging) a sigsa3_registros (normalizado).
+    Solo migra registros con paciente_id + (medico_id o personal_salud_id).
+    Los registros migrados se eliminan de sigsa3 para ahorrar espacio."""
+    cie10_cache = {}
+    esp_cache = {}
+
+    total_migrados = 0
+    total_omitidos = 0
+    total_errores = 0
+
+    while True:
+        registros = (
+            db.query(Sigsa3Model)
+            .filter(
+                Sigsa3Model.paciente_id.isnot(None),
+                Sigsa3Model.paciente_id != 0,
+            )
+            .order_by(Sigsa3Model.id)
+            .limit(batch_size)
+            .all()
+        )
+        if not registros:
+            break
+
+        for reg in registros:
+            try:
+                tipo_id = _resolver_tipo_consulta_id(reg.tipo_consulta) or reg.tipo_consulta_id
+                cie10_id = reg.codigo_cie_10_id or _resolver_cie10_id(db, reg.codigo_cie_10, cie10_cache)
+                esp_id = reg.especialidad_id or _resolver_especialidad_id(db, reg.especialidad, esp_cache)
+
+                nuevo = Sigsa3RegistroModel(
+                    paciente_id=reg.paciente_id,
+                    medico_id=reg.medico_id,
+                    personal_salud_id=reg.personal_salud_id,
+                    consulta_id=reg.consulta_id,
+                    fecha_consulta=reg.fecha_consulta,
+                    tipo_consulta_id=tipo_id,
+                    control=reg.control,
+                    semana_gestacional=reg.semana_gestacional,
+                    codigo_cie_10_id=cie10_id,
+                    especialidad_id=esp_id,
+                )
+                db.add(nuevo)
+                db.flush()
+                db.delete(reg)
+                total_migrados += 1
+            except Exception:
+                total_errores += 1
+                continue
+
+        db.commit()
+
+    # Omitidos: los que tienen paciente_id pero no medico_id ni personal_salud_id
+    omitidos = db.query(Sigsa3Model).filter(
+        Sigsa3Model.paciente_id.isnot(None),
+        Sigsa3Model.paciente_id != 0,
+        Sigsa3Model.medico_id.is_(None),
+        Sigsa3Model.personal_salud_id.is_(None),
+    ).count()
+
+    return {
+        "migrados": total_migrados,
+        "omitidos_sin_medico": omitidos,
+        "pendientes_sin_paciente": db.query(Sigsa3Model).filter(
+            Sigsa3Model.paciente_id.is_(None)
+        ).count(),
+        "errores": total_errores,
+    }
 
 

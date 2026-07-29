@@ -1,8 +1,8 @@
 # modules/medicos/models.py
-
-from sqlalchemy import Column, Integer, String, BigInteger, Boolean, TIMESTAMP, text, Index
+from sqlalchemy import Column, Integer, String, BigInteger, Boolean, TIMESTAMP, text, Index, ForeignKey
 from sqlalchemy.orm import relationship
 from core.database import Base
+
 
 class MedicoModel(Base):
     __tablename__ = "medicos"
@@ -14,6 +14,7 @@ class MedicoModel(Base):
     dpi = Column(BigInteger, index=True)
     sexo = Column(String(1))
     especialidad = Column(String(100), index=True)
+    especialidad_id = Column(Integer, ForeignKey("especialidades.id", ondelete="SET NULL"), nullable=True, index=True)
     activo = Column(Boolean, default=True, index=True)
     created_at = Column(
         TIMESTAMP(timezone=False),
@@ -33,3 +34,4 @@ class MedicoModel(Base):
     "ConstanciaNacimientoModel",
     back_populates="medico"
 )
+    especialidad_ref = relationship("EspecialidadModel", lazy="joined")

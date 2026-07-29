@@ -44,7 +44,7 @@ def crear(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return service_crear(data.nombre, data.especialidad, data.medico_id, db)
+    return service_crear(data.nombre, data.especialidad, data.especialidad_id, data.medico_id, db)
 
 
 @router.put("/{ps_id}", response_model=PersonalSaludOut)
@@ -54,7 +54,7 @@ def actualizar(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return service_actualizar(ps_id, data.nombre, data.especialidad, data.medico_id, db)
+    return service_actualizar(ps_id, data.nombre, data.especialidad, data.especialidad_id, data.medico_id, db)
 
 
 @router.delete("/{ps_id}")

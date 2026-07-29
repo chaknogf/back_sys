@@ -16,6 +16,7 @@ class CiclosConsulta(Base):
     registro = Column(TIMESTAMP, nullable=False, server_default=func.now())
     usuario = Column(Text, nullable=False)
     especialidad = Column(Text)
+    especialidad_id = Column(Integer, ForeignKey("especialidades.id", ondelete="SET NULL"), nullable=True)
     servicio = Column(Text)
     contenido = Column(Text)
     datos_medicos = Column(JSONB)
@@ -31,3 +32,4 @@ class CiclosConsulta(Base):
     )
 
     consulta = relationship("ConsultaModel", back_populates="ciclos")
+    especialidad_ref = relationship("EspecialidadModel", lazy="joined")

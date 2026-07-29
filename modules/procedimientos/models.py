@@ -31,6 +31,7 @@ class ProceMedico(Base):
     sexo = Column(CHAR(1), nullable=True)
     id_procedimiento = Column(Integer, ForeignKey("public.procedimientos.id", ondelete="SET NULL"), nullable=True)
     especialidad = Column(String(10), nullable=True)
+    especialidad_id = Column(Integer, ForeignKey("especialidades.id", ondelete="SET NULL"), nullable=True)
     cantidad = Column(Integer, nullable=False, default=1)
     responsable = Column(String(20), nullable=True)
     anestesia = Column(Integer, nullable=True, default=0)

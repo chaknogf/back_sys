@@ -7,7 +7,7 @@ from typing import Optional, List
 from datetime import datetime, date, time, timedelta
 
 from modules.pacientes.models import PacienteModel
-from modules.consultas.models import ConsultaModel
+from modules.consultas.models import ConsultaModel, ConsultaHistorialModel
 from modules.ciclos.models import CiclosConsulta
 from modules.laboratorios.models import Laboratorios
 from modules.rayos_x.models import RayosX
@@ -18,20 +18,23 @@ from modules.consultas.schemas import (
 from modules.expediente.service import generar_expediente, generar_emergencia
 
 
-def _agregar_ciclo(consulta, nuevo_ciclo, current_user):
+def _agregar_ciclo(db, consulta, nuevo_ciclo, current_user):
     nuevo_ciclo["registro"] = datetime.now().isoformat()
     nuevo_ciclo["usuario"] = current_user.username
     nuevo_ciclo.setdefault("estado", "actualizado")
 
-    historial = consulta.ciclo
-    if not historial or isinstance(historial, dict):
-        historial = []
-    elif not isinstance(historial, list):
-        historial = []
+    historial_entry = ConsultaHistorialModel(
+        consulta_id=consulta.id,
+        estado=nuevo_ciclo.get("estado", "actualizado"),
+        registro=nuevo_ciclo.get("registro", datetime.now().isoformat()),
+        usuario=current_user.username,
+        especialidad=nuevo_ciclo.get("especialidad"),
+        servicio=nuevo_ciclo.get("servicio"),
+        comentario=nuevo_ciclo.get("comentario"),
+    )
+    db.add(historial_entry)
 
-    consulta.ciclo = historial + [nuevo_ciclo]
     consulta.ultimo_estado = nuevo_ciclo["estado"]
-    flag_modified(consulta, "ciclo")
 
 
 def buscar_consultas_activas(
@@ -46,6 +49,7 @@ def buscar_consultas_activas(
     segundo_apellido: Optional[str] = None,
     tipo_consulta: Optional[int] = None,
     especialidad: Optional[str] = None,
+    especialidad_id: Optional[int] = None,
     servicio: Optional[str] = None,
     fecha: Optional[date] = None,
     ultimo_estado: Optional[str] = None,
@@ -84,6 +88,8 @@ def buscar_consultas_activas(
 
     if especialidad:
         query = query.filter(ConsultaModel.especialidad == especialidad)
+    if especialidad_id is not None:
+        query = query.filter(ConsultaModel.especialidad_id == especialidad_id)
 
     if servicio:
         query = query.filter(ConsultaModel.servicio == servicio)
@@ -280,14 +286,16 @@ def registrar_consulta(datos: RegistroConsultaCreate, db: Session, current_user)
     indicadores_dict = datos.indicadores.model_dump() if datos.indicadores else {}
     empleado_publico = indicadores_dict.get("empleado_publico", False)
 
-    if not empleado_publico and paciente.datos_extra:
-        socioeconomicos = paciente.datos_extra.get("socioeconomicos", {})
-        if socioeconomicos.get("empleado_publico") == "S":
+    if not empleado_publico:
+        socio_emp = (paciente.datos_extra or {}).get("socioeconomicos", {}).get("empleado_publico")
+        if socio_emp == "S":
             empleado_publico = True
 
     personal_hospital = indicadores_dict.get("personal_hospital")
-    if personal_hospital is None and paciente.datos_extra:
-        ph = paciente.datos_extra.get("socioeconomicos", {}).get("personal_hospital")
+    if personal_hospital is None:
+        ph = paciente.es_personal_hospital
+        if ph is None:
+            ph = (paciente.datos_extra or {}).get("socioeconomicos", {}).get("personal_hospital")
         if ph is True or ph == "S":
             personal_hospital = "S"
         elif ph is False or ph == "N":
@@ -305,16 +313,6 @@ def registrar_consulta(datos: RegistroConsultaCreate, db: Session, current_user)
         "ambulancia": indicadores_dict.get("ambulancia", False),
         "embarazo": indicadores_dict.get("embarazo", False),
     }
-
-    ciclo_inicial = CicloClinico(
-        estado="admision",
-        registro=datetime.now().isoformat(),
-        usuario=current_user.username,
-        especialidad=datos.especialidad,
-        servicio=datos.servicio
-    )
-
-    ciclo_historial = [ciclo_inicial.model_dump(mode="json")]
 
     hoy = date.today()
     ultimo_orden = (
@@ -337,12 +335,22 @@ def registrar_consulta(datos: RegistroConsultaCreate, db: Session, current_user)
         fecha_consulta=hoy,
         hora_consulta=datetime.now().time(),
         indicadores=indicadores_completos,
-        ciclo=ciclo_historial,
         orden=ultimo_orden + 1,
         ultimo_estado="admision",
     )
 
     db.add(nueva_consulta)
+    db.flush()
+
+    historial_entry = ConsultaHistorialModel(
+        consulta_id=nueva_consulta.id,
+        estado="admision",
+        registro=datetime.now().isoformat(),
+        usuario=current_user.username,
+        especialidad=datos.especialidad,
+        servicio=datos.servicio,
+    )
+    db.add(historial_entry)
 
     try:
         db.commit()
@@ -353,6 +361,18 @@ def registrar_consulta(datos: RegistroConsultaCreate, db: Session, current_user)
             status_code=500,
             detail=f"Error al registrar consulta: {str(e)}"
         )
+
+    registro_val = historial_entry.registro
+    if hasattr(registro_val, 'isoformat'):
+        registro_val = registro_val.isoformat()
+
+    historial_list = [{
+        "estado": "admision",
+        "registro": registro_val,
+        "usuario": current_user.username,
+        "especialidad": datos.especialidad,
+        "servicio": datos.servicio,
+    }]
 
     return RegistroConsultaOut(
         id=nueva_consulta.id,
@@ -365,7 +385,7 @@ def registrar_consulta(datos: RegistroConsultaCreate, db: Session, current_user)
         fecha_consulta=nueva_consulta.fecha_consulta,
         hora_consulta=nueva_consulta.hora_consulta,
         indicadores=Indicador(**nueva_consulta.indicadores),
-        ciclo=[CicloClinico(**c) for c in nueva_consulta.ciclo],
+        ciclo=[CicloClinico(**c) for c in historial_list],
         orden=nueva_consulta.orden
     )
 
@@ -421,7 +441,7 @@ def actualizar_consulta(consulta_id: int, update_data: ConsultaUpdate, db: Sessi
 
     if update_data.ciclo is not None:
         nuevo_ciclo = update_data.ciclo.model_dump_clean(mode='json')
-        _agregar_ciclo(consulta, nuevo_ciclo, current_user)
+        _agregar_ciclo(db, consulta, nuevo_ciclo, current_user)
 
     recalcular_orden = any(
         key in datos
@@ -477,6 +497,7 @@ def desactivar_consulta(consulta_id: int, db: Session, current_user):
         )
 
     _agregar_ciclo(
+        db,
         consulta,
         {"estado": "borrado"},
         current_user
@@ -505,6 +526,9 @@ def eliminar_consulta(consulta_id: int, db: Session, current_user=None):
     try:
         db.query(CiclosConsulta).filter(
             CiclosConsulta.consulta_id == consulta_id
+        ).delete(synchronize_session=False)
+        db.query(ConsultaHistorialModel).filter(
+            ConsultaHistorialModel.consulta_id == consulta_id
         ).delete(synchronize_session=False)
         db.query(Laboratorios).filter(
             Laboratorios.consulta_id == consulta_id
@@ -543,11 +567,11 @@ def sincronizar_indicadores(db: Session, desde: date, hasta: date, current_user)
         indicadores = consulta.indicadores or {}
         cambio = False
 
-        if paciente and paciente.datos_extra:
-            socioeconomicos = paciente.datos_extra.get("socioeconomicos", {})
-            socio_empleado = socioeconomicos.get("empleado_publico")
-            socio_estudiante = socioeconomicos.get("estudiante_publico")
-            socio_ph = socioeconomicos.get("personal_hospital")
+        if paciente:
+            socio = (paciente.datos_extra or {}).get("socioeconomicos", {})
+            socio_empleado = socio.get("empleado_publico") or socio.get("empleado_público")
+            socio_estudiante = paciente.es_estudiante_publico or socio.get("estudiante_publico")
+            socio_ph = paciente.es_personal_hospital or socio.get("personal_hospital")
 
             if socio_empleado == "S" and not indicadores.get("empleado_publico"):
                 indicadores["empleado_publico"] = True

@@ -9,7 +9,7 @@ import json
 
 from core.dependencies import get_db, get_current_user, get_current_admin_user
 from modules.users.models import UserModel
-from .schemas import Sigsa3Out
+from .schemas import Sigsa3Out, Sigsa3RegistroOut
 from .service import (
     eliminar_por_periodo,
     sincronizar_sigsa3,
@@ -18,6 +18,7 @@ from .service import (
     asociar_paciente,
     listar_no_asociados,
     exportar_csv,
+    normalizar as service_normalizar,
 )
 
 router = APIRouter(
@@ -125,3 +126,15 @@ def asociar_pacientes_masivo_stream(
             yield f"data: {json.dumps(evento, default=str)}\n\n"
 
     return StreamingResponse(_eventos(), media_type="text/event-stream")
+
+
+@router.post("/normalizar")
+def normalizar_sigsa3(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Migra registros SIGSA-3 con paciente+medico a sigsa3_registros (normalizado).
+    Los registros migrados se eliminan de la tabla staging sigsa3 para ahorrar espacio.
+    Resuelve CIE-10, especialidad y tipo_consulta a FKs del catálogo."""
+    resultado = service_normalizar(db)
+    return resultado

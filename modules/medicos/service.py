@@ -28,6 +28,7 @@ def listar_medicos(
     colegiado: str | None = None,
     pasaporte: str | None = None,
     especialidad: str | None = None,
+    especialidad_id: int | None = None,
     skip: int = 0,
     limit: int = 50,
 ):
@@ -56,6 +57,8 @@ def listar_medicos(
 
     if especialidad:
         query = query.filter(MedicoModel.especialidad.ilike(f"%{especialidad}%"))
+    if especialidad_id is not None:
+        query = query.filter(MedicoModel.especialidad_id == especialidad_id)
 
     total = query.count()
 

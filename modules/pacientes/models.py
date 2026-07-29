@@ -18,9 +18,45 @@ class PacienteModel(Base):
     contacto = Column(JSONB, nullable=True)
     referencias = Column(JSONB, nullable=True)
     datos_extra = Column(JSONB, nullable=True)
+    idioma_id = Column(Integer, nullable=True)
+    pueblo_id = Column(Integer, nullable=True)
+    nacionalidad = Column(String(10), nullable=True)
+    lugar_nacimiento = Column(String(4), nullable=True)
+    discapacidad = Column(String(50), nullable=True)
+    educacion = Column(String(100), nullable=True)
+    estado_civil = Column(String(50), nullable=True)
+    es_estudiante_publico = Column(String(2), nullable=True)
+    ocupacion = Column(String(100), nullable=True)
+    es_personal_hospital = Column(String(2), nullable=True)
     estado = Column(String(2), server_default="A", nullable=False)
     metadatos = Column(MutableList.as_mutable(JSONB), default=list)
     nombre_completo = Column(Text, nullable=True)
+
+    @validates("datos_extra")
+    def sync_socioeconomicos(self, key, value):
+        if value and isinstance(value, dict):
+            socio = value.get("socioeconomicos", {})
+            if socio and isinstance(socio, dict):
+                for col, k in [("discapacidad", "discapacidad"), ("educacion", "educacion"),
+                               ("estado_civil", "estado_civil"), ("es_estudiante_publico", "estudiante_publico"),
+                               ("ocupacion", "ocupacion"), ("es_personal_hospital", "personal_hospital")]:
+                    v = socio.get(k)
+                    if v is not None and v != "":
+                        setattr(self, col, v)
+            demo = value.get("demograficos", {})
+            if demo and isinstance(demo, dict):
+                for col, k in [("idioma_id", "idioma"), ("pueblo_id", "pueblo"),
+                               ("nacionalidad", "nacionalidad"), ("lugar_nacimiento", "lugar_nacimiento")]:
+                    v = demo.get(k)
+                    if v is not None and v != "" and v != "null":
+                        if k in ("idioma", "pueblo"):
+                            try:
+                                setattr(self, col, int(v))
+                            except (ValueError, TypeError):
+                                pass
+                        else:
+                            setattr(self, col, v)
+        return value
 
     __table_args__ = (
         Index("uq_cui_not_null", "cui", unique=True,

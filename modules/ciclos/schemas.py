@@ -27,6 +27,7 @@ class CicloConsultaBase(BaseModel):
     registro: Optional[datetime] = None
     usuario: str = ""
     especialidad: Optional[str] = None
+    especialidad_id: Optional[int] = None
     servicio: Optional[str] = None
     contenido: Optional[str] = None
     datos_medicos: Optional[Dict[str, Any]] = None

@@ -191,9 +191,7 @@ def personal_hospital(db: Session, desde: str, hasta: str, skip: int = 0, limit:
         LEFT JOIN sigsa3 s ON s.consulta_id = c.id
         WHERE c.fecha_consulta BETWEEN :desde AND :hasta
           AND c.activo = true
-          AND (
-              p.datos_extra#>>'{socioeconomicos,personal_hospital}' = 'S'
-          )
+          AND p.es_personal_hospital = 'S'
         ORDER BY c.id
         LIMIT :limit OFFSET :skip
     """), {"desde": f_desde, "hasta": f_hasta, "limit": limit, "skip": skip}).fetchall()
@@ -226,9 +224,7 @@ def personal_hospital(db: Session, desde: str, hasta: str, skip: int = 0, limit:
         JOIN pacientes p ON p.id = c.paciente_id
         WHERE c.fecha_consulta BETWEEN :desde AND :hasta
           AND c.activo = true
-          AND (
-              p.datos_extra#>>'{socioeconomicos,personal_hospital}' = 'S'
-          )
+          AND p.es_personal_hospital = 'S'
     """), {"desde": f_desde, "hasta": f_hasta}).scalar()
 
     return {
@@ -264,9 +260,7 @@ def estudiante_publico(db: Session, desde: str, hasta: str) -> dict:
         LEFT JOIN sigsa3 s ON s.consulta_id = c.id
         WHERE c.fecha_consulta BETWEEN :desde AND :hasta
           AND c.activo = true
-          AND (
-              p.datos_extra#>>'{socioeconomicos,estudiante_publico}' = 'S'
-          )
+          AND p.es_estudiante_publico = 'S'
         ORDER BY c.id
     """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
 

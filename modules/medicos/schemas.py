@@ -1,8 +1,7 @@
-# modules/medicos/schemas.py
-
 from pydantic import BaseModel, ConfigDict, Field
-from typing import List, Optional
+from typing import Optional
 from datetime import datetime
+
 
 class MedicoBase(BaseModel):
     nombre: str = Field(..., max_length=200)
@@ -11,6 +10,7 @@ class MedicoBase(BaseModel):
     dpi: Optional[int] = None
     sexo: Optional[str] = Field(None, max_length=1)
     especialidad: Optional[str] = Field(None, max_length=100)
+    especialidad_id: Optional[int] = None
     activo: Optional[bool] = True
 
 
@@ -25,6 +25,7 @@ class MedicoUpdate(BaseModel):
     dpi: Optional[int] = None
     sexo: Optional[str] = Field(None, max_length=1)
     especialidad: Optional[str] = Field(None, max_length=100)
+    especialidad_id: Optional[int] = None
     activo: Optional[bool] = None
 
 
@@ -37,6 +38,6 @@ class MedicoOut(MedicoBase):
 
 class MedicoListResponse(BaseModel):
     total: int
-    medicos: List[MedicoOut]
+    medicos: list[MedicoOut]
 
     model_config = ConfigDict(from_attributes=True)

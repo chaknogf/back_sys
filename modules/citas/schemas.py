@@ -11,7 +11,10 @@ class CitaBase(BaseModel):
     expediente: Optional[str] = None
     paciente_id: Optional[int] = None
     especialidad: Optional[str] = None
+    especialidad_id: Optional[int] = None
     fecha_cita: Optional[date] = None
+    razon_consulta: Optional[str] = None
+    notas: Optional[str] = None
     datos_extra: Optional[Dict[str, Any]] = None
    
 
@@ -23,7 +26,10 @@ class CitaUpdate(BaseModel):
     paciente_id: Optional[int] = None
     expediente: Optional[str] = None
     especialidad: Optional[str] = None
+    especialidad_id: Optional[int] = None
     fecha_cita: Optional[date] = None
+    razon_consulta: Optional[str] = None
+    notas: Optional[str] = None
     datos_extra: Optional[Dict[str, Any]] = None
 
 

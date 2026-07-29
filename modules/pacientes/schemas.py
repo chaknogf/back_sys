@@ -141,6 +141,10 @@ class PacienteBase(BaseModel):
     contacto: Optional[Contacto] = None
     referencias: Optional[List[Referencia]] = None
     datos_extra: Optional[Dict[str, Any]] = None
+    idioma_id: Optional[int] = None
+    pueblo_id: Optional[int] = None
+    nacionalidad: Optional[str] = None
+    lugar_nacimiento: Optional[str] = None
     estado: Optional[str] = Field("V", pattern=r"^(V|F|I|A)$", description="V=Vivo, F=Fallecido, I=Inactivo, A=Activo")
 
     @field_validator("cui", mode="before")
@@ -191,6 +195,10 @@ class PacienteUpdate(BaseModel):
     contacto: Optional[Contacto] = None
     referencias: Optional[List[Referencia]] = None
     datos_extra: Optional[Dict[str, Any]] = None
+    idioma_id: Optional[int] = None
+    pueblo_id: Optional[int] = None
+    nacionalidad: Optional[str] = None
+    lugar_nacimiento: Optional[str] = None
     estado: Optional[str] = None
 
 
@@ -203,6 +211,55 @@ class PacienteOutConsulta(PacienteBase):
     creado_en: Optional[date] = None
     actualizado_en: Optional[date] = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def socioeconomicos_desde_columnas(cls, data):
+        """Inyecta datos socioeconomicos y demograficos desde columnas → datos_extra"""
+        extra = None
+        if hasattr(data, 'datos_extra'):
+            extra = data.datos_extra or {}
+        elif isinstance(data, dict):
+            extra = data.get('datos_extra') or {}
+
+        if extra is None:
+            return data
+
+        socio = {}
+        for col, key in [('discapacidad', 'discapacidad'), ('educacion', 'educacion'),
+                         ('estado_civil', 'estado_civil'), ('es_estudiante_publico', 'estudiante_publico'),
+                         ('ocupacion', 'ocupacion'), ('es_personal_hospital', 'personal_hospital')]:
+            if hasattr(data, col):
+                val = getattr(data, col)
+            elif isinstance(data, dict):
+                val = data.get(col)
+            else:
+                continue
+            if val is not None:
+                socio[key] = val
+
+        if socio:
+            extra['socioeconomicos'] = socio
+
+        demo = {}
+        for col, key in [('idioma_id', 'idioma'), ('pueblo_id', 'pueblo'),
+                         ('nacionalidad', 'nacionalidad'), ('lugar_nacimiento', 'lugar_nacimiento')]:
+            if hasattr(data, col):
+                val = getattr(data, col)
+            elif isinstance(data, dict):
+                val = data.get(col)
+            else:
+                continue
+            if val is not None:
+                demo[key] = val
+
+        if demo:
+            extra['demograficos'] = demo
+
+        if isinstance(data, dict):
+            data['datos_extra'] = extra
+        else:
+            data.datos_extra = extra
+        return data
 
     @model_validator(mode="before")
     @classmethod
@@ -221,6 +278,10 @@ class PacienteOutConsulta(PacienteBase):
                     data["nombre_completo"] = nombre_obj.completo
                 else:
                     data["nombre_completo"] = ""
+        else:
+            nombre_obj = getattr(data, "nombre", None)
+            if nombre_obj and hasattr(nombre_obj, "completo"):
+                data.nombre_completo = nombre_obj.completo
         return data
 
     model_config = ConfigDict(from_attributes=True)
@@ -273,16 +334,20 @@ class PacientesResumen(BaseModel):
         if not isinstance(data, dict):
             if hasattr(data, "datos_extra"):
                 d = {f: getattr(data, f, None) for f in cls.model_fields}
-                extras = data.datos_extra
-                if extras:
-                    d["defuncion"] = extras.get("defuncion")
-                    ph = extras.get("socioeconomicos", {}).get("personal_hospital")
-                    if ph is True or ph == "S":
-                        d["personal_hospital"] = "S"
-                    elif ph is False or ph == "N":
-                        d["personal_hospital"] = "N"
-                    else:
-                        d["personal_hospital"] = None
+                ph_col = getattr(data, 'es_personal_hospital', None)
+                if ph_col in ("S", "N"):
+                    d["personal_hospital"] = ph_col
+                elif ph_col is None:
+                    extras = data.datos_extra
+                    if extras:
+                        d["defuncion"] = extras.get("defuncion")
+                        ph = extras.get("socioeconomicos", {}).get("personal_hospital")
+                        if ph is True or ph == "S":
+                            d["personal_hospital"] = "S"
+                        elif ph is False or ph == "N":
+                            d["personal_hospital"] = "N"
+                        else:
+                            d["personal_hospital"] = None
                 nombre_obj = data.nombre
                 if not d.get("nombre_completo") and nombre_obj:
                     if isinstance(nombre_obj, dict):
@@ -297,13 +362,17 @@ class PacientesResumen(BaseModel):
         if "datos_extra" in data and data["datos_extra"]:
             extras = data["datos_extra"]
             data["defuncion"] = extras.get("defuncion")
-            ph = extras.get("socioeconomicos", {}).get("personal_hospital")
-            if ph is True or ph == "S":
-                data["personal_hospital"] = "S"
-            elif ph is False or ph == "N":
-                data["personal_hospital"] = "N"
+            ph_col = data.get("es_personal_hospital")
+            if ph_col in ("S", "N"):
+                data["personal_hospital"] = ph_col
             else:
-                data["personal_hospital"] = None
+                ph = extras.get("socioeconomicos", {}).get("personal_hospital")
+                if ph is True or ph == "S":
+                    data["personal_hospital"] = "S"
+                elif ph is False or ph == "N":
+                    data["personal_hospital"] = "N"
+                else:
+                    data["personal_hospital"] = None
         if not data.get("nombre_completo") and data.get("nombre"):
             nombre_obj = data["nombre"]
             if isinstance(nombre_obj, dict):

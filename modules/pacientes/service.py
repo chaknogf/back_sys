@@ -61,7 +61,7 @@ def buscar_neonatales(db: Session, filters: dict, skip: int = 0, limit: int = 50
         PacienteModel.id, PacienteModel.cui, PacienteModel.expediente,
         PacienteModel.pasaporte, PacienteModel.nombre, PacienteModel.nombre_completo,
         PacienteModel.sexo, PacienteModel.fecha_nacimiento, PacienteModel.estado,
-        PacienteModel.datos_extra,
+        PacienteModel.datos_extra, PacienteModel.es_personal_hospital,
     ]
     query = db.query(PacienteModel).options(load_only(*_LIST_COLS)).order_by(desc(PacienteModel.id))
     query = query.filter(PacienteModel.estado != "I")
@@ -118,9 +118,7 @@ def buscar_personal_hospital(db: Session, filters: dict | None = None, skip: int
     ]
     query = db.query(PacienteModel).options(load_only(*_LIST_COLS)).order_by(desc(PacienteModel.id))
     query = query.filter(PacienteModel.estado != "I")
-    query = query.filter(
-        func.jsonb_extract_path_text(PacienteModel.datos_extra, 'socioeconomicos', 'personal_hospital') == 'S'
-    )
+    query = query.filter(PacienteModel.es_personal_hospital == 'S')
 
     filters = filters or {}
     for campo in ["primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido"]:

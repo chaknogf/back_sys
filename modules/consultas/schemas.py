@@ -135,6 +135,7 @@ class ConsultaBase(BaseModel):
     paciente_id: int = Field(..., gt=0)
     tipo_consulta: Optional[int] = Field(None, ge=1)
     especialidad: Optional[str] = Field(None, max_length=50)
+    especialidad_id: Optional[int] = None
     servicio: Optional[str] = Field(None, max_length=50)
     documento: Optional[str] = Field(None, max_length=20)
     fecha_consulta: Optional[date] = None
@@ -144,6 +145,9 @@ class ConsultaBase(BaseModel):
     orden: Optional[int] = Field(None, ge=0)
     activo: bool = True
     egreso: Optional[Dict[str, Any]] = None
+    registro_medico: Optional[str] = None
+    condicion_egreso: Optional[str] = None
+    fecha_egreso: Optional[date] = None
    
     model_config = ConfigDict(from_attributes=True)
 
@@ -154,6 +158,7 @@ class ConsultaUpdate(BaseModel):
     paciente_id: Optional[int] = Field(None, gt=0)
     tipo_consulta: Optional[int] = None
     especialidad: Optional[str] = None
+    especialidad_id: Optional[int] = None
     servicio: Optional[str] = None
     documento: Optional[str] = None
     fecha_consulta: Optional[date] = None
@@ -163,6 +168,9 @@ class ConsultaUpdate(BaseModel):
     orden: Optional[int] = None
     activo: Optional[bool] = None
     egreso: Optional[Dict[str, Any]] = None
+    registro_medico: Optional[str] = None
+    condicion_egreso: Optional[str] = None
+    fecha_egreso: Optional[date] = None
 
     model_config = ConfigDict(extra="ignore")
 
@@ -177,12 +185,43 @@ class ConsultaOut(ConsultaBase):
     id: int 
     ultimo_estado: Optional[str] = None 
     paciente: Optional[PacienteConsultaBase] = None
-     
+
+    @model_validator(mode="before")
+    @classmethod
+    def ciclo_from_historial(cls, data):
+        historial = None
+        has_ciclo = False
+        if hasattr(data, 'historial'):
+            historial = data.historial
+            has_ciclo = hasattr(data, 'ciclo') and data.ciclo
+        elif isinstance(data, dict):
+            historial = data.get('historial')
+            has_ciclo = data.get('ciclo')
+        if historial and not has_ciclo:
+            ciclo_list = []
+            for h in historial:
+                if isinstance(h, dict):
+                    ciclo_list.append(h)
+                else:
+                    ciclo_list.append({
+                        "estado": h.estado,
+                        "registro": h.registro,
+                        "usuario": h.usuario,
+                        "especialidad": h.especialidad,
+                        "servicio": h.servicio,
+                        "comentario": h.comentario,
+                    })
+            if isinstance(data, dict):
+                data["ciclo"] = ciclo_list
+            else:
+                data.ciclo = ciclo_list
+        return data
+
     @field_validator('ciclo', mode='before')
     @classmethod
     def convertir_ciclo_a_lista(cls, v):
         if v is None:
-            return None
+            return []
         if isinstance(v, dict) and not v:
             return []
         if isinstance(v, dict):
@@ -200,6 +239,7 @@ class ConsultasModel(BaseModel):
     paciente_id: int
     tipo_consulta: Optional[int] = None
     especialidad: Optional[str] = None
+    especialidad_id: Optional[int] = None
     servicio: Optional[str] = None
     documento: Optional[str] = None
     fecha_consulta: Optional[date] = None
@@ -208,6 +248,9 @@ class ConsultasModel(BaseModel):
     orden: Optional[int] = None
     activo: bool = True
     egreso: Optional[Dict[str, Any]] = None
+    registro_medico: Optional[str] = None
+    condicion_egreso: Optional[str] = None
+    fecha_egreso: Optional[date] = None
     paciente: Optional[PacientesNombre] = None
     dias_acumulados: Optional[int] = None
     
@@ -219,6 +262,7 @@ class RegistroConsultaOut(BaseModel):
     paciente_id: int
     tipo_consulta: int
     especialidad: str
+    especialidad_id: Optional[int] = None
     servicio: str
     documento: Optional[str] = None
     fecha_consulta: date
@@ -228,6 +272,9 @@ class RegistroConsultaOut(BaseModel):
     orden: int
     activo: Optional[bool] = None
     egreso: Optional[Dict[str, Any]] = None
+    registro_medico: Optional[str] = None
+    condicion_egreso: Optional[str] = None
+    fecha_egreso: Optional[date] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -248,6 +295,7 @@ class RegistroConsultaCreate(BaseModel):
     paciente_id: int = Field(..., gt=0, description="ID del paciente")
     tipo_consulta: int = Field(..., ge=1, le=3, description="1=Primera vez, 2=Subsecuente, 3=Emergencia")
     especialidad: str = Field(..., max_length=50)
+    especialidad_id: Optional[int] = None
     servicio: str = Field(..., max_length=50)
     indicadores: Optional[Indicador] = None
 
@@ -257,6 +305,7 @@ class ConsultaBaseOut(BaseModel):
     expediente: Optional[str] = Field(None, max_length=20)
     tipo_consulta: Optional[int] = Field(None, ge=1)
     especialidad: Optional[str] = Field(None, max_length=50)
+    especialidad_id: Optional[int] = None
     servicio: Optional[str] = Field(None, max_length=50)
     documento: Optional[str] = Field(None, max_length=20)
     fecha_consulta: Optional[date] = None

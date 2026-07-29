@@ -35,6 +35,7 @@ class ProceMedicoBase(BaseModel):
     sexo: Optional[str] = Field(None, pattern="^[MF]$")
     id_procedimiento: Optional[int] = None
     especialidad: Optional[str] = None
+    especialidad_id: Optional[int] = None
     cantidad: int = Field(1, ge=1)
     responsable: Optional[str] = Field(None, max_length=20)
     anestesia: Optional[int] = Field(0, ge=0)
@@ -56,6 +57,7 @@ class ProceMedicoUpdate(BaseModel):
     sexo: Optional[str] = Field(None, pattern="^[MF]$")
     id_procedimiento: Optional[int] = None
     especialidad: Optional[str] = None
+    especialidad_id: Optional[int] = None
     cantidad: Optional[int] = Field(None, ge=1)
     responsable: Optional[str] = Field(None, max_length=20)
     anestesia: Optional[int] = Field(None, ge=0)

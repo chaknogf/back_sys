@@ -14,7 +14,7 @@ class DatosExtra(BaseModel):
 
 class Responsable(BaseModel):
     nombre: str
-    registro: str
+    registro: Optional[str] = None
     nota: Optional[str] = None
     cargo: Optional[str] = None
 

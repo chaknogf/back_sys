@@ -180,6 +180,7 @@ def listar_procedimientos_medicos(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     especialidad: Optional[str] = Query(None),
+    especialidad_id: Optional[int] = Query(None),
     lugar_servicio: Optional[str] = Query(None),
     id_procedimiento: Optional[int] = Query(None),
     mes: Optional[int] = Query(None, ge=1, le=12),
@@ -195,6 +196,10 @@ def listar_procedimientos_medicos(
     if especialidad:
         query = query.filter(
             ProceMedicoModel.especialidad == especialidad
+        )
+    if especialidad_id is not None:
+        query = query.filter(
+            ProceMedicoModel.especialidad_id == especialidad_id
         )
 
     if lugar_servicio:

@@ -9,7 +9,6 @@ class MedicoBase(BaseModel):
     pasaporte: Optional[str] = Field(None, max_length=20)
     dpi: Optional[int] = None
     sexo: Optional[str] = Field(None, max_length=1)
-    especialidad: Optional[str] = Field(None, max_length=100)
     especialidad_id: Optional[int] = None
     activo: Optional[bool] = True
 
@@ -24,7 +23,6 @@ class MedicoUpdate(BaseModel):
     pasaporte: Optional[str] = Field(None, max_length=20)
     dpi: Optional[int] = None
     sexo: Optional[str] = Field(None, max_length=1)
-    especialidad: Optional[str] = Field(None, max_length=100)
     especialidad_id: Optional[int] = None
     activo: Optional[bool] = None
 
@@ -32,6 +30,7 @@ class MedicoUpdate(BaseModel):
 class MedicoOut(MedicoBase):
     id: int
     created_at: datetime
+    especialidad_nombre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

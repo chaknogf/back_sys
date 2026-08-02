@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, Query, UploadFile, File
+from fastapi import APIRouter, Depends, status, Query, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -130,11 +130,71 @@ def asociar_pacientes_masivo_stream(
 
 @router.post("/normalizar")
 def normalizar_sigsa3(
+    dry_run: bool = Query(False, description="Solo simular: cuenta y reporta sin migrar ni borrar"),
+    ids: str = Query(None, description="IDs de staging a migrar (CSV: '1,2,3'). Por defecto migra todos los elegibles"),
+    max_registros: Optional[int] = Query(None, description="Tope máximo de registros a migrar en esta corrida"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
     """Migra registros SIGSA-3 con paciente+medico a sigsa3_registros (normalizado).
-    Los registros migrados se eliminan de la tabla staging sigsa3 para ahorrar espacio.
-    Resuelve CIE-10, especialidad y tipo_consulta a FKs del catálogo."""
-    resultado = service_normalizar(db)
+    Copia sigsa3_id en el normalizado; al final purga de staging los id migrados.
+    Resuelve CIE-10, especialidad y tipo_consulta a FKs del catálogo.
+    Reporta los personal_salud que no encontraron coincidencia.
+
+    ⚠️ No lanzar dos veces en paralelo: la corrida masiva no tiene bloqueo."""
+    lista_ids = None
+    if ids:
+        try:
+            lista_ids = [int(x.strip()) for x in ids.split(",") if x.strip()]
+        except ValueError:
+            raise HTTPException(
+                status_code=422,
+                detail="ids debe ser una lista separada por comas de enteros",
+            )
+    resultado = service_normalizar(db, dry_run=dry_run, ids=lista_ids, max_registros=max_registros)
     return resultado
+
+
+class SincronizarTodoRequest(BaseModel):
+    dry_run: bool = False
+    ejecutar_asociacion: bool = True
+
+
+@router.post("/sincronizar-todo")
+def sincronizar_todo(
+    data: SincronizarTodoRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Orquesta el flujo completo de sincronización:
+
+    1. sincronizar-medico-especialidad: asocia medico_id por personal_salud.nombre
+       y copia especialidad_id desde personal_salud (tabla puente depurada).
+    2. asociar-pacientes-masivo: pipeline que llena paciente_id y consulta_id.
+    3. normalizar: migra a sigsa3_registros (con sigsa3_id) y purga staging.
+
+    Con dry_run=True no se escribe ni borra nada; reporta lo que pasaría."""
+    paso1 = sincronizar_sigsa3(db, dry_run=data.dry_run)
+    if data.dry_run:
+        resultado_normalizacion = service_normalizar(db, dry_run=True)
+        return {
+            "sincronizar_medico_especialidad": paso1,
+            "asociar_pacientes": "omitido (dry_run)",
+            "normalizar": resultado_normalizacion,
+        }
+
+    paso2 = None
+    if data.ejecutar_asociacion:
+        for evento in asociar_paciente_y_consulta(db):
+            if evento.get("step") == "done":
+                paso2 = evento
+                break
+            if evento.get("step") == "error":
+                paso2 = {"error": evento.get("message", "Error en el pipeline")}
+                break
+    resultado_normalizacion = service_normalizar(db)
+    return {
+        "sincronizar_medico_especialidad": paso1,
+        "asociar_pacientes": paso2,
+        "normalizar": resultado_normalizacion,
+    }

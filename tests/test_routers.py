@@ -192,10 +192,10 @@ class TestMedicos:
             "/medicos/",
             json={
                 "nombre": f"Dr. Test {s}",
-                "colegiado": int(s),
+                "colegiado": str(int(s)),
                 "dpi": 1234567890123,
                 "sexo": "M",
-                "especialidad": "TEST",
+                "especialidad_id": 1,
             },
         )
         assert r.status_code in (200, 201)
@@ -205,10 +205,12 @@ class TestMedicos:
     def test_list_medicos(self, client, auth_headers):
         r = client.get("/medicos/")
         assert r.status_code == 200
-        assert isinstance(r.json(), list)
+        data = r.json()
+        assert "total" in data
+        assert "medicos" in data
 
     def test_list_medicos_with_filter(self, client, auth_headers):
-        r = client.get("/medicos/?especialidad=TEST")
+        r = client.get("/medicos/?especialidad_id=1")
         assert r.status_code == 200
 
     def test_get_medico(self, client, auth_headers):
@@ -225,14 +227,16 @@ class TestMedicos:
         if not created_ids["medicos"]:
             pytest.skip("No medico created")
         mid = created_ids["medicos"][0]
+        # Usar un colegiado único (columna UNIQUE) para no colisionar
+        # con registros persistentes de la BD (ej. 99999).
+        s = _sufijo()
         r = client.put(
             f"/medicos/{mid}",
             json={
                 "nombre": "Dr. Test Updated",
-                "colegiado": 99999,
+                "colegiado": f"CU{s}",
                 "dpi": 1234567890123,
                 "sexo": "M",
-                "especialidad": "TEST-UPDATED",
             },
         )
         assert r.status_code == 200
@@ -630,7 +634,7 @@ class TestCitas:
             headers=auth_headers,
             json={
                 "paciente_id": created_ids["pacientes"][0],
-                "expediente": "TEST-CITA",
+                "expediente": "TST-CITA",
                 "especialidad": "MED",
                 "fecha_cita": (date.today() + timedelta(days=30)).isoformat(),
             },

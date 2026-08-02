@@ -264,13 +264,11 @@ class TestNormalizacionEspecialidad:
     def test_especialidad_id_en_medicos(self):
         db = SessionLocal()
         try:
-            total = db.query(MedicoModel).filter(
-                MedicoModel.especialidad.isnot(None),
-                MedicoModel.especialidad != "",
+            sin_fk = db.query(MedicoModel).filter(
+                MedicoModel.especialidad_id.is_(None)
             ).count()
-            con_fk = db.query(MedicoModel).filter(
-                MedicoModel.especialidad_id.isnot(None)
-            ).count()
+            total = db.query(MedicoModel).count()
+            con_fk = total - sin_fk
             assert con_fk >= total * 0.9, (
                 f"Solo {con_fk}/{total} médicos tienen especialidad_id"
             )
@@ -620,15 +618,37 @@ class TestPacientes:
         assert r.json()["cui"] is None
 
     def test_madre_hijo(self, client, admin_headers):
-        if not created_ids["pacientes"]:
-            pytest.skip("No paciente created")
-        madre_id = created_ids["pacientes"][0]
-        r = client.get(f"/pacientes/{madre_id}", headers=admin_headers)
-        if r.status_code != 200:
-            pytest.skip("No se puede obtener la madre")
-        madre = r.json()
-        if madre.get("sexo") != "F":
-            pytest.skip(f"Paciente {madre_id} no es femenino (sexo={madre.get('sexo')}), no elegible como madre")
+        madre_id = None
+        for pid in created_ids["pacientes"]:
+            r = client.get(f"/pacientes/{pid}", headers=admin_headers)
+            if r.status_code == 200:
+                p_data = r.json()
+                fn = p_data.get("fecha_nacimiento")
+                if p_data.get("sexo") == "F" and fn:
+                    try:
+                        dob = date.fromisoformat(str(fn)[:10])
+                        age = (date.today() - dob).days // 365
+                        if age >= 12:
+                            madre_id = pid
+                            break
+                    except Exception:
+                        pass
+        if not madre_id:
+            s = _sufijo()
+            res = client.post(
+                "/pacientes/",
+                headers=admin_headers,
+                json={
+                    "nombre": {"primer_nombre": f"Madre{s}", "primer_apellido": f"Test{s}"},
+                    "sexo": "F",
+                    "fecha_nacimiento": "1995-01-01"
+                }
+            )
+            if res.status_code == 201:
+                madre_id = res.json()["id"]
+                created_ids["pacientes"].append(madre_id)
+        if not madre_id:
+            pytest.skip("No female patient available")
         r = client.post(
             f"/pacientes/madre-hijo/{madre_id}",
             headers=admin_headers,

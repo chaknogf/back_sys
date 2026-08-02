@@ -21,12 +21,12 @@ class Sigsa3Model(Base):
     edad_meses = Column(Integer, nullable=True)
     edad_anios = Column(Integer, nullable=True)
     tipo_consulta = Column(String(80), nullable=True)
+    tipo_consulta_id = Column(SmallInteger, ForeignKey("tipos_consulta_sigsa3.id", ondelete="SET NULL"), nullable=True, index=True)
     control = Column(String(80), nullable=True)
     semana_gestacional = Column(Integer, nullable=True)
     codigo_cie_10_id = Column(Integer, ForeignKey("cie10_catalogo.id", ondelete="SET NULL"), nullable=True, index=True)
     codigo_cie_10 = Column(String(30), nullable=True)
     dx = Column(Text, nullable=True)
-    especialidad = Column(String(100), nullable=True)
     especialidad_id = Column(Integer, ForeignKey("especialidades.id", ondelete="SET NULL"), nullable=True, index=True)
 
     __table_args__ = (
@@ -40,6 +40,12 @@ class Sigsa3Model(Base):
         Index("ix_sigsa3_especialidad_id", "especialidad_id"),
     )
 
+    especialidad_ref = relationship("EspecialidadModel", lazy="joined")
+
+    @property
+    def especialidad_nombre(self):
+        return self.especialidad_ref.nombre if self.especialidad_ref else None
+
 
 class Sigsa3RegistroModel(Base):
     """Normalizado: solo FKs, sin datos redundantes."""
@@ -51,14 +57,18 @@ class Sigsa3RegistroModel(Base):
     personal_salud_id = Column(Integer, ForeignKey("personal_salud.id", ondelete="SET NULL"), nullable=True, index=True)
     consulta_id = Column(Integer, ForeignKey("consultas.id", ondelete="SET NULL"), nullable=True, index=True)
     fecha_consulta = Column(Date, nullable=False, index=True)
-    tipo_consulta_id = Column(SmallInteger, ForeignKey("tipos_consulta.id", ondelete="SET NULL"), nullable=True, index=True)
+    tipo_consulta_id = Column(SmallInteger, ForeignKey("tipos_consulta_sigsa3.id", ondelete="SET NULL"), nullable=True, index=True)
     control = Column(String(80), nullable=True)
     semana_gestacional = Column(Integer, nullable=True)
     codigo_cie_10_id = Column(Integer, ForeignKey("cie10_catalogo.id", ondelete="SET NULL"), nullable=True, index=True)
     especialidad_id = Column(Integer, ForeignKey("especialidades.id", ondelete="SET NULL"), nullable=True, index=True)
+    # ID del registro staging (sigsa3) de origen. Sin FK (default NULL) para
+    # evitar restricciones al purgar staging tras normalizar.
+    sigsa3_id = Column(BigInteger, nullable=True, default=None, index=True)
     normalized_at = Column(TIMESTAMP(timezone=False), server_default=text("CURRENT_TIMESTAMP"))
 
     __table_args__ = (
         Index("ix_sigsa3_reg_paciente_fecha", "paciente_id", "fecha_consulta"),
         Index("ix_sigsa3_reg_fecha", "fecha_consulta"),
+        Index("ix_sigsa3_reg_sigsa3_id", "sigsa3_id"),
     )

@@ -44,10 +44,9 @@ class TestDefunciones:
             "/medicos/",
             json={
                 "nombre": f"Dr. Forense {s}",
-                "colegiado": int(s),
+                "colegiado": str(s),
                 "dpi": 1234567890123,
                 "sexo": "M",
-                "especialidad": "MEDICINA_FORENSE",
             },
         )
         assert r.status_code in (200, 201)

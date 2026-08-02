@@ -73,7 +73,7 @@ _PACIENTE_SELECT = """
 """
 
 _MEDICO_SELECT = """
-    doc.id AS m_id, doc.nombre AS m_nombre, doc.colegiado AS m_colegiado, doc.especialidad AS m_especialidad
+    doc.id AS m_id, doc.nombre AS m_nombre, doc.colegiado AS m_colegiado, doc.especialidad_id AS m_especialidad
 """
 
 

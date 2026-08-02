@@ -570,21 +570,26 @@ def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
 # SIGSA-3 ESTADÍSTICAS
 # =====================================================================
 def sigsa3_por_especialidad(db: Session, desde: str, hasta: str) -> dict:
+    """Consultas SIGSA-3 (normalizadas) por especialidad, tipo y sexo.
+    Fuente: sigsa3_registros (listado principal/final)."""
     f_desde, f_hasta = _parse_fechas(desde, hasta)
 
     rows = db.execute(text("""
         SELECT
-            especialidad,
-            tipo_consulta,
-            sexo,
+            COALESCE(e.nombre, '—') AS especialidad,
+            COALESCE(tc.nombre, '—') AS tipo_consulta,
+            p.sexo AS sexo,
             COUNT(*) AS total
-        FROM sigsa3
-        WHERE fecha_consulta BETWEEN :desde AND :hasta
-          AND especialidad IS NOT NULL
-          AND tipo_consulta IS NOT NULL
-          AND sexo IS NOT NULL
-        GROUP BY especialidad, tipo_consulta, sexo
-        ORDER BY especialidad, tipo_consulta, sexo
+        FROM sigsa3_registros r
+        LEFT JOIN especialidades e ON e.id = r.especialidad_id
+        LEFT JOIN tipos_consulta_sigsa3 tc ON tc.id = r.tipo_consulta_id
+        LEFT JOIN pacientes p ON p.id = r.paciente_id
+        WHERE r.fecha_consulta BETWEEN :desde AND :hasta
+          AND r.especialidad_id IS NOT NULL
+          AND r.tipo_consulta_id IS NOT NULL
+          AND p.sexo IS NOT NULL
+        GROUP BY e.nombre, tc.nombre, p.sexo
+        ORDER BY e.nombre, tc.nombre, p.sexo
     """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
 
     datos = []
@@ -611,6 +616,8 @@ def sigsa3_por_especialidad(db: Session, desde: str, hasta: str) -> dict:
 
 
 def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str, top: int = 10, tipo_consulta: int = None, especialidad: str = None) -> dict:
+    """Top diagnósticos (CIE-10) más frecuentes por especialidad, tipo y sexo.
+    Fuente: sigsa3_registros (normalizado). El dx es el código CIE-10 del catálogo."""
     f_desde, f_hasta = _parse_fechas(desde, hasta)
 
     if top is None or top <= 0:
@@ -619,25 +626,30 @@ def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str, top: int = 10, tip
     rows = db.execute(text("""
         WITH base AS (
             SELECT
-                especialidad,
-                tipo_consulta,
-                sexo,
-                dx,
+                COALESCE(e.nombre, '—') AS especialidad,
+                COALESCE(tc.nombre, '—') AS tipo_consulta,
+                p.sexo AS sexo,
+                c.codigo AS dx,
+                c.descripcion AS dx_desc,
                 COUNT(*) AS total
-            FROM sigsa3
-            WHERE fecha_consulta BETWEEN :desde AND :hasta
-              AND especialidad IS NOT NULL
-              AND tipo_consulta IS NOT NULL
-              AND sexo IS NOT NULL
-              AND dx IS NOT NULL
-              AND dx <> ''
-              AND dx NOT LIKE 'Z:%'
-              AND dx NOT LIKE 'O:82:9%'
-              AND dx NOT LIKE 'O:80:9%'
-              AND dx NOT LIKE 'O:62:0%'
-              AND (CAST(:tc AS TEXT) IS NULL OR tipo_consulta LIKE CAST(:tc AS TEXT) || ' %')
-              AND (:esp IS NULL OR especialidad = :esp)
-            GROUP BY especialidad, tipo_consulta, sexo, dx
+            FROM sigsa3_registros r
+            LEFT JOIN especialidades e ON e.id = r.especialidad_id
+            LEFT JOIN tipos_consulta_sigsa3 tc ON tc.id = r.tipo_consulta_id
+            LEFT JOIN pacientes p ON p.id = r.paciente_id
+            LEFT JOIN cie10_catalogo c ON c.id = r.codigo_cie_10_id
+            WHERE r.fecha_consulta BETWEEN :desde AND :hasta
+              AND r.especialidad_id IS NOT NULL
+              AND r.tipo_consulta_id IS NOT NULL
+              AND p.sexo IS NOT NULL
+              AND c.codigo IS NOT NULL
+              AND c.codigo <> ''
+              AND c.codigo NOT LIKE 'Z%'
+              AND c.codigo NOT LIKE 'O82%'
+              AND c.codigo NOT LIKE 'O80%'
+              AND c.codigo NOT LIKE 'O62%'
+              AND (:tc IS NULL OR r.tipo_consulta_id = :tc)
+              AND (:esp IS NULL OR e.nombre = :esp)
+            GROUP BY e.nombre, tc.nombre, p.sexo, c.codigo, c.descripcion
         ),
         combinado AS (
             SELECT
@@ -665,6 +677,7 @@ def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str, top: int = 10, tip
             b.tipo_consulta,
             b.sexo,
             b.dx,
+            b.dx_desc,
             b.total,
             r.total_combinado,
             r.rn
@@ -679,7 +692,7 @@ def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str, top: int = 10, tip
     from collections import defaultdict
 
     grupos: dict[tuple, dict] = defaultdict(
-        lambda: defaultdict(lambda: {"m": 0, "f": 0, "rn": None, "total_combinado": 0})
+        lambda: defaultdict(lambda: {"m": 0, "f": 0, "rn": None, "total_combinado": 0, "dx_desc": ""})
     )
 
     for r in rows:
@@ -690,6 +703,7 @@ def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str, top: int = 10, tip
         total = int(m["total"])
 
         entry = grupos[key_grupo][dx]
+        entry["dx_desc"] = m.get("dx_desc") or ""
         if sexo == "M":
             entry["m"] += total
         elif sexo == "F":
@@ -717,7 +731,7 @@ def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str, top: int = 10, tip
             datos.append({
                 "especialidad": esp,
                 "tipo_consulta": tc,
-                "dx": dx,
+                "dx": (f"{dx} {v['dx_desc']}".strip() if v["dx_desc"] else dx),
                 "total_m": v["m"],
                 "total_f": v["f"],
                 "total": v["m"] + v["f"],

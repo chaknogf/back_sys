@@ -134,6 +134,16 @@ def crear_paciente_desde_madre(
             status_code=400,
             detail="Tipo de parto Simple no puede tener múltiples recién nacidos"
         )
+    if tipo_parto_global == "Doble" and total != 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Tipo de parto Doble debe registrar exactamente 2 recién nacidos"
+        )
+    if tipo_parto_global == "Multiple" and total < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Tipo de parto Múltiple debe registrar al menos 2 recién nacidos"
+        )
 
     for i, hijo in enumerate(payload.hijos, start=1):
         datos_extra = construir_datos_extra_derivados(madre)
@@ -160,7 +170,7 @@ def crear_paciente_desde_madre(
             apellido_casada=nombre_madre.get("apellido_casada"),
         )
 
-        es_multiple = neonatales_dict.get("tipo_parto") == "Multiple"
+        es_multiple = neonatales_dict.get("tipo_parto") in ("Multiple", "Doble")
         if total == 1 and not es_multiple:
             nombre_dict = nombre_hijo.model_dump()
             for campo in ["primer_nombre", "segundo_nombre", "otro_nombre",

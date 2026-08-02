@@ -19,7 +19,6 @@ class Sigsa3Base(BaseModel):
     codigo_cie_10: Optional[str] = Field(None, max_length=30)
     codigo_cie_10_id: Optional[int] = None
     dx: Optional[str] = None
-    especialidad: Optional[str] = Field(None, max_length=100)
     especialidad_id: Optional[int] = None
     paciente_id: Optional[int] = None
     medico_id: Optional[int] = None
@@ -47,7 +46,6 @@ class Sigsa3Update(BaseModel):
     codigo_cie_10: Optional[str] = Field(None, max_length=30)
     codigo_cie_10_id: Optional[int] = None
     dx: Optional[str] = None
-    especialidad: Optional[str] = Field(None, max_length=100)
     especialidad_id: Optional[int] = None
     medico_id: Optional[int] = None
     consulta_id: Optional[int] = None
@@ -56,6 +54,7 @@ class Sigsa3Update(BaseModel):
 class Sigsa3Out(Sigsa3Base):
     id: int
     paciente_id: Optional[int] = None
+    especialidad_nombre: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -71,6 +70,7 @@ class Sigsa3RegistroOut(BaseModel):
     semana_gestacional: Optional[int] = None
     codigo_cie_10_id: Optional[int] = None
     especialidad_id: Optional[int] = None
+    sigsa3_id: Optional[int] = None
     normalized_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,4 +1,3 @@
-# modules/medicos/service.py
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -55,8 +54,6 @@ def listar_medicos(
     if pasaporte:
         query = query.filter(MedicoModel.pasaporte.ilike(f"%{pasaporte}%"))
 
-    if especialidad:
-        query = query.filter(MedicoModel.especialidad.ilike(f"%{especialidad}%"))
     if especialidad_id is not None:
         query = query.filter(MedicoModel.especialidad_id == especialidad_id)
 

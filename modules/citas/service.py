@@ -23,7 +23,7 @@ DIAS_ES = {
 
 def crear_cita(cita: CitaCreate, current_user, db: Session):
     nueva_cita = CitaModel(
-        created_by=current_user.username,
+        created_by=current_user.username[:8] if current_user and current_user.username else None,
         fecha_registro=cita.fecha_registro,
         expediente=cita.expediente,
         paciente_id=cita.paciente_id,

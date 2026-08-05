@@ -85,6 +85,7 @@ def _filtros(
 
 def _serializar(row) -> dict:
     reg, pac_nombre, pac_expediente, pac_sexo, med_nombre, ps_nombre, tc_nombre, cie10, cie10_desc, esp_nombre = row
+    cie10_completo = f"{cie10} {cie10_desc}".strip() if cie10 else None
     return {
         "id": reg.id,
         "paciente_id": reg.paciente_id,
@@ -106,6 +107,7 @@ def _serializar(row) -> dict:
         "tipo_consulta_nombre": tc_nombre,
         "codigo_cie_10": cie10,
         "codigo_cie_10_descripcion": cie10_desc,
+        "codigo_cie_10_completo": cie10_completo,
         "especialidad_nombre": esp_nombre,
     }
 

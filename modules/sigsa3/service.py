@@ -476,19 +476,22 @@ def eliminar_por_periodo(desde: date, hasta: date, db: Session) -> dict:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="La fecha 'desde' debe ser menor o igual a 'hasta'"
         )
-    registros = db.query(Sigsa3Model).filter(
-        Sigsa3Model.fecha_consulta >= desde,
-        Sigsa3Model.fecha_consulta <= hasta,
-    ).all()
-    if not registros:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontraron registros en el periodo {desde} al {hasta}"
-        )
     try:
-        eliminados = len(registros)
-        for reg in registros:
-            db.delete(reg)
+        # Normalizado primero (sigsa3_registros), luego staging (sigsa3)
+        q_normalizado = db.query(Sigsa3RegistroModel).filter(
+            Sigsa3RegistroModel.fecha_consulta >= desde,
+            Sigsa3RegistroModel.fecha_consulta <= hasta,
+        )
+        eliminados_normalizados = q_normalizado.count()
+        q_normalizado.delete(synchronize_session=False)
+
+        q_staging = db.query(Sigsa3Model).filter(
+            Sigsa3Model.fecha_consulta >= desde,
+            Sigsa3Model.fecha_consulta <= hasta,
+        )
+        eliminados_staging = q_staging.count()
+        q_staging.delete(synchronize_session=False)
+
         db.commit()
     except Exception:
         db.rollback()
@@ -496,7 +499,20 @@ def eliminar_por_periodo(desde: date, hasta: date, db: Session) -> dict:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Error al eliminar los registros"
         )
-    return {"eliminados": eliminados, "desde": desde.isoformat(), "hasta": hasta.isoformat()}
+
+    total = eliminados_staging + eliminados_normalizados
+    if total == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontraron registros en el periodo {desde} al {hasta}"
+        )
+    return {
+        "eliminados": total,
+        "sigsa3": eliminados_staging,
+        "sigsa3_registros": eliminados_normalizados,
+        "desde": desde.isoformat(),
+        "hasta": hasta.isoformat(),
+    }
 
 
 def _build_personal_salud_map(db: Session) -> dict:
@@ -580,6 +596,7 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
             "personal_salud_asociados": int(exactos or 0) + fuzzy,
             "especialidades_actualizadas": int(exactos or 0) + fuzzy,
             "sin_match": sin_match,
+            "personal_salud_sin_match": _personal_salud_sin_match(db),
             "modo": "dry_run",
         }
 
@@ -638,6 +655,7 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
         "personal_salud_asociados": personal_salud_asociados,
         "especialidades_actualizadas": especialidades_actualizadas,
         "sin_match": sin_match,
+        "personal_salud_sin_match": _personal_salud_sin_match(db),
     }
 
 
@@ -1008,36 +1026,59 @@ def _parse_fechas(desde: str, hasta: str) -> tuple[date, date]:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
 
 
+def _normalizar_equal(codigo: str) -> str:
+    """Solo alfanuméricos en mayúsculas, para comparar códigos ignorando puntuación."""
+    return "".join(ch for ch in codigo.upper() if ch.isalnum())
+
+
 def dx_por_codigo_cie(db: Session, desde: str, hasta: str, codigos: list[str]) -> dict:
+    """Diagnósticos (Z:34, Z:10, ...) basados en sigsa3_registros (normalizado).
+
+    Fuente: sigsa3_registros.codigo_cie_10_id → cie10_catalogo.codigo.
+    Se comparan los códigos ignorando puntuación, de modo que Z:10:4, Z10.4 y Z104
+    del catálogo colapsan a la misma fila normalizada."""
     f_desde, f_hasta = _parse_fechas(desde, hasta)
 
-    placeholders = ", ".join(f":c{i}" for i in range(len(codigos)))
-    params = {"desde": f_desde, "hasta": f_hasta}
-    for i, c in enumerate(codigos):
-        params[f"c{i}"] = c
+    estandares = []
+    for c in codigos:
+        est = _normalizar_codigo_cie10(c)
+        if est and est not in estandares:
+            estandares.append(est)
+    if not estandares:
+        raise HTTPException(status_code=400, detail="No se especificaron códigos CIE-10")
+
+    display_por_norm = {_normalizar_equal(nb): nb for nb in estandares}
+
+    placeholders = ", ".join(f":n{i}" for i in range(len(estandares)))
+    params: dict = {"desde": f_desde, "hasta": f_hasta}
+    for i, e in enumerate(estandares):
+        params[f"n{i}"] = _normalizar_equal(e)
 
     rows = db.execute(text(f"""
         SELECT
-            tipo_consulta,
-            codigo_cie_10,
+            COALESCE(tc.nombre, '—') AS tipo_consulta,
+            REGEXP_REPLACE(UPPER(COALESCE(c.codigo, '')), '[^A-Z0-9]', '', 'g') AS norm_code,
             COUNT(*) AS total,
-            COUNT(DISTINCT paciente_id) AS pacientes
-        FROM sigsa3
-        WHERE fecha_consulta BETWEEN :desde AND :hasta
-          AND codigo_cie_10 IS NOT NULL
-          AND codigo_cie_10 <> ''
-          AND codigo_cie_10 IN ({placeholders})
-        GROUP BY tipo_consulta, codigo_cie_10
-        ORDER BY tipo_consulta, total DESC
+            COUNT(DISTINCT r.paciente_id) AS pacientes
+        FROM sigsa3_registros r
+        LEFT JOIN cie10_catalogo c ON c.id = r.codigo_cie_10_id
+        LEFT JOIN tipos_consulta_sigsa3 tc ON tc.id = r.tipo_consulta_id
+        WHERE r.fecha_consulta BETWEEN :desde AND :hasta
+          AND c.codigo IS NOT NULL
+          AND c.codigo <> ''
+          AND REGEXP_REPLACE(UPPER(c.codigo), '[^A-Z0-9]', '', 'g') IN ({placeholders})
+        GROUP BY tc.nombre, norm_code
+        ORDER BY norm_code, total DESC
     """), params).fetchall()
 
     total_pacientes = db.execute(text(f"""
-        SELECT COUNT(DISTINCT paciente_id) AS total
-        FROM sigsa3
-        WHERE fecha_consulta BETWEEN :desde AND :hasta
-          AND codigo_cie_10 IS NOT NULL
-          AND codigo_cie_10 <> ''
-          AND codigo_cie_10 IN ({placeholders})
+        SELECT COUNT(DISTINCT r.paciente_id) AS total
+        FROM sigsa3_registros r
+        LEFT JOIN cie10_catalogo c ON c.id = r.codigo_cie_10_id
+        WHERE r.fecha_consulta BETWEEN :desde AND :hasta
+          AND c.codigo IS NOT NULL
+          AND c.codigo <> ''
+          AND REGEXP_REPLACE(UPPER(c.codigo), '[^A-Z0-9]', '', 'g') IN ({placeholders})
     """), params).scalar()
 
     datos = []
@@ -1048,7 +1089,7 @@ def dx_por_codigo_cie(db: Session, desde: str, hasta: str, codigos: list[str]) -
         total_general += t
         datos.append({
             "tipo_consulta": str(m["tipo_consulta"]),
-            "codigo_cie_10": str(m["codigo_cie_10"]),
+            "codigo_cie_10": display_por_norm.get(str(m["norm_code"]), str(m["norm_code"])),
             "total": t,
             "pacientes": int(m["pacientes"]),
         })
@@ -1078,8 +1119,9 @@ def dx_z10(db: Session, desde: str, hasta: str) -> dict:
 
 def truncate_tabla(db: Session) -> dict:
     db.execute(text("TRUNCATE TABLE sigsa3 RESTART IDENTITY CASCADE"))
+    db.execute(text("TRUNCATE TABLE sigsa3_registros RESTART IDENTITY CASCADE"))
     db.commit()
-    return {"truncado": True, "tabla": "sigsa3"}
+    return {"truncado": True, "tabla": "sigsa3", "tabla_normalizada": "sigsa3_registros"}
 
 
 def exportar_csv(db: Session) -> bytes:
@@ -1124,14 +1166,13 @@ def listar_no_asociados(db: Session, limit: int = 100) -> list[Sigsa3Model]:
 # =====================================================================
 
 def _normalizar_codigo_cie10(codigo: str) -> str:
-    """Convierte código CIE-10 del formato SIGSA-3 (Z:34, O:82:9) a formato estándar (Z34, O82.9)."""
+    """Convierte código CIE-10 del formato SIGSA-3 (Z:34, O:82:9) al formato del catálogo (Z34, O829).
+
+    El catálogo cie10_catalogo guarda los códigos SIN punto ni dos puntos (O829), así que
+    aquí solo se elimina la puntuación (:, ., espacios) y se normaliza a mayúsculas."""
     if not codigo:
         return ""
-    c = codigo.strip().upper()
-    c = c.replace(":", "")
-    if len(c) > 3 and c[3] != ".":
-        c = c[:3] + "." + c[3:]
-    return c
+    return "".join(ch for ch in codigo.strip().upper() if ch.isalnum())
 
 
 def _resolver_cie10_id(db: Session, codigo_sigsa3: str, cie10_cache: dict) -> int | None:
@@ -1143,10 +1184,10 @@ def _resolver_cie10_id(db: Session, codigo_sigsa3: str, cie10_cache: dict) -> in
     estandar = _normalizar_codigo_cie10(codigo_sigsa3)
     if estandar in cie10_cache:
         return cie10_cache[estandar]
-    # Buscar en DB
+    # Buscar en DB (compara el código normalizado sin puntuación, igual al formato del catálogo)
     row = db.execute(
-        text("SELECT id FROM cie10_catalogo WHERE codigo = :c OR codigo = :e LIMIT 1"),
-        {"c": codigo_sigsa3, "e": estandar},
+        text("SELECT id FROM cie10_catalogo WHERE codigo = :e LIMIT 1"),
+        {"e": estandar},
     ).first()
     if row:
         cid = row[0]
@@ -1154,7 +1195,55 @@ def _resolver_cie10_id(db: Session, codigo_sigsa3: str, cie10_cache: dict) -> in
         cie10_cache[estandar] = cid
         return cid
     cie10_cache[codigo_sigsa3] = None
+    cie10_cache[estandar] = None
     return None
+
+
+def _resolver_cie10_o_crear(db: Session, codigo_sigsa3: str, cie10_cache: dict) -> int | None:
+    """Resuelve código CIE-10 string → FK a cie10_catalogo.id.
+
+    Igual que _resolver_cie10_id pero si el código normalizado NO existe en el
+    catálogo, lo CREA (fuente SIGSA-3) para que sigsa3_registros siempre conserve
+    el código y el diagnóstico sea recuperable a través de él. La descripción se
+    deja como el propio código hasta que se complete en el catálogo."""
+    if not codigo_sigsa3:
+        return None
+    estandar = _normalizar_codigo_cie10(codigo_sigsa3)
+    if not estandar:
+        return None
+    if codigo_sigsa3 in cie10_cache:
+        return cie10_cache[codigo_sigsa3]
+    if estandar in cie10_cache:
+        return cie10_cache[estandar]
+
+    row = db.execute(
+        text("SELECT id FROM cie10_catalogo WHERE codigo = :e LIMIT 1"),
+        {"e": estandar},
+    ).first()
+    if row:
+        cid = row[0]
+        cie10_cache[codigo_sigsa3] = cid
+        cie10_cache[estandar] = cid
+        return cid
+
+    # No existe: crear entrada normalizada para que el FK nunca quede vacío.
+    db.execute(
+        text("""
+            INSERT INTO cie10_catalogo (codigo, descripcion, nivel, fuente)
+            VALUES (:e, :e, 0, 'sigsa3_auto')
+            ON CONFLICT (codigo) DO NOTHING
+        """),
+        {"e": estandar},
+    )
+    db.commit()
+    row = db.execute(
+        text("SELECT id FROM cie10_catalogo WHERE codigo = :e LIMIT 1"),
+        {"e": estandar},
+    ).first()
+    cid = row[0] if row else None
+    cie10_cache[codigo_sigsa3] = cid
+    cie10_cache[estandar] = cid
+    return cid
 
 
 def _resolver_especialidad_id(db: Session, especialidad: str, esp_cache: dict) -> int | None:
@@ -1203,7 +1292,6 @@ def _stats_staging(db: Session) -> dict:
         Sigsa3Model.paciente_id.isnot(None),
         Sigsa3Model.paciente_id != 0,
         Sigsa3Model.medico_id.is_(None),
-        Sigsa3Model.personal_salud_id.is_(None),
     ).count()
     return {
         "omitidos_sin_medico": omitidos_sin_medico,
@@ -1234,7 +1322,8 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
              ids: list[int] | None = None, max_registros: int | None = None) -> dict:
     """Migra registros de sigsa3 (staging) a sigsa3_registros (normalizado).
 
-    - Solo migra registros con paciente_id + (medico_id o personal_salud_id).
+    - Solo migra registros con paciente_id + medico_id (ambos obligatorios).
+      consulta_id es opcional.
     - Copia sigsa3_id (id del staging) en sigsa3_registros para trazabilidad.
     - NO borra en línea: al final purga de sigsa3 los id migrados (los que
       tienen sigsa3_id en sigsa3_registros). En staging solo quedan huérfanos.
@@ -1255,10 +1344,8 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
     base_filter = [
         Sigsa3Model.paciente_id.isnot(None),
         Sigsa3Model.paciente_id != 0,
-        or_(
-            Sigsa3Model.medico_id.isnot(None),
-            Sigsa3Model.personal_salud_id.isnot(None),
-        ),
+        Sigsa3Model.medico_id.isnot(None),
+        Sigsa3Model.medico_id != 0,
     ]
     if ids:
         base_filter.append(Sigsa3Model.id.in_(ids))
@@ -1299,7 +1386,7 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
         for reg in registros:
             try:
                 tipo_id = _resolver_tipo_consulta_id(reg.tipo_consulta) or reg.tipo_consulta_id
-                cie10_id = reg.codigo_cie_10_id or _resolver_cie10_id(db, reg.codigo_cie_10, cie10_cache)
+                cie10_id = reg.codigo_cie_10_id or _resolver_cie10_o_crear(db, reg.codigo_cie_10, cie10_cache)
                 esp_id = reg.especialidad_id
 
                 nuevo = Sigsa3RegistroModel(

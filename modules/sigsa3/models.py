@@ -53,7 +53,7 @@ class Sigsa3RegistroModel(Base):
 
     id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
     paciente_id = Column(Integer, ForeignKey("pacientes.id", ondelete="SET NULL"), nullable=False, index=True)
-    medico_id = Column(Integer, ForeignKey("medicos.id", ondelete="SET NULL"), nullable=True, index=True)
+    medico_id = Column(Integer, ForeignKey("medicos.id", ondelete="SET NULL"), nullable=False, index=True)
     personal_salud_id = Column(Integer, ForeignKey("personal_salud.id", ondelete="SET NULL"), nullable=True, index=True)
     consulta_id = Column(Integer, ForeignKey("consultas.id", ondelete="SET NULL"), nullable=True, index=True)
     fecha_consulta = Column(Date, nullable=False, index=True)

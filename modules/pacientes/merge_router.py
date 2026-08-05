@@ -139,6 +139,88 @@ def merge_campos_unicos(principal, duplicado, db: Session):
     return campos_alternativos
 
 
+def merge_contacto(principal, duplicado):
+    """Fusiona el contacto: combina teléfonos y rellena los demás campos vacíos."""
+    merge_telefonos(principal, duplicado)
+
+    c_pri = principal.contacto or {}
+    c_dup = duplicado.contacto or {}
+    cambiado = False
+
+    for key, value in c_dup.items():
+        if key == "telefonos":
+            continue
+        valor_pri = c_pri.get(key)
+        if (valor_pri is None or valor_pri == "") and value not in (None, ""):
+            c_pri[key] = value
+            cambiado = True
+
+    if cambiado:
+        principal.contacto = c_pri
+        flag_modified(principal, "contacto")
+
+
+def _fill_campos_vacios(principal, duplicado):
+    """Copia cualquier campo simple (no JSONB) del duplicado al principal
+    si el principal lo tiene vacío."""
+    campos = [
+        "sexo", "fecha_nacimiento", "idioma_id", "pueblo_id", "nacionalidad",
+        "lugar_nacimiento", "discapacidad", "educacion", "estado_civil",
+        "es_estudiante_publico", "ocupacion", "es_personal_hospital",
+    ]
+    for campo in campos:
+        valor_pri = getattr(principal, campo, None)
+        valor_dup = getattr(duplicado, campo, None)
+        if (valor_pri is None or valor_pri == "") and valor_dup not in (None, ""):
+            setattr(principal, campo, valor_dup)
+
+
+def _deep_fill(dest: dict, fuente: dict) -> bool:
+    """Relleno profundo: copia de `fuente` los valores no vacíos en las claves de
+    `dest` que estén vacías. Devuelve True si algo cambió."""
+    cambiado = False
+    for key, value in (fuente or {}).items():
+        if isinstance(value, dict):
+            if isinstance(dest.get(key), dict):
+                if _deep_fill(dest[key], value):
+                    cambiado = True
+            else:
+                # No existe el subobjeto: según size de value
+                if value:
+                    dest[key] = value
+                    cambiado = True
+        else:
+            valor_pri = dest.get(key)
+            if (valor_pri is None or valor_pri == "") and value not in (None, ""):
+                dest[key] = value
+                cambiado = True
+    return cambiado
+
+
+def merge_datos_extra(principal, duplicado):
+    """Fusiona datos_extra: relleno profundo de los campos vacíos del principal
+    con los valores del duplicado (socio-económicos, demográficos, etc.)."""
+    if not duplicado.datos_extra:
+        return
+
+    p_extra = principal.datos_extra or {}
+    d_extra = duplicado.datos_extra or {}
+
+    cambiado = _deep_fill(p_extra, d_extra)
+
+    # Preservar merge de colisiones previas
+    if "campos_alternativos_merge" in d_extra:
+        if "campos_alternativos_merge" not in p_extra:
+            p_extra["campos_alternativos_merge"] = {}
+        if isinstance(d_extra["campos_alternativos_merge"], dict):
+            p_extra["campos_alternativos_merge"].update(d_extra["campos_alternativos_merge"])
+            cambiado = True
+
+    if cambiado:
+        principal.datos_extra = p_extra
+        flag_modified(principal, "datos_extra")
+
+
 def merge_referencias(principal, duplicado):
     """
     Fusiona las referencias evitando duplicados por nombre y parentesco.
@@ -226,30 +308,13 @@ def merge_pacientes(
                 dup.cui = None
                 flag_modified(dup, "datos_extra")
 
-            merge_telefonos(principal, dup)
+            merge_contacto(principal, dup)
 
             campos_alt = merge_campos_unicos(principal, dup, db)
 
-            for campo in ["sexo", "fecha_nacimiento"]:
-                valor_principal = getattr(principal, campo, None)
-                valor_dup = getattr(dup, campo, None)
+            _fill_campos_vacios(principal, dup)
 
-                if valor_principal is None and valor_dup is not None:
-                    setattr(principal, campo, valor_dup)
-
-            if dup.datos_extra:
-                if principal.datos_extra is None:
-                    principal.datos_extra = {}
-
-                for key, value in dup.datos_extra.items():
-                    if key not in principal.datos_extra:
-                        principal.datos_extra[key] = value
-                    elif key == "campos_alternativos_merge":
-                        if "campos_alternativos_merge" not in principal.datos_extra:
-                            principal.datos_extra["campos_alternativos_merge"] = {}
-                        principal.datos_extra["campos_alternativos_merge"].update(value)
-
-                flag_modified(principal, "datos_extra")
+            merge_datos_extra(principal, dup)
 
             merge_referencias(principal, dup)
 

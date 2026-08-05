@@ -5,6 +5,7 @@ import pytest
 
 from core.database import SessionLocal
 from modules.pacientes.models import PacienteModel
+from modules.medicos.models import MedicoModel
 from modules.sigsa3.models import Sigsa3RegistroModel
 
 
@@ -12,13 +13,17 @@ def _sufijo():
     return str(int(_time.time() * 1000000))[-6:]
 
 
-def _cleanup(paciente_id=None, registro_id=None):
+def _cleanup(paciente_id=None, medico_id=None, registro_id=None):
     db = SessionLocal()
     try:
         if registro_id is not None:
             db.query(Sigsa3RegistroModel).filter(
                 Sigsa3RegistroModel.id == registro_id
             ).delete(synchronize_session=False)
+        if medico_id is not None:
+            db.query(MedicoModel).filter(MedicoModel.id == medico_id).delete(
+                synchronize_session=False
+            )
         if paciente_id is not None:
             db.query(PacienteModel).filter(PacienteModel.id == paciente_id).delete(
                 synchronize_session=False
@@ -30,6 +35,7 @@ def _cleanup(paciente_id=None, registro_id=None):
 
 class TestSigsa3Registros:
     PACIENTE_ID = None
+    MEDICO_ID = None
     REGISTRO_ID = None
 
     def test_create_paciente_helper(self, client, auth_headers):
@@ -51,15 +57,28 @@ class TestSigsa3Registros:
         assert r.status_code == 201
         TestSigsa3Registros.PACIENTE_ID = r.json()["id"]
 
+        r = client.post(
+            "/medicos/",
+            headers=auth_headers,
+            json={
+                "nombre": f"Medico Test {s}",
+                "colegiado": f"{s}",
+            },
+        )
+        assert r.status_code == 201
+        TestSigsa3Registros.MEDICO_ID = r.json()["id"]
+
     def test_create_sigsa3_registro(self, client, auth_headers):
         pid = TestSigsa3Registros.PACIENTE_ID
-        if not pid:
-            pytest.skip("No paciente creado")
+        mid = TestSigsa3Registros.MEDICO_ID
+        if not pid or not mid:
+            pytest.skip("No paciente/medico creado")
         r = client.post(
             "/sigsa3-registros/",
             headers=auth_headers,
             json={
                 "paciente_id": pid,
+                "medico_id": mid,
                 "fecha_consulta": date.today().isoformat(),
                 "tipo_consulta_id": 1,
                 "control": "SIG-TEST",
@@ -71,8 +90,25 @@ class TestSigsa3Registros:
         data = r.json()
         assert data["id"] > 0
         assert data["paciente_id"] == pid
+        assert data["medico_id"] == mid
         assert data["fecha_consulta"] == date.today().isoformat()
         TestSigsa3Registros.REGISTRO_ID = data["id"]
+
+    def test_create_sigsa3_registro_sin_medico(self, client, auth_headers):
+        """medico_id es obligatorio: crear sin él debe dar 422."""
+        pid = TestSigsa3Registros.PACIENTE_ID
+        if not pid:
+            pytest.skip("No paciente creado")
+        r = client.post(
+            "/sigsa3-registros/",
+            headers=auth_headers,
+            json={
+                "paciente_id": pid,
+                "fecha_consulta": date.today().isoformat(),
+                "tipo_consulta_id": 1,
+            },
+        )
+        assert r.status_code == 422
 
     def test_create_sigsa3_registro_fk_invalido(self, client, auth_headers):
         """FK de medico inexistente debe dar 404 (coincidencias garantizadas)."""
@@ -84,8 +120,8 @@ class TestSigsa3Registros:
             headers=auth_headers,
             json={
                 "paciente_id": pid,
-                "fecha_consulta": date.today().isoformat(),
                 "medico_id": 999999,
+                "fecha_consulta": date.today().isoformat(),
                 "tipo_consulta_id": 1,
             },
         )
@@ -133,6 +169,7 @@ class TestSigsa3Registros:
                 headers=auth_headers,
                 json={
                     "paciente_id": pid,
+                    "medico_id": TestSigsa3Registros.MEDICO_ID,
                     "consulta_id": con_id,
                     "fecha_consulta": date.today().isoformat(),
                     "tipo_consulta_id": 1,
@@ -215,6 +252,8 @@ class TestSigsa3Registros:
             return
         _cleanup(
             paciente_id=pid,
+            medico_id=TestSigsa3Registros.MEDICO_ID,
             registro_id=TestSigsa3Registros.REGISTRO_ID,
         )
         TestSigsa3Registros.PACIENTE_ID = None
+        TestSigsa3Registros.MEDICO_ID = None

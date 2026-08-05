@@ -564,6 +564,75 @@ class TestMergePacientes:
         )
         assert r.status_code in (400, 422)
 
+    def test_merge_copia_datos_vacios(self, client, auth_headers):
+        """El merge debe copiar los datos del duplicado en los campos vacíos del principal."""
+        s = _sufijo()
+        r1 = client.post(
+            "/pacientes/",
+            headers=auth_headers,
+            json={
+                "nombre": {
+                    "primer_nombre": f"MergeCopy{s}",
+                    "primer_apellido": "Principal",
+                },
+                "sexo": "F",
+            },
+        )
+        assert r1.status_code == 201
+        p1 = r1.json()["id"]
+
+        r2 = client.post(
+            "/pacientes/",
+            headers=auth_headers,
+            json={
+                "nombre": {
+                    "primer_nombre": f"MergeCopy{s}",
+                    "segundo_nombre": "Segundo",
+                    "primer_apellido": "Principal",
+                    "segundo_apellido": "Duplicado",
+                },
+                "sexo": "F",
+                "fecha_nacimiento": "1988-03-03",
+                "contacto": {"telefonos": ["99990000"], "domicilio": "Guatemala"},
+                "datos_extra": {
+                    "socioeconomicos": {"educacion": "Primaria", "ocupacion": "Estudiante"},
+                },
+            },
+        )
+        assert r2.status_code == 201
+        p2 = r2.json()["id"]
+        created_ids["pacientes"].extend([p1, p2])
+
+        try:
+            r = client.post(
+                "/pacientes/merge",
+                headers=auth_headers,
+                params={"principal_id": p1, "ids": [p1, p2]},
+            )
+            assert r.status_code == 200
+            assert r.json()["estado"] == "merge_completado"
+
+            db = SessionLocal()
+            try:
+                principal = db.query(PacienteModel).filter(PacienteModel.id == p1).first()
+                assert principal.sexo == "F"
+                assert principal.fecha_nacimiento == date(1988, 3, 3)
+                assert principal.educacion == "Primaria"
+                assert principal.ocupacion == "Estudiante"
+                tele = (principal.contacto or {}).get("telefonos", [])
+                assert "99990000" in tele
+                assert (principal.contacto or {}).get("domicilio") == "Guatemala"
+            finally:
+                db.close()
+        finally:
+            db = SessionLocal()
+            try:
+                db.query(PacienteModel).filter(PacienteModel.id == p1).delete()
+                db.query(PacienteModel).filter(PacienteModel.id == p2).delete()
+                db.commit()
+            finally:
+                db.close()
+
 
 # =====================================================================
 # SIGSA-3 EXTRA ENDPOINTS

@@ -99,6 +99,7 @@ class LegacyReferenceOut(BaseModel):
     madre_id: Optional[int] = None
     madre_expediente: Optional[str] = None
     madre_nombre: Optional[str] = None
+    madre_confianza: Optional[float] = None
 
     paciente_id: Optional[int] = None
     paciente_expediente: Optional[str] = None

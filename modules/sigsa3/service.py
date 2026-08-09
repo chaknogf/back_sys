@@ -16,6 +16,16 @@ from modules.especialidades.models import EspecialidadModel
 from modules.cie10.models import Cie10Model
 from modules.personal_salud.models import PersonalSaludModel
 from modules.sigsa3_registros.models import TipoConsultaSigsa3Model
+from modules.common.vector_similarity import (
+    CONFIANZA_ALTA,
+    CONFIANZA_MEDIA,
+    idf_por_token,
+    mejor_candidato,
+    pesado_por_idf,
+    similitud_compuesta,
+    tokenizar,
+    tokens_equivalentes,
+)
 
 # Mapeo de columnas Excel → campos SIGSA-3
 EXCEL_COLUMN_MAP = {
@@ -294,6 +304,8 @@ def listar_registros(
     db: Session,
     personal_salud: Opt[str] = None,
     fecha_consulta: Opt[date] = None,
+    fecha_desde: Opt[date] = None,
+    fecha_hasta: Opt[date] = None,
     no_historia_clinica: Opt[str] = None,
     nombre_paciente: Opt[str] = None,
     sexo: Opt[str] = None,
@@ -309,6 +321,10 @@ def listar_registros(
         query = query.filter(Sigsa3Model.personal_salud.ilike(f"%{personal_salud}%"))
     if fecha_consulta:
         query = query.filter(Sigsa3Model.fecha_consulta == fecha_consulta)
+    if fecha_desde:
+        query = query.filter(Sigsa3Model.fecha_consulta >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(Sigsa3Model.fecha_consulta <= fecha_hasta)
     if no_historia_clinica:
         query = query.filter(Sigsa3Model.no_historia_clinica.ilike(f"%{no_historia_clinica}%"))
     if nombre_paciente:
@@ -546,13 +562,287 @@ def _resolver_personal_salud(mapa: dict, nombre: str) -> tuple | None:
     return None
 
 
+def _idf_personal_salud(mapa: dict) -> dict:
+    """IDF sobre el corpus de nombres de personal_salud: pondera las
+    características (tokens/apellidos) que discriminan entre personas."""
+    return idf_por_token([tokenizar(n) for n in mapa])
+
+
+def _resolver_personal_salud_vectorizado(
+    mapa: dict, idf: dict, nombre: str, umbral_auto: float = CONFIANZA_ALTA
+) -> dict | None:
+    """Resuelve personal_salud con lógica vectorial.
+
+    - Match exacto normalizado (títulos/sinónimos/acentos absorbidos) → 1.0.
+    - Si no, similitud vectorial ponderada por IDF sobre TODOS los tokens del
+      nombre (no solo el primero), y se devuelve la confianza EXPLÍCITA.
+    - 'asociar' es True solo cuando la confianza supera el umbral: nunca se
+      convierte una similitud baja en una certeza (el reporte lo deja visible).
+    Devuelve dict con id/medico_id/especialidad_id/confianza/nivel/asociar
+    o None si el nombre no tiene candidatos."""
+    if not nombre:
+        return None
+    directo = mapa.get(nombre.strip().lower())
+    if directo:
+        return {
+            "id": directo[0], "medico_id": directo[1], "especialidad_id": directo[2],
+            "candidato": nombre, "confianza": 1.0, "nivel": "exacto", "asociar": True,
+        }
+    resultado = mejor_candidato(nombre, list(mapa.keys()), idf=idf, umbral=umbral_auto)
+    if not resultado:
+        return None
+    valores = mapa.get(resultado["candidato"])
+    if not valores:
+        return None
+    confianza = resultado["confianza"]
+    return {
+        "id": valores[0], "medico_id": valores[1], "especialidad_id": valores[2],
+        "candidato": resultado["candidato"], "score": resultado["score"],
+        "confianza": confianza, "nivel": resultado["nivel"],
+        "asociar": confianza >= umbral_auto,
+    }
+
+
+def _personal_salud_baja_confianza(mapa: dict, idf: dict, registros) -> list[dict]:
+    """Nombres con candidato vectorial por DEBAJO del umbral de certeza
+    (similitud media): se exponen para revisión, no se asocian solos."""
+    por_nombre: dict[str, dict] = {}
+    for reg in registros:
+        r = _resolver_personal_salud_vectorizado(mapa, idf, reg.personal_salud)
+        if r is None or r.get("asociar"):
+            continue
+        item = por_nombre.setdefault(reg.personal_salud, {
+            "nombre": reg.personal_salud, "total": 0,
+            "candidato": r.get("candidato"), "confianza": r.get("confianza"), "nivel": r.get("nivel"),
+        })
+        item["total"] += 1
+    return sorted(por_nombre.values(), key=lambda d: -d["total"])[:500]
+
+
+_UMBRAL_SUBMATCH = 0.82
+_MARCAS_PARENTESCO = ("HO/", "H/", "HIJO", "HIJA", "R.N", "RN-", "RECIEN", "NB")
+
+# ── Modelo de decisión por evidencia combinada (record linkage, Fellegi-Sunter) ──
+# Ningún campo basta por sí solo. Cada campo comparable aporta una evidencia
+# proporcional a su poder discriminante y la decisión se toma sobre la suma,
+# en tres zonas. Regla de oro: minimizar falsos positivos (más barato revisar
+# un caso dudoso que fusionar dos identidades).
+PESO_EXPEDIENTE_COINCIDE = 0.80   # igualar el número de historia equiv. a identidad casi segura
+CASTIGO_EXPEDIENTE_DIFIERE = -0.15  # el expediente de SIGSA-3 puede estar desactualizado: castigo suave
+PESO_SEXO_COINCIDE = 0.15          # campo común: coindicir apoya poco, pero apoya
+CASTIGO_SEXO_CONFLICTO = -0.50     # sexo divergente: evidencia en contra (madre/hijo, homónimos)
+ZONA_MATCH = 0.85                  # score ≥ 0.85 → match automático
+ZONA_REVISION = 0.70               # 0.70 ≤ score < 0.85 → zona gris, revisión humana
+
+
+def _evidencia_expediente(no_historia: str, expediente: str) -> float:
+    """Igualdad exacta (normalizada) de número de historia: la evidencia más
+    fuerte disponible. NO coincidir penaliza poco, porque el número en SIGSA-3
+    está desactualizado (decisión de negocio documentada)."""
+    if not no_historia or not expediente:
+        return 0.0
+    a = str(no_historia).strip().lower()
+    b = str(expediente).strip().lower()
+    return PESO_EXPEDIENTE_COINCIDE if a == b else CASTIGO_EXPEDIENTE_DIFIERE
+
+
+def _evidencia_sexo(sexo_sig: str, sexo_pac: str) -> float:
+    if not sexo_sig or not sexo_pac:
+        return 0.0
+    return PESO_SEXO_COINCIDE if sexo_sig == sexo_pac else CASTIGO_SEXO_CONFLICTO
+
+
+def _score_combinado(nombre_sim: float, no_historia: str, expediente: str,
+                     sexo_sig: str, sexo_pac: str) -> float:
+    """Score único = similitud de nombre + evidencia de historia + evidencia de
+    sexo, acotado a [0, 1]. El nombre se mide contra candidatos únicos con el
+    sesgo de que el expediente desactualizado no lo bloquea."""
+    total = nombre_sim + _evidencia_expediente(no_historia, expediente) + _evidencia_sexo(sexo_sig, sexo_pac)
+    return max(0.0, min(1.0, total))
+
+
+def _zona_decision(score: float) -> str:
+    if score >= ZONA_MATCH:
+        return "match"
+    if score >= ZONA_REVISION:
+        return "revision"
+    return "no_match"
+
+
+def _es_relacion_familiar(nombre_a: str, nombre_b: str) -> bool:
+    """True si un nombre lleva marca de parentesco ('HIJO/HIJA DE …', 'HO/…',
+    'R.N …') y el otro no: son personas distintas (madre vs recién nacido)."""
+    def kin(nombre: str) -> bool:
+        alto = nombre.strip().upper()
+        if alto.startswith(_MARCAS_PARENTESCO):
+            return True
+        return any(t in _MARCAS_PARENTESCO for t in tokenizar(nombre))
+    return kin(nombre_a) != kin(nombre_b)
+
+
+def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes):
+    """Devuelve (asociaciones, revision).
+
+    Record linkage SIGSA-3 → pacientes, discriminando por evidencia combinada:
+    1. Normalización (tokenización/idf) y bloqueo por firma de tokens.
+    2. Identidad exacta: un único paciente → match (aunque el sexo discrepe, se
+       reporta para corregir el dato).
+    3. Homónimo exacto (2+ pacientes): se desambigua por número de historia
+       exacto o por sexo; si quedan varios → zona gris (reportado, y se marca
+       como posible duplicado de pacientes).
+    4. Submatch por apellido de casada/abreviado (firma ⊆ paciente, 1-2
+       tokens): candidato único con score combinado ≥ zona match → asocia,
+       aunque el expediente de SIGSA-3 esté desactualizado.
+    5. Excluye coincidencias de parentesco (HIJO/HIJA/HO/) y todo caso dudoso
+       se enumera en 'revision' para revisión humana (zona gris/minimizar FP).
+    """
+    from collections import defaultdict
+
+    por_sign: dict[tuple, list] = defaultdict(list)   # firma -> [(pid, nombre, sexo, exp)]
+    sig_con_token: dict[str, set] = defaultdict(set)   # token -> firmas que lo contienen
+    corpus = []
+    for _, paciente in df_pacientes.iterrows():
+        nombre = paciente.get("nombre_completo")
+        if not isinstance(nombre, str) or not nombre.strip():
+            continue
+        firma = tuple(sorted(tokenizar(nombre)))
+        if not firma:
+            continue
+        sexo = paciente.get("sexo")
+        sexo = sexo.strip().upper() if isinstance(sexo, str) else ""
+        expo = paciente.get("expediente")
+        expo = str(expo).strip().lower() if expo is not None and str(expo).strip() else ""
+        estado = paciente.get("estado")
+        estado = estado.strip().upper() if isinstance(estado, str) else ""
+        por_sign[firma].append((int(paciente["pac_id"]), nombre, sexo, expo, estado))
+        for token in set(firma):
+            sig_con_token[token].add(firma)
+        corpus.append(firma)
+    idf = idf_por_token(corpus)
+    perfiles: dict[str, tuple] = {}
+
+    asociaciones: dict[int, int] = {}
+    revision: list[dict] = []
+
+    def _perfil(nombre):
+        perfil = perfiles.get(nombre)
+        if perfil is None:
+            perfil = (tokenizar(nombre), pesado_por_idf(tokenizar(nombre), idf))
+            perfiles[nombre] = perfil
+        return perfil
+
+    def _ficha(rid, **campos):
+        campos.setdefault("sigsa3_id", rid)
+        revision.append(campos)
+
+    pendientes = df_sigsa[
+        df_sigsa["paciente_id"].isna() & df_sigsa["nombre_paciente"].notna()
+    ]
+    for _, registro in pendientes.iterrows():
+        nombre_sigsa = registro["nombre_paciente"]
+        tokens = tokenizar(nombre_sigsa)
+        if len(tokens) < 2:
+            continue
+        firma = tuple(sorted(tokens))
+        sexo_sigsa = registro.get("sexo")
+        sexo_sigsa = sexo_sigsa.strip().upper() if isinstance(sexo_sigsa, str) else ""
+        nh = registro.get("no_historia_clinica")
+        no_historia = str(nh).strip().lower() if nh is not None and str(nh).strip() else ""
+        rid = int(registro["id"])
+
+        ident = por_sign[firma]
+
+        if len(ident) == 1:
+            pid, nombre, sexo_pac, exp_pac, _estado_pac = ident[0]
+            if sexo_sigsa and sexo_pac and sexo_sigsa != sexo_pac:
+                _ficha(rid, tipo="sexo_discrepante", nombre_sigsa=nombre_sigsa,
+                       sexo_sigsa=sexo_sigsa, nombre_paciente=nombre,
+                       sexo_paciente=sexo_pac)
+            asociaciones[rid] = pid
+            continue
+
+        if len(ident) > 1:
+            por_hist = [c for c in ident if _evidencia_expediente(no_historia, c[3]) == PESO_EXPEDIENTE_COINCIDE]
+            if len(por_hist) == 1:
+                asociaciones[rid] = por_hist[0][0]
+                continue
+            por_estado = [c for c in ident if c[4] in ("V", "F")]
+            if len(por_estado) == 1:
+                asociaciones[rid] = por_estado[0][0]
+                continue
+            por_sex = [c for c in ident if not sexo_sigsa or not c[2] or sexo_sigsa == c[2]]
+            por_sex = [c for c in por_sex if c[4] in ("V", "F")] or por_sex
+            if len(por_sex) == 1:
+                asociaciones[rid] = por_sex[0][0]
+                continue
+            _ficha(rid, tipo="homonimo", nombre_sigsa=nombre_sigsa,
+                   sexo_sigsa=sexo_sigsa,
+                   pacientes=sorted({c[1] for c in ident if c[4] in ("V", "F")}))
+            continue
+
+        sigs_cand = None
+        for token in set(firma):
+            s = sig_con_token[token]
+            sigs_cand = s if sigs_cand is None else (sigs_cand & s)
+        if not sigs_cand:
+            continue
+        candidatos = []
+        for key in sigs_cand:
+            if len(key) == len(firma) or len(key) - len(firma) > 2:
+                continue
+            if not set(firma) <= set(key):
+                continue
+            candidatos.extend(por_sign[key])
+        by_nombre: dict[str, set] = defaultdict(set)  # nombre -> set(pid)
+        for pid, nombre, sexo, expo, _est in candidatos:
+            by_nombre[nombre].add(pid)
+        unicos = [n for n, ids in by_nombre.items() if len(ids) == 1]
+        unicos = [n for n in unicos if not _es_relacion_familiar(nombre_sigsa, n)]
+        if not unicos:
+            continue
+        pesos = pesado_por_idf(tokens, idf)
+        puntuados = []
+        for nombre in unicos:
+            _, pesos_candidato = _perfil(nombre)
+            puntuados.append((similitud_compuesta(pesos, pesos_candidato), nombre))
+        puntuados.sort(reverse=True)
+        mejor_score, mejor_nombre = puntuados[0]
+        if len(puntuados) > 1 and puntuados[1][0] == mejor_score:
+            continue
+        cd = next(c for c in candidatos if c[1] == mejor_nombre)
+        pid, _, sexo_pac, expo_pac, _est_pac = cd
+        score = _score_combinado(mejor_score, no_historia, expo_pac, sexo_sigsa, sexo_pac)
+        zona = _zona_decision(score)
+
+        if mejor_score >= _UMBRAL_SUBMATCH or zona == "match":
+            if sexo_sigsa and sexo_pac and sexo_sigsa != sexo_pac:
+                _ficha(rid, tipo="sexo_discrepante", nombre_sigsa=nombre_sigsa,
+                       sexo_sigsa=sexo_sigsa, nombre_paciente=mejor_nombre,
+                       sexo_paciente=sexo_pac)
+            asociaciones[rid] = pid
+        else:
+            _ficha(rid, tipo="submatch_bajo_score", nombre_sigsa=nombre_sigsa,
+                   nombre_paciente=mejor_nombre, score=round(score, 3),
+                   zona=zona,
+                   evolucion={
+                       "nombre": round(mejor_score, 3),
+                       "expediente": _evidencia_expediente(no_historia, expo_pac),
+                       "sexo": _evidencia_sexo(sexo_sigsa, sexo_pac),
+                   })
+    return asociaciones, revision
+
+
 def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
     """Paso 1: asocia personal_salud_id y medico_id en SIGSA-3 por nombre
     (personal_salud → personal_salud.medico_id, tabla puente depurada).
     Paso 2: actualiza especialidad_id desde personal_salud (y medicos).
 
-    Optimizado para 500K+ filas: match exacto masivo en SQL; el barrido fuzzy
-    (subcadena) se reserva para los pocos sin medico_id.
+    Emparejamiento con LÓGICA VECTORIAL: match exacto masivo en SQL para los
+    500K+ filas; para los pocos sin medico_id se usa similitud de vectores de
+    características (nombres completos tokenizados, pesos por IDF). Solo se
+    asocia automáticamente cuando la confianza supera el umbral; los nombres
+    con candidato pero sin certeza se reportan en personal_salud_baja_confianza
+    para revisión humana (no se convierte similitud en certidumbre).
 
     Con dry_run=True no escribe nada: solo cuenta lo que se asociaría.
     """
@@ -562,6 +852,7 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
             "personal_salud_asociados": 0,
             "especialidades_actualizadas": 0,
             "sin_match": 0,
+            "personal_salud_baja_confianza": [],
         }
 
     if dry_run:
@@ -580,23 +871,26 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
             Sigsa3Model.medico_id.is_(None),
         ).count()
         mapa = _build_personal_salud_map(db)
+        idf = _idf_personal_salud(mapa)
         fuzzy = 0
         sin_match = 0
-        for reg in db.query(Sigsa3Model).filter(
+        registros_sin_medico = db.query(Sigsa3Model).filter(
             Sigsa3Model.personal_salud.isnot(None),
             Sigsa3Model.medico_id.is_(None),
-        ).all():
-            match = _resolver_personal_salud(mapa, reg.personal_salud)
-            if match:
-                fuzzy += 1
-            else:
+        ).all()
+        for reg in registros_sin_medico:
+            match = _resolver_personal_salud_vectorizado(mapa, idf, reg.personal_salud)
+            if match is None:
                 sin_match += 1
+            elif match.get("asociar"):
+                fuzzy += 1
         return {
             "asociados": int(sin_medico or 0),
             "personal_salud_asociados": int(exactos or 0) + fuzzy,
             "especialidades_actualizadas": int(exactos or 0) + fuzzy,
             "sin_match": sin_match,
             "personal_salud_sin_match": _personal_salud_sin_match(db),
+            "personal_salud_baja_confianza": _personal_salud_baja_confianza(mapa, idf, registros_sin_medico),
             "modo": "dry_run",
         }
 
@@ -625,8 +919,9 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
     db.commit()
     personal_salud_asociados = int(res or 0)
 
-    # ── Pasos fuzzy solo para los sin medico_id (pocos, ~2K) ──
+    # ── Barrido vectorial solo para los sin medico_id (pocos, ~2K) ──
     mapa = _build_personal_salud_map(db)
+    idf = _idf_personal_salud(mapa)
     asociados = 0
     especialidades_actualizadas = 0
     sin_match = 0
@@ -635,11 +930,15 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
         Sigsa3Model.medico_id.is_(None),
     ).all()
     for reg in registros_sin_medico:
-        match = _resolver_personal_salud(mapa, reg.personal_salud)
-        if not match:
+        match = _resolver_personal_salud_vectorizado(mapa, idf, reg.personal_salud)
+        if match is None:
             sin_match += 1
             continue
-        ps_id, medico_id, personal_esp_id = match
+        if not match.get("asociar"):
+            continue  # candidato sin certeza: se reporta, no se asocia
+        ps_id = match["id"]
+        medico_id = match["medico_id"]
+        personal_esp_id = match["especialidad_id"]
         if ps_id is not None and reg.personal_salud_id != ps_id:
             reg.personal_salud_id = ps_id
         if medico_id is not None and reg.medico_id != medico_id:
@@ -656,19 +955,38 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
         "especialidades_actualizadas": especialidades_actualizadas,
         "sin_match": sin_match,
         "personal_salud_sin_match": _personal_salud_sin_match(db),
+        "personal_salud_baja_confianza": _personal_salud_baja_confianza(mapa, idf, registros_sin_medico),
     }
 
 
 def asociar_paciente_y_consulta(db: Session):
+    """Ejecuta el pipeline en exclusión mutua para evitar asociaciones
+    concurrentes sobre los mismos registros SIGSA-3."""
+    bloqueado = db.execute(
+        text("SELECT pg_try_advisory_lock(hashtext('sigsa3_asociar_pacientes_masivo'))")
+    ).scalar()
+    if not bloqueado:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya hay una asociación masiva SIGSA-3 en ejecución",
+        )
+    try:
+        yield from _asociar_paciente_y_consulta_pipeline(db)
+    finally:
+        db.execute(text("SELECT pg_advisory_unlock(hashtext('sigsa3_asociar_pacientes_masivo'))"))
+
+
+def _asociar_paciente_y_consulta_pipeline(db: Session):
     """Pipeline completo usando pandas para asociación masiva.
     Generador que yield eventos de progreso como dicts.
     1. nombre_paciente = nombre_completo AND no_historia_clinica = expediente → paciente_id
     2. no_historia_clinica = expediente (tipo 1/2) o = documento + fecha (tipo 3) → paciente_id / consulta_id
-    3. nombre_paciente vs nombre_completo: trigram similarity >0.3 o ILIKE bidireccional ≥4 chars → paciente_id
+    3. nombre_paciente vs nombre_completo: similitud vectorial con umbral alto
+       y margen frente al segundo candidato → paciente_id
     4. paciente_id + fecha ±1d + tipo coincidente → consulta_id
     5. no_historia_clinica = documento + fecha ±1d → consulta_id (+ paciente_id si faltaba)
     6a. paciente_id + fecha ±1d (cualquier tipo) → consulta_id (rezagados)
-    6b. nombre_paciente vs nombre_completo: trigram similarity >0.2 → paciente_id (rezagados)
+    6b. reservado para revisión humana: no se autoasocian nombres ambiguos.
     """
     import pandas as pd
     from datetime import datetime
@@ -688,7 +1006,7 @@ def asociar_paciente_y_consulta(db: Session):
     from core.database import engine
 
     df = pd.read_sql(
-        "SELECT id, nombre_paciente, no_historia_clinica, fecha_consulta, tipo_consulta, paciente_id, consulta_id FROM sigsa3 WHERE paciente_id IS NULL OR consulta_id IS NULL",
+        "SELECT id, nombre_paciente, no_historia_clinica, fecha_consulta, tipo_consulta, sexo, paciente_id, consulta_id FROM sigsa3 WHERE paciente_id IS NULL OR consulta_id IS NULL",
         engine, parse_dates=["fecha_consulta"]
     )
     print(f"[PIPELINE] registros cargados={len(df)}")
@@ -704,7 +1022,7 @@ def asociar_paciente_y_consulta(db: Session):
 
     # Cargar pacientes y consultas para pasos basados en pandas (4, 5, 6a)
     df_pac = pd.read_sql(
-        "SELECT id AS pac_id, nombre_completo, expediente FROM pacientes WHERE nombre_completo IS NOT NULL",
+        "SELECT id AS pac_id, nombre_completo, expediente, sexo, estado FROM pacientes WHERE nombre_completo IS NOT NULL",
         engine
     )
     df_con = pd.read_sql(
@@ -776,80 +1094,31 @@ def asociar_paciente_y_consulta(db: Session):
     # Commit parcial: paso 2 escrito en DB + refrescar df
     _aplicar_updates()
     df = pd.read_sql(
-        "SELECT id, nombre_paciente, no_historia_clinica, fecha_consulta, tipo_consulta, paciente_id, consulta_id FROM sigsa3 WHERE paciente_id IS NULL OR consulta_id IS NULL",
+        "SELECT id, nombre_paciente, no_historia_clinica, fecha_consulta, tipo_consulta, sexo, paciente_id, consulta_id FROM sigsa3 WHERE paciente_id IS NULL OR consulta_id IS NULL",
         engine, parse_dates=["fecha_consulta"]
     )
 
-    # ── PASO 3a: last-2-words key JOIN + trigram similarity > 0.3 ──
-    mask = df["paciente_id"].isna() & df["nombre_paciente"].notna()
-    if mask.any():
-        paso3a = pd.read_sql(text("""\
-            SELECT DISTINCT ON (s.id) s.id, p.id AS pac_id
-            FROM (
-                SELECT id, nombre_paciente,
-                       CASE WHEN unaccent(nombre_paciente) LIKE '% % %'
-                           THEN SUBSTRING(unaccent(nombre_paciente) FROM '\\S+\\s+(\\S+\\s+\\S+)$')
-                           ELSE SUBSTRING(unaccent(nombre_paciente) FROM '(\\S+)$')
-                       END AS key
-                FROM sigsa3
-                WHERE paciente_id IS NULL AND nombre_paciente IS NOT NULL AND nombre_paciente <> ''
-            ) s
-            JOIN (
-                SELECT id, nombre_completo,
-                       CASE WHEN unaccent(nombre_completo) LIKE '% % %'
-                           THEN SUBSTRING(unaccent(nombre_completo) FROM '\\S+\\s+(\\S+\\s+\\S+)$')
-                           ELSE SUBSTRING(unaccent(nombre_completo) FROM '(\\S+)$')
-                       END AS key
-                FROM pacientes
-                WHERE nombre_completo IS NOT NULL AND nombre_completo <> ''
-            ) p ON s.key = p.key
-              AND similarity(unaccent(s.nombre_paciente), unaccent(p.nombre_completo)) > 0.3
-            ORDER BY s.id,
-              similarity(unaccent(s.nombre_paciente), unaccent(p.nombre_completo)) DESC
-        """), engine)
-        for _, row in paso3a.iterrows():
-            rid = int(row["id"])
-            pid = int(row["pac_id"])
-            updates_paciente[rid] = pid
-            df.loc[df["id"] == rid, "paciente_id"] = pid
-            resultados["paso3_paciente"] += 1
-
-    # Commit paso 3a
+    # ── PASO 3: nombre vectorial; solo candidatos inequívocos ──
+    paso3, revision = _asociar_pacientes_por_nombre_vectorial(df, df_pac)
+    for rid, pid in paso3.items():
+        updates_paciente[rid] = pid
+        df.loc[df["id"] == rid, "paciente_id"] = pid
+        resultados["paso3_paciente"] += 1
     _aplicar_updates()
-
-    # ── PASO 3b: last-word key JOIN + trigram similarity > 0.3 (SQL, leftovers) ──
-    mask = df["paciente_id"].isna() & df["nombre_paciente"].notna()
-    if mask.any():
-        paso3b = pd.read_sql(text("""\
-            WITH sig AS MATERIALIZED (
-                SELECT id, nombre_paciente,
-                       SUBSTRING(unaccent(nombre_paciente) FROM '(\\S+)$') AS key1
-                FROM sigsa3
-                WHERE paciente_id IS NULL AND nombre_paciente IS NOT NULL AND nombre_paciente <> ''
-            ),
-            pac AS MATERIALIZED (
-                SELECT id, nombre_completo,
-                       SUBSTRING(unaccent(nombre_completo) FROM '(\\S+)$') AS key1
-                FROM pacientes
-                WHERE nombre_completo IS NOT NULL AND nombre_completo <> ''
-            )
-            SELECT DISTINCT ON (s.id) s.id, p.id AS pac_id
-            FROM sig s
-            JOIN pac p ON s.key1 = p.key1
-              AND similarity(unaccent(s.nombre_paciente), unaccent(p.nombre_completo)) > 0.3
-            ORDER BY s.id,
-              similarity(unaccent(s.nombre_paciente), unaccent(p.nombre_completo)) DESC
-        """), engine)
-        for _, row in paso3b.iterrows():
-            rid = int(row["id"])
-            pid = int(row["pac_id"])
-            updates_paciente[rid] = pid
-            df.loc[df["id"] == rid, "paciente_id"] = pid
-            resultados["paso3_paciente"] += 1
-
-    # Commit paso 3
-    _aplicar_updates()
-    yield {"step": "paso3", "progress": 55, "message": f"Paso 3 — clave (apellidos) + trigram: {resultados['paso3_paciente']} pacientes", **resultados}
+    aviso3 = ""
+    if revision:
+        por_tipo: dict[str, int] = {}
+        for r in revision:
+            por_tipo[r.get("tipo", "?")] = por_tipo.get(r.get("tipo", "?"), 0) + 1
+        detalle = " | ".join(f"{k}: {v}" for k, v in por_tipo.items())
+        ejemplos = revision[:2]
+        aviso3 = (
+            f"⚠️ {len(revision)} pendientes para revisar ({detalle}). "
+            f"Expediente desactualizado o nombre ambiguo; ej: {ejemplos}. "
+            f"Los homónimos exactos suelen ser pacientes duplicados (merge)."
+        )
+        print(f"[PIPELINE] {aviso3}")
+    yield {"step": "paso3", "progress": 55, "message": f"Paso 3 — nombre vectorial inequívoco: {resultados['paso3_paciente']} pacientes", "aviso": aviso3, **resultados}
 
     # ── PASO 4: consulta_id por paciente_id + fecha_consulta ±1d + tipo_consulta ──
     mask = df["consulta_id"].isna() & df["paciente_id"].notna() & df["fecha_consulta"].notna()
@@ -937,40 +1206,7 @@ def asociar_paciente_y_consulta(db: Session):
             resultados["paso6a_consulta"] += 1
     yield {"step": "paso6a", "progress": 90, "message": f"Paso 6a — paciente+fecha±1d (cualquier tipo): {resultados['paso6a_consulta']} consultas", **resultados}
 
-    # 6b: sin paciente_id → key JOIN + trigram similarity > 0.2 (rezagados)
-    mask = df["paciente_id"].isna() & df["nombre_paciente"].notna()
-    if mask.any():
-        paso6b = pd.read_sql(text("""\
-            SELECT DISTINCT ON (s.id) s.id, p.id AS pac_id
-            FROM (
-                SELECT id, nombre_paciente,
-                       CASE WHEN unaccent(nombre_paciente) LIKE '% % %'
-                           THEN SUBSTRING(unaccent(nombre_paciente) FROM '\\S+\\s+(\\S+\\s+\\S+)$')
-                           ELSE SUBSTRING(unaccent(nombre_paciente) FROM '(\\S+)$')
-                       END AS key
-                FROM sigsa3
-                WHERE paciente_id IS NULL AND nombre_paciente IS NOT NULL AND nombre_paciente <> ''
-            ) s
-            JOIN (
-                SELECT id, nombre_completo,
-                       CASE WHEN unaccent(nombre_completo) LIKE '% % %'
-                           THEN SUBSTRING(unaccent(nombre_completo) FROM '\\S+\\s+(\\S+\\s+\\S+)$')
-                           ELSE SUBSTRING(unaccent(nombre_completo) FROM '(\\S+)$')
-                       END AS key
-                FROM pacientes
-                WHERE nombre_completo IS NOT NULL AND nombre_completo <> ''
-            ) p ON s.key = p.key
-              AND similarity(unaccent(s.nombre_paciente), unaccent(p.nombre_completo)) > 0.2
-            ORDER BY s.id,
-              similarity(unaccent(s.nombre_paciente), unaccent(p.nombre_completo)) DESC
-        """), engine)
-        for _, row in paso6b.iterrows():
-            rid = int(row["id"])
-            pid = int(row["pac_id"])
-            updates_paciente[rid] = pid
-            df.loc[df["id"] == rid, "paciente_id"] = pid
-            resultados["paso6b_paciente"] += 1
-    yield {"step": "paso6b", "progress": 95, "message": f"Paso 6b — clave + trigram >0.2: {resultados['paso6b_paciente']} pacientes", **resultados}
+    yield {"step": "paso6b", "progress": 95, "message": "Paso 6b — nombres ambiguos pendientes de revisión", **resultados}
 
     _aplicar_updates()
     total_pac = sum(resultados[k] for k in ("paso1_paciente", "paso2_paciente", "paso3_paciente", "paso6b_paciente"))
@@ -1364,12 +1600,30 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
             "modo": "dry_run",
             "migrarian": migrables,
             **stats,
+            "resoluciones": {
+                "tipo_consulta_resuelto": 0,
+                "cie10_existente": 0,
+                "cie10_creado_auto": 0,
+                "cie10_pendiente": 0,
+            },
             "personal_salud_sin_match": _personal_salud_sin_match(db),
             "errores": 0,
         }
 
     total_migrados = 0
     total_errores = 0
+    res_tipo = 0
+    res_cie10_existente = 0
+    res_cie10_creado = 0
+    res_cie10_pendiente = 0
+
+    def _resoluciones():
+        return {
+            "tipo_consulta_resuelto": res_tipo,
+            "cie10_existente": res_cie10_existente,
+            "cie10_creado_auto": res_cie10_creado,
+            "cie10_pendiente": res_cie10_pendiente,
+        }
 
     while True:
         query = (
@@ -1386,7 +1640,22 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
         for reg in registros:
             try:
                 tipo_id = _resolver_tipo_consulta_id(reg.tipo_consulta) or reg.tipo_consulta_id
-                cie10_id = reg.codigo_cie_10_id or _resolver_cie10_o_crear(db, reg.codigo_cie_10, cie10_cache)
+                if tipo_id is not None:
+                    res_tipo += 1
+                codigo_str = reg.codigo_cie_10
+                if codigo_str and not reg.codigo_cie_10_id:
+                    estandar = _normalizar_codigo_cie10(codigo_str)
+                    existia = estandar in cie10_cache and cie10_cache.get(estandar) is not None
+                else:
+                    existia = True
+                cie10_id = reg.codigo_cie_10_id or _resolver_cie10_o_crear(db, codigo_str, cie10_cache)
+                if cie10_id is not None:
+                    if existia:
+                        res_cie10_existente += 1
+                    else:
+                        res_cie10_creado += 1
+                else:
+                    res_cie10_pendiente += 1
                 esp_id = reg.especialidad_id
 
                 nuevo = Sigsa3RegistroModel(
@@ -1433,8 +1702,7 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
         "migrados": total_migrados,
         "purgeados_de_staging": total_migrados,
         **stats,
+        "resoluciones": _resoluciones(),
         "personal_salud_sin_match": _personal_salud_sin_match(db),
         "errores": total_errores,
     }
-
-

@@ -29,6 +29,8 @@ router = APIRouter(
 def listar(
     personal_salud: Optional[str] = Query(None, max_length=100),
     fecha_consulta: Optional[date] = None,
+    fecha_desde: Optional[date] = Query(None, description="Fecha desde (YYYY-MM-DD)"),
+    fecha_hasta: Optional[date] = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
     no_historia_clinica: Optional[str] = Query(None, max_length=30),
     nombre_paciente: Optional[str] = Query(None, max_length=150),
     sexo: Optional[str] = Query(None, max_length=1),
@@ -36,7 +38,7 @@ def listar(
     especialidad_id: Optional[int] = Query(None),
     codigo_cie_10: Optional[str] = Query(None, max_length=30),
     q: Optional[str] = Query(None, max_length=200, description="Búsqueda general"),
-    limit: int = Query(100, le=500),
+    limit: int = Query(100, le=5000),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
@@ -44,6 +46,8 @@ def listar(
         db=db,
         personal_salud=personal_salud,
         fecha_consulta=fecha_consulta,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
         no_historia_clinica=no_historia_clinica,
         nombre_paciente=nombre_paciente,
         sexo=sexo,

@@ -9,6 +9,13 @@ from typing import Optional
 
 from modules.nacimientos.models import NacimientoModel
 from modules.nacimientos.schemas import NacimientoCreate, NacimientoUpdate, NeonatalesUpdate, LegacyReferenceOut
+from modules.common.vector_similarity import (
+    CONFIANZA_ALTA,
+    CONFIANZA_MEDIA,
+    idf_por_token,
+    mejor_candidato,
+    tokenizar,
+)
 
 
 def _fetchone(db: Session, sql: str, params: dict | None = None) -> dict | None:
@@ -198,6 +205,27 @@ def _computar(neonatales: dict) -> dict:
         "peso_gramos": pg,
         "clasificacion_nacimiento": clasificacion_nacimiento(pg),
         "trabajo_parto": trabajo_parto(neonatales.get("edad_gestacional")),
+    }
+
+
+def confianza_evidencias_neonatales(neonatales: dict, computado: dict) -> dict:
+    """Nivel de confianza del análisis según la evidencia disponible.
+
+    Debates observado:
+      - peso_nacimiento + edad_gestacional presentes → evidencia completa.
+      - solo uno → evidencia parcial (la inferencia del otro es 'sin evidencia').
+      - ninguno → sin evidencia: no se puede concluir nada.
+    Devuelve dict con 'nivel' (alta/media/sin_evidencia) y por-campo.
+    """
+    tiene_peso = bool(neonatales.get("peso_nacimiento"))
+    tiene_eg = bool(neonatales.get("edad_gestacional"))
+    nivel = "alta" if (tiene_peso and tiene_eg) else ("media" if (tiene_peso or tiene_eg) else "sin_evidencia")
+    return {
+        "nivel": nivel,
+        "peso_nacimiento": tiene_peso,
+        "edad_gestacional": tiene_eg,
+        "clasificacion_nacimiento_evidence": tiene_peso,
+        "trabajo_parto_evidence": tiene_eg,
     }
 
 
@@ -544,7 +572,11 @@ def recomputar_todos(db: Session) -> dict:
 
     paciente_ids = [r["paciente_id"] for r in rows if r["paciente_id"]]
     if not paciente_ids:
-        return {"total_analizados": 0, "actualizados": 0, "sin_cambios": 0, "sin_datos_neonatales": 0, "detalles": []}
+        return {
+            "total_analizados": 0, "actualizados": 0, "sin_cambios": 0,
+            "consistentes": 0, "sin_datos_neonatales": 0, "sin_evidencia": 0,
+            "detalles": [], "analisis": [],
+        }
 
     pac_rows = _fetchall(db, """
         SELECT id, datos_extra FROM pacientes WHERE id = ANY(:ids)
@@ -559,7 +591,10 @@ def recomputar_todos(db: Session) -> dict:
     actualizados = 0
     sin_datos = 0
     sin_cambios = 0
+    consistentes = 0
+    sin_evidencia = 0
     detalles = []
+    analisis = []
 
     for row in rows:
         nac_id = row["id"]
@@ -574,39 +609,62 @@ def recomputar_todos(db: Session) -> dict:
             continue
 
         neonatales = de.get("neonatales") or {}
-        
         if not neonatales:
             sin_datos += 1
             continue
 
         tiene_peso = neonatales.get("peso_nacimiento")
         tiene_eg = neonatales.get("edad_gestacional")
-        
         if not tiene_peso and not tiene_eg:
-            sin_datos += 1
+            sin_evidencia += 1
             continue
 
         computado = _computar(neonatales)
+        evidencias = confianza_evidencias_neonatales(neonatales, computado)
         cambios = False
         detal = {"id": nac_id, "paciente_id": paciente_id, "cambios": {}}
+        analisis_reg = {
+            "id": nac_id,
+            "paciente_id": paciente_id,
+            "confianza": evidencias["nivel"],  # alta/media (sin_evidencia ya saltó)
+            "evidencias": {
+                "peso_nacimiento": bool(tiene_peso),
+                "edad_gestacional": bool(tiene_eg),
+            },
+            # observado = dato almacenado (origen); computado = inferencia
+            "observado": {
+                "peso_gramos": row["peso_gramos"],
+                "clasificacion_nacimiento": row["clasificacion_nacimiento"],
+                "trabajo_parto": row["trabajo_parto"],
+            },
+            "computado": {
+                "peso_gramos": float(computado["peso_gramos"]) if computado["peso_gramos"] is not None else None,
+                "clasificacion_nacimiento": computado["clasificacion_nacimiento"],
+                "trabajo_parto": computado["trabajo_parto"],
+            },
+            "inconsistencia": False,
+        }
 
         if tiene_peso and computado["peso_gramos"] is not None and computado["peso_gramos"] != row["peso_gramos"]:
             detal["cambios"]["peso_gramos"] = {"de": row["peso_gramos"], "a": float(computado["peso_gramos"])}
             cambios = True
+            analisis_reg["inconsistencia"] = True
 
         if tiene_peso and computado["clasificacion_nacimiento"] is not None and computado["clasificacion_nacimiento"] != row["clasificacion_nacimiento"]:
             detal["cambios"]["clasificacion_nacimiento"] = {"de": row["clasificacion_nacimiento"], "a": computado["clasificacion_nacimiento"]}
             cambios = True
+            analisis_reg["inconsistencia"] = True
 
         if tiene_eg and computado["trabajo_parto"] is not None and computado["trabajo_parto"] != row["trabajo_parto"]:
             detal["cambios"]["trabajo_parto"] = {"de": row["trabajo_parto"], "a": computado["trabajo_parto"]}
             cambios = True
+            analisis_reg["inconsistencia"] = True
 
         if cambios:
             pg = computado["peso_gramos"] if tiene_peso and computado["peso_gramos"] is not None else row["peso_gramos"]
             clasif = computado["clasificacion_nacimiento"] if tiene_peso and computado["clasificacion_nacimiento"] is not None else row["clasificacion_nacimiento"]
             tp = computado["trabajo_parto"] if tiene_eg and computado["trabajo_parto"] is not None else row["trabajo_parto"]
-            
+
             db.execute(text("""
                 UPDATE nacimientos
                 SET peso_gramos = :pg, clasificacion_nacimiento = :clasif, trabajo_parto = :tp, updated_at = NOW()
@@ -621,14 +679,20 @@ def recomputar_todos(db: Session) -> dict:
             detalles.append(detal)
         else:
             sin_cambios += 1
+            consistentes += 1
+
+        analisis.append(analisis_reg)
 
     db.commit()
     return {
         "total_analizados": len(rows),
         "actualizados": actualizados,
         "sin_cambios": sin_cambios,
+        "consistentes": consistentes,
         "sin_datos_neonatales": sin_datos,
+        "sin_evidencia": sin_evidencia,
         "detalles": detalles,
+        "analisis": analisis,
     }
 
 
@@ -693,6 +757,46 @@ def _peso_legacy_a_str(lb: int | None, onz: int | None) -> str | None:
     return " ".join(partes) if partes else None
 
 
+def _madre_candidata_por_nombre(
+    leg_madre: str,
+    madres: dict,
+    umbral_auto: float = CONFIANZA_ALTA,
+) -> dict | None:
+    """Compara el nombre de madre legacy contra las madres candidatas usando
+    vectores de características (tokens completos del nombre + IDF).
+
+    No convierte la similitud en una certeza: 'asociar' solo es True si la
+    confianza supera el umbral; en caso contario se devuelve el candidato
+    con su confianza para que el llamado decida/exponga."""
+    if not leg_madre:
+        return None
+    nombres: dict[int, str] = {
+        mid: (m.get("nombre_completo") or "")
+        for mid, m in madres.items()
+        if m.get("nombre_completo")
+    }
+    if not nombres:
+        return None
+    veraged = _idf_madres(madres)
+    resultado = mejor_candidato(leg_madre, list(nombres.values()), idf=veraged, umbral=umbral_auto)
+    if not resultado:
+        return None
+    madre_id = next((mid for mid, n in nombres.items() if n == resultado["candidato"]), None)
+    if madre_id is None:
+        return None
+    return {
+        "madre_id": madre_id,
+        "nombre": resultado["candidato"],
+        "confianza": resultado["confianza"],
+        "nivel": resultado["nivel"],
+        "asociar": resultado["confianza"] >= umbral_auto,
+    }
+
+
+def _idf_madres(madres: dict) -> dict:
+    return idf_por_token([tokenizar(m.get("nombre_completo")) for m in madres.values() if m.get("nombre_completo")])
+
+
 def referenciar_legacy(
     db: Session,
     limit: int = 500,
@@ -755,6 +859,7 @@ def referenciar_legacy(
     for leg in rows:
         madre = None
         match_tipo = "sin_match"
+        madre_confianza = None
         leg_exp = leg.get("expediente")
         leg_dpi = leg.get("dpi")
 
@@ -794,11 +899,14 @@ def referenciar_legacy(
                         origen = de.get("origen", {})
                         if origen.get("tipo") == "MADRE" and origen.get("paciente_id"):
                             m = candidatas_madres.get(origen["paciente_id"])
-                            if m and leg_madre.lower() in (m.get("nombre_completo", "") or "").lower():
-                                hijo = c
-                                madre = m
-                                match_tipo = "por_madre_fecha_sexo"
-                                break
+                            if m:
+                                sim = _madre_candidata_por_nombre(leg_madre, {m["id"]: m})
+                                if sim and sim.get("asociar"):
+                                    hijo = c
+                                    madre = m
+                                    match_tipo = "por_madre_nombre_vectorial"
+                                    madre_confianza = sim["confianza"]
+                                    break
 
         nacimiento_id = None
         if hijo:
@@ -814,7 +922,7 @@ def referenciar_legacy(
         elif madre:
             legacy_ids_a_buscar.add(leg["id"])
 
-        legs_data.append((leg, madre, hijo, match_tipo))
+        legs_data.append((leg, madre, hijo, match_tipo, madre_confianza))
 
     nacimiento_por_paciente = {}
     if paciente_ids_a_buscar:
@@ -826,7 +934,7 @@ def referenciar_legacy(
         for r in _fetchall(db, "SELECT id, id_legacy FROM nacimientos WHERE id_legacy IS NOT NULL AND id_legacy = ANY(:ids)", {"ids": list(legacy_ids_a_buscar)}):
             nacimiento_por_legacy[r["id_legacy"]] = r["id"]
 
-    for leg, madre, hijo, match_tipo in legs_data:
+    for leg, madre, hijo, match_tipo, madre_confianza in legs_data:
         nacimiento_id = None
         if hijo:
             nacimiento_id = nacimiento_por_paciente.get(hijo["id"])
@@ -841,6 +949,11 @@ def referenciar_legacy(
             else:
                 sin_nacimiento += 1
             madres_sin_hijo += 1
+
+        if match_tipo in ("por_expediente", "por_dpi", "por_madre_fecha_sexo"):
+            confianza_final = 1.0  # relación respaldada por identificadores observados
+        else:
+            confianza_final = madre_confianza
 
         referencias.append(LegacyReferenceOut(
             legacy_id=leg["id"],
@@ -859,6 +972,7 @@ def referenciar_legacy(
             madre_id=madre["id"] if madre else None,
             madre_expediente=madre.get("expediente") if madre else None,
             madre_nombre=madre.get("nombre_completo") if madre else None,
+            madre_confianza=confianza_final,
             paciente_id=hijo["id"] if hijo else None,
             paciente_expediente=hijo.get("expediente") if hijo else None,
             paciente_nombre=hijo.get("nombre_completo") if hijo else None,

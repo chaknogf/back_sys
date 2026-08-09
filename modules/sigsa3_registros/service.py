@@ -46,8 +46,11 @@ def _filtros(
     consulta_id: Optional[int] = None,
     tipo_consulta_id: Optional[int] = None,
     especialidad_id: Optional[int] = None,
+    fecha_consulta: Optional[date] = None,
     fecha_desde: Optional[date] = None,
     fecha_hasta: Optional[date] = None,
+    nombre_paciente: Optional[str] = None,
+    no_historia_clinica: Optional[str] = None,
     q: Optional[str] = None,
 ):
     conds = []
@@ -63,10 +66,16 @@ def _filtros(
         conds.append(Sigsa3RegistroModel.tipo_consulta_id == tipo_consulta_id)
     if especialidad_id is not None:
         conds.append(Sigsa3RegistroModel.especialidad_id == especialidad_id)
+    if fecha_consulta is not None:
+        conds.append(Sigsa3RegistroModel.fecha_consulta == fecha_consulta)
     if fecha_desde is not None:
         conds.append(Sigsa3RegistroModel.fecha_consulta >= fecha_desde)
     if fecha_hasta is not None:
         conds.append(Sigsa3RegistroModel.fecha_consulta <= fecha_hasta)
+    if nombre_paciente:
+        conds.append(PacienteModel.nombre_completo.ilike(f"%{nombre_paciente}%"))
+    if no_historia_clinica:
+        conds.append(PacienteModel.expediente.ilike(f"%{no_historia_clinica}%"))
     if q:
         term = f"%{q}%"
         conds.append(
@@ -176,8 +185,11 @@ def listar_registros(
     consulta_id: Optional[int] = None,
     tipo_consulta_id: Optional[int] = None,
     especialidad_id: Optional[int] = None,
+    fecha_consulta: Optional[date] = None,
     fecha_desde: Optional[date] = None,
     fecha_hasta: Optional[date] = None,
+    nombre_paciente: Optional[str] = None,
+    no_historia_clinica: Optional[str] = None,
     q: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,
@@ -189,8 +201,11 @@ def listar_registros(
         consulta_id=consulta_id,
         tipo_consulta_id=tipo_consulta_id,
         especialidad_id=especialidad_id,
+        fecha_consulta=fecha_consulta,
         fecha_desde=fecha_desde,
         fecha_hasta=fecha_hasta,
+        nombre_paciente=nombre_paciente,
+        no_historia_clinica=no_historia_clinica,
         q=q,
     )
     query = _base_query(db).filter(*conds)

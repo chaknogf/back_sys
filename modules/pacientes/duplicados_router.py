@@ -5,6 +5,7 @@ from typing import Literal
 from core.database import get_db
 from core.security import get_current_user
 from modules.users.models import UserModel
+from modules.common.vector_similarity import perfil, similitud_compuesta, tokenizar, tokens_equivalentes
 
 router = APIRouter(
     prefix="/pacientes",
@@ -16,12 +17,67 @@ router = APIRouter(
 def pacientes_nombres_similares(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    similitud_minima: float = Query(0.7, ge=0.1, le=1.0),
-    metodo: Literal["trigram", "soundex", "levenshtein"] = Query("trigram"),
+    similitud_minima: float = Query(0.85, ge=0.1, le=1.0),
+    metodo: Literal["vectorial", "trigram", "soundex", "levenshtein"] = Query("vectorial"),
     incluir_fecha_nacimiento: bool = Query(True),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+
+    if metodo == "vectorial":
+        # El motor vectorial se evalúa en Python sobre pares ya bloqueados en
+        # SQL por apellido, sexo y fecha; no se usa para fusionar registros.
+        pares = db.execute(text("""
+            SELECT
+                a.id AS id_a, a.nombre_completo AS nombre_a, a.expediente AS expediente_a,
+                a.cui AS cui_a, a.fecha_nacimiento AS fecha_nacimiento_a, a.sexo AS sexo_a,
+                b.id AS id_b, b.nombre_completo AS nombre_b, b.expediente AS expediente_b,
+                b.cui AS cui_b, b.fecha_nacimiento AS fecha_nacimiento_b, b.sexo AS sexo_b
+            FROM pacientes a
+            JOIN pacientes b ON a.id < b.id
+              AND lower(unaccent(COALESCE(a.nombre->>'primer_apellido', '')))
+                  = lower(unaccent(COALESCE(b.nombre->>'primer_apellido', '')))
+              AND (
+                  :incluir_fecha = false
+                  OR a.fecha_nacimiento = b.fecha_nacimiento
+                  OR a.fecha_nacimiento IS NULL
+                  OR b.fecha_nacimiento IS NULL
+              )
+              AND (a.sexo IS NULL OR b.sexo IS NULL OR a.sexo = b.sexo)
+            WHERE a.estado != 'I' AND b.estado != 'I'
+              AND a.nombre_completo IS NOT NULL AND b.nombre_completo IS NOT NULL
+        """), {"incluir_fecha": incluir_fecha_nacimiento}).mappings().all()
+
+        ids = set()
+        for par in pares:
+            tokens_a, tokens_b = tokenizar(par["nombre_a"]), tokenizar(par["nombre_b"])
+            score = 1.0 if tokens_equivalentes(tokens_a, tokens_b) else similitud_compuesta(
+                perfil(par["nombre_a"]), perfil(par["nombre_b"])
+            )
+            if score >= similitud_minima:
+                ids.update((par["id_a"], par["id_b"]))
+
+        resultados = db.execute(text("""
+            SELECT id, nombre_completo AS nombre, expediente, cui, fecha_nacimiento, sexo
+            FROM pacientes
+            WHERE id = ANY(:ids)
+            ORDER BY nombre_completo
+            LIMIT :limit OFFSET :offset
+        """), {"ids": list(ids) or [-1], "limit": limit, "offset": offset}).fetchall()
+        return {
+            "resultados": [
+                {
+                    "id": r.id, "nombre": r.nombre, "expediente": r.expediente,
+                    "cui": r.cui,
+                    "fecha_nacimiento": r.fecha_nacimiento.isoformat() if r.fecha_nacimiento else None,
+                    "sexo": r.sexo,
+                }
+                for r in resultados
+            ],
+            "filtros": {"metodo": metodo, "similitud_minima": similitud_minima,
+                         "incluir_fecha_nacimiento": incluir_fecha_nacimiento},
+            "paginacion": {"limit": limit, "offset": offset, "total_resultados": len(resultados)},
+        }
 
     if metodo == "trigram":
         comparacion = """

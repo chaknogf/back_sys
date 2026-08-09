@@ -174,25 +174,28 @@ def personal_hospital(db: Session, desde: str, hasta: str, skip: int = 0, limit:
     limit = min(limit, 500)
 
     rows = db.execute(text("""
-        SELECT DISTINCT ON (c.id)
+        SELECT
             p.nombre,
             p.nombre_completo,
             p.expediente,
-            c.tipo_consulta,
+            r.tipo_consulta_id AS tipo_consulta,
             p.sexo,
             p.fecha_nacimiento,
-            c.fecha_consulta,
-            c.especialidad,
+            r.fecha_consulta,
+            COALESCE(e.nombre, '—') AS especialidad,
             c.documento,
-            c.paciente_id,
-            COALESCE(NULLIF(c.egreso#>>'{diagnosticos}', ''), s.dx) AS diagnostico
-        FROM consultas c
-        JOIN pacientes p ON p.id = c.paciente_id
-        LEFT JOIN sigsa3 s ON s.consulta_id = c.id
-        WHERE c.fecha_consulta BETWEEN :desde AND :hasta
-          AND c.activo = true
+            r.paciente_id,
+            CASE WHEN cie.codigo IS NOT NULL
+                 THEN cie.codigo || COALESCE(' - ' || cie.descripcion, '')
+            END AS diagnostico
+        FROM sigsa3_registros r
+        JOIN pacientes p ON p.id = r.paciente_id
+        LEFT JOIN especialidades e ON e.id = r.especialidad_id
+        LEFT JOIN cie10_catalogo cie ON cie.id = r.codigo_cie_10_id
+        LEFT JOIN consultas c ON c.id = r.consulta_id
+        WHERE r.fecha_consulta BETWEEN :desde AND :hasta
           AND p.es_personal_hospital = 'S'
-        ORDER BY c.id
+        ORDER BY r.fecha_consulta, r.id
         LIMIT :limit OFFSET :skip
     """), {"desde": f_desde, "hasta": f_hasta, "limit": limit, "skip": skip}).fetchall()
 
@@ -220,10 +223,9 @@ def personal_hospital(db: Session, desde: str, hasta: str, skip: int = 0, limit:
 
     total = db.execute(text("""
         SELECT COUNT(*) AS total
-        FROM consultas c
-        JOIN pacientes p ON p.id = c.paciente_id
-        WHERE c.fecha_consulta BETWEEN :desde AND :hasta
-          AND c.activo = true
+        FROM sigsa3_registros r
+        JOIN pacientes p ON p.id = r.paciente_id
+        WHERE r.fecha_consulta BETWEEN :desde AND :hasta
           AND p.es_personal_hospital = 'S'
     """), {"desde": f_desde, "hasta": f_hasta}).scalar()
 
@@ -243,25 +245,28 @@ def estudiante_publico(db: Session, desde: str, hasta: str) -> dict:
     f_desde, f_hasta = _parse_fechas(desde, hasta)
 
     rows = db.execute(text("""
-        SELECT DISTINCT ON (c.id)
+        SELECT
             p.nombre,
             p.nombre_completo,
             p.expediente,
-            c.tipo_consulta,
+            r.tipo_consulta_id AS tipo_consulta,
             p.sexo,
             p.fecha_nacimiento,
-            c.fecha_consulta,
-            c.especialidad,
+            r.fecha_consulta,
+            COALESCE(e.nombre, '—') AS especialidad,
             c.documento,
-            c.paciente_id,
-            COALESCE(NULLIF(c.egreso#>>'{diagnosticos}', ''), s.dx) AS diagnostico
-        FROM consultas c
-        JOIN pacientes p ON p.id = c.paciente_id
-        LEFT JOIN sigsa3 s ON s.consulta_id = c.id
-        WHERE c.fecha_consulta BETWEEN :desde AND :hasta
-          AND c.activo = true
+            r.paciente_id,
+            CASE WHEN cie.codigo IS NOT NULL
+                 THEN cie.codigo || COALESCE(' - ' || cie.descripcion, '')
+            END AS diagnostico
+        FROM sigsa3_registros r
+        JOIN pacientes p ON p.id = r.paciente_id
+        LEFT JOIN especialidades e ON e.id = r.especialidad_id
+        LEFT JOIN cie10_catalogo cie ON cie.id = r.codigo_cie_10_id
+        LEFT JOIN consultas c ON c.id = r.consulta_id
+        WHERE r.fecha_consulta BETWEEN :desde AND :hasta
           AND p.es_estudiante_publico = 'S'
-        ORDER BY c.id
+        ORDER BY r.fecha_consulta, r.id
     """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
 
     datos = []
@@ -286,12 +291,20 @@ def estudiante_publico(db: Session, desde: str, hasta: str) -> dict:
             "paciente_id": str(m["paciente_id"])
         })
 
+    total = db.execute(text("""
+        SELECT COUNT(*)
+        FROM sigsa3_registros r
+        JOIN pacientes p ON p.id = r.paciente_id
+        WHERE r.fecha_consulta BETWEEN :desde AND :hasta
+          AND p.es_estudiante_publico = 'S'
+    """), {"desde": f_desde, "hasta": f_hasta}).scalar()
+
     return {
         "titulo": "Consultas de Estudiantes Públicos",
         "desde": f_desde,
         "hasta": f_hasta,
         "datos": datos,
-        "total_general": len(datos),
+        "total_general": int(total) if total else 0,
         "generado_en": datetime.now().isoformat(),
     }
 

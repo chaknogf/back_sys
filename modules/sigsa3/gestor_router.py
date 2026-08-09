@@ -111,9 +111,13 @@ def asociar_pacientes_masivo(
             if evento.get("step") == "error":
                 return {"error": evento.get("message", "Error en el pipeline")}
         return {"error": "no se ejecutó el pipeline"}
-    except Exception as e:
-        import traceback
-        return {"error": str(e), "traceback": traceback.format_exc()}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al ejecutar la asociación masiva SIGSA-3",
+        )
 
 
 @router.post("/asociar-pacientes-masivo-stream")

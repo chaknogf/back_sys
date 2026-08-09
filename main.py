@@ -70,6 +70,7 @@ from modules.personal_salud.router import router as personal_salud_router
 from modules.cie10.router import router as cie10_router
 from modules.defunciones.router import router as defunciones_router
 from modules.chat.router import router as chat_router
+from modules.agente.router import router as agente_router
 from modules.especialidades.router import router as especialidades_router
 
 app = FastAPI(
@@ -167,6 +168,7 @@ app.include_router(sigsa3_registros_router)
 app.include_router(cie10_router)
 app.include_router(defunciones_router)
 app.include_router(chat_router)
+app.include_router(agente_router)
 app.include_router(especialidades_router)
 
 

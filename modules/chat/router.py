@@ -15,7 +15,6 @@ from modules.chat.schemas import (
     TablaInfo,
 )
 from modules.chat.service import consultar, TABLAS_CONOCIDAS
-from core.config import CHAT_LLM_PROVIDER, CHAT_LLM_MODEL
 
 router = APIRouter(prefix="/chat", tags=["Chat Inteligente"])
 
@@ -46,10 +45,9 @@ def consulta_chat(
         respuesta=resultado.get("respuesta", ""),
         datos=resultado.get("datos", []),
         columnas=resultado.get("columnas", []),
-        sql_generado=resultado.get("sql_generado"),
         total_filas=resultado.get("total_filas", 0),
         ejecucion_ms=resultado.get("ejecucion_ms", 0),
-        modelo=resultado.get("modelo", f"{CHAT_LLM_PROVIDER}:{CHAT_LLM_MODEL}"),
+        modelo=resultado.get("modelo", "agente-rule"),
         error=resultado.get("error"),
         generado_en=datetime.now(timezone.utc),
     )

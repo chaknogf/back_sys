@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -38,6 +39,8 @@ def listar_prestamos(
     expediente: Optional[str] = Query(None),
     tipo_documento: Optional[str] = Query(None),
     nombre_paciente: Optional[str] = Query(None),
+    fecha_desde: Optional[date] = Query(None, description="Rango desde (YYYY-MM-DD)"),
+    fecha_hasta: Optional[date] = Query(None, description="Rango hasta (YYYY-MM-DD)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -46,7 +49,9 @@ def listar_prestamos(
     return service_listar(
         db=db, activo=activo, id_paciente=id_paciente,
         expediente=expediente, tipo_documento=tipo_documento,
-        nombre_paciente=nombre_paciente, skip=skip, limit=limit,
+        nombre_paciente=nombre_paciente,
+        fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+        skip=skip, limit=limit,
     )
 
 

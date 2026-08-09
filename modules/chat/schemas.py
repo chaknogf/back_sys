@@ -59,9 +59,6 @@ class ChatResponse(BaseModel):
         default_factory=list,
         description="Nombres de columnas del resultado",
     )
-    sql_generado: Optional[str] = Field(
-        None, description="SQL ejecutado",
-    )
     total_filas: int = Field(0, description="Número de filas")
     ejecucion_ms: int = Field(0, description="Tiempo de ejecución en ms")
     modelo: str = Field("", description="Modelo LLM usado")

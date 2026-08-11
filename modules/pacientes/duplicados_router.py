@@ -5,7 +5,7 @@ from typing import Literal
 from core.database import get_db
 from core.security import get_current_user
 from modules.users.models import UserModel
-from modules.common.vector_similarity import perfil, similitud_compuesta, tokenizar, tokens_equivalentes
+from modules.pacientes.duplicados_service import buscar_ids_duplicados
 
 router = APIRouter(
     prefix="/pacientes",
@@ -25,37 +25,11 @@ def pacientes_nombres_similares(
 ):
 
     if metodo == "vectorial":
-        # El motor vectorial se evalúa en Python sobre pares ya bloqueados en
-        # SQL por apellido, sexo y fecha; no se usa para fusionar registros.
-        pares = db.execute(text("""
-            SELECT
-                a.id AS id_a, a.nombre_completo AS nombre_a, a.expediente AS expediente_a,
-                a.cui AS cui_a, a.fecha_nacimiento AS fecha_nacimiento_a, a.sexo AS sexo_a,
-                b.id AS id_b, b.nombre_completo AS nombre_b, b.expediente AS expediente_b,
-                b.cui AS cui_b, b.fecha_nacimiento AS fecha_nacimiento_b, b.sexo AS sexo_b
-            FROM pacientes a
-            JOIN pacientes b ON a.id < b.id
-              AND lower(unaccent(COALESCE(a.nombre->>'primer_apellido', '')))
-                  = lower(unaccent(COALESCE(b.nombre->>'primer_apellido', '')))
-              AND (
-                  :incluir_fecha = false
-                  OR a.fecha_nacimiento = b.fecha_nacimiento
-                  OR a.fecha_nacimiento IS NULL
-                  OR b.fecha_nacimiento IS NULL
-              )
-              AND (a.sexo IS NULL OR b.sexo IS NULL OR a.sexo = b.sexo)
-            WHERE a.estado != 'I' AND b.estado != 'I'
-              AND a.nombre_completo IS NOT NULL AND b.nombre_completo IS NOT NULL
-        """), {"incluir_fecha": incluir_fecha_nacimiento}).mappings().all()
-
-        ids = set()
-        for par in pares:
-            tokens_a, tokens_b = tokenizar(par["nombre_a"]), tokenizar(par["nombre_b"])
-            score = 1.0 if tokens_equivalentes(tokens_a, tokens_b) else similitud_compuesta(
-                perfil(par["nombre_a"]), perfil(par["nombre_b"])
-            )
-            if score >= similitud_minima:
-                ids.update((par["id_a"], par["id_b"]))
+        # El motor vectorial se evalúa sobre pares ya bloqueados en SQL por
+        # apellido, sexo y fecha; la similitud la resuelve el servicio F5
+        # (motor Rust con fallback Python, pre-filtro F4.5 incluido).
+        # No se usa para fusionar registros.
+        ids = buscar_ids_duplicados(db, incluir_fecha_nacimiento, similitud_minima)
 
         resultados = db.execute(text("""
             SELECT id, nombre_completo AS nombre, expediente, cui, fecha_nacimiento, sexo

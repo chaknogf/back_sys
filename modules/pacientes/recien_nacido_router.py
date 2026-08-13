@@ -24,7 +24,9 @@ def calcular_edad(fecha_nacimiento: date) -> int:
 
 def construir_datos_extra_derivados(madre: PacienteModel) -> dict:
     madre_extra = madre.datos_extra or {}
-    madre_demo = madre_extra.get("demografico", {})
+    # ``demograficos`` is the canonical API key. Keep the singular spelling as
+    # a read-only fallback for records created by older versions.
+    madre_demo = madre_extra.get("demograficos") or madre_extra.get("demografico", {})
 
     idpersona_madre = None
     if madre.cui:
@@ -83,7 +85,8 @@ def crear_paciente_desde_madre(
         nombre_madre.get("segundo_apellido"),
     ]))
 
-    madre_demo = (madre.datos_extra or {}).get("demografico", {})
+    madre_extra = madre.datos_extra or {}
+    madre_demo = madre_extra.get("demograficos") or madre_extra.get("demografico", {})
     vecindad_madre = madre_demo.get("vecindad") or madre_demo.get("municipio")
 
     referencia_hijo = Referencia(

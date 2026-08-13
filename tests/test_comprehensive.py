@@ -433,6 +433,25 @@ class TestNormalizacionDatosExtra:
         finally:
             db.close()
 
+    def test_respuesta_paciente_conserva_vecindad_en_demograficos(self):
+        """La hidratación desde columnas no debe eliminar campos exclusivos de JSONB."""
+        from modules.pacientes.schemas import PacienteOut
+
+        paciente = PacienteOut.model_validate({
+            "id": 1,
+            "nombre": {"primer_nombre": "TEST", "primer_apellido": "VECINDAD"},
+            "nombre_completo": "TEST VECINDAD",
+            "datos_extra": {
+                "demograficos": {
+                    "idioma": 24,
+                    "vecindad": "0401",
+                }
+            },
+            "idioma_id": 24,
+        })
+
+        assert paciente.datos_extra["demograficos"]["vecindad"] == "0401"
+
 
 # =====================================================================
 # MEDICOS (public endpoints)

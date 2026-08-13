@@ -238,7 +238,12 @@ class PacienteOutConsulta(PacienteBase):
                 socio[key] = val
 
         if socio:
-            extra['socioeconomicos'] = socio
+            # Preserve fields that only live in JSONB when exposing normalized
+            # column values in the API response.
+            extra['socioeconomicos'] = {
+                **(extra.get('socioeconomicos') or {}),
+                **socio,
+            }
 
         demo = {}
         for col, key in [('idioma_id', 'idioma'), ('pueblo_id', 'pueblo'),
@@ -253,7 +258,13 @@ class PacienteOutConsulta(PacienteBase):
                 demo[key] = val
 
         if demo:
-            extra['demograficos'] = demo
+            # ``vecindad`` has no dedicated column. Replacing this object with
+            # only normalized columns made it disappear from the response and
+            # subsequent edits then persisted it as null.
+            extra['demograficos'] = {
+                **(extra.get('demograficos') or {}),
+                **demo,
+            }
 
         if isinstance(data, dict):
             data['datos_extra'] = extra

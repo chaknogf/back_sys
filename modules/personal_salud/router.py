@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from core.dependencies import get_db, get_current_user
 from modules.users.models import UserModel
@@ -19,13 +19,20 @@ router = APIRouter(
 )
 
 
-@router.get("", response_model=List[PersonalSaludOut])
 @router.get("/", response_model=List[PersonalSaludOut])
 def listar(
+    nombre: Optional[str] = Query(None, max_length=200, description="Filtro por nombre (búsqueda parcial)"),
+    especialidad_id: Optional[int] = Query(None, description="Filtro por especialidad"),
+    medico_id: Optional[int] = Query(None, description="Filtro por médico"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return service_listar(db)
+    return service_listar(
+        db,
+        nombre=nombre,
+        especialidad_id=especialidad_id,
+        medico_id=medico_id,
+    )
 
 
 @router.get("/{ps_id}", response_model=PersonalSaludOut)
@@ -37,7 +44,6 @@ def obtener(
     return service_obtener(ps_id, db)
 
 
-@router.post("", response_model=PersonalSaludOut, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=PersonalSaludOut, status_code=status.HTTP_201_CREATED)
 def crear(
     data: PersonalSaludCreate,

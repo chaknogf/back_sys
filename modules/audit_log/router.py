@@ -56,6 +56,10 @@ def listar_logs(
                 "registro_id": l.registro_id,
                 "endpoint": l.endpoint,
                 "metodo": l.metodo,
+                "ip_address": l.ip_address,
+                "so": l.so,
+                "nombre_equipo": l.nombre_equipo,
+                "user_agent": l.user_agent,
             }
             for l in logs
         ],

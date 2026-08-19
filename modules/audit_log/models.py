@@ -13,3 +13,7 @@ class AuditLogModel(Base):
     registro_id = Column(Integer, nullable=True)
     endpoint = Column(String(255), nullable=False)
     metodo = Column(String(10), nullable=False, default="GET")
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    so = Column(String(100), nullable=True)
+    nombre_equipo = Column(String(255), nullable=True)

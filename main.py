@@ -16,6 +16,7 @@ from core.exceptions import register_exception_handlers
 from core.limiter import limiter
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
+from modules.audit_log.middleware import AuditClientIPMiddleware
 
 
 @asynccontextmanager
@@ -131,6 +132,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(AuditClientIPMiddleware)
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=os.getenv("ALLOWED_HOSTS", "*").split(","),

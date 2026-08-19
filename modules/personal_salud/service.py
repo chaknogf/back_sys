@@ -11,8 +11,20 @@ def obtener_personal_salud(ps_id: int, db: Session) -> PersonalSaludModel:
     return registro
 
 
-def listar_personal_salud(db: Session) -> list:
-    return db.query(PersonalSaludModel).order_by(PersonalSaludModel.nombre).all()
+def listar_personal_salud(
+    db: Session,
+    nombre: str | None = None,
+    especialidad_id: int | None = None,
+    medico_id: int | None = None,
+) -> list:
+    query = db.query(PersonalSaludModel)
+    if nombre:
+        query = query.filter(PersonalSaludModel.nombre.ilike(f"%{nombre}%"))
+    if especialidad_id is not None:
+        query = query.filter(PersonalSaludModel.especialidad_id == especialidad_id)
+    if medico_id is not None:
+        query = query.filter(PersonalSaludModel.medico_id == medico_id)
+    return query.order_by(PersonalSaludModel.nombre).all()
 
 
 def crear_personal_salud(nombre: str, especialidad_id: int | None, medico_id: int | None, db: Session) -> PersonalSaludModel:

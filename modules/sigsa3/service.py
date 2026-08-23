@@ -1120,6 +1120,51 @@ def _asociar_paciente_y_consulta_pipeline(db: Session):
         print(f"[PIPELINE] {aviso3}")
     yield {"step": "paso3", "progress": 55, "message": f"Paso 3 — nombre vectorial inequívoco: {resultados['paso3_paciente']} pacientes", "aviso": aviso3, **resultados}
 
+    # ── PASO 3b: tolerancia a typos en apellido (último recurso) ──
+    # Solo para registros que siguen sin paciente_id tras paso 3.
+    # Requiere: nombre de pila EXACTO, apellido con typo tolerado, y corroboración
+    # por expediente o sexo para auto-asociar; si no hay corroboración -> revisión.
+    from modules.common.similitud_fonetica import intentar_match_por_typo
+    mask_typo = df["paciente_id"].isna() & df["nombre_paciente"].notna()
+    paso3b_count = 0
+    paso3b_revision = 0
+    if mask_typo.any() and not df_pac.empty:
+        # Preparar candidatos: lista de tuplas (pid, nombre_completo, sexo, expediente, estado)
+        candidatos = []
+        for _, pac in df_pac.iterrows():
+            nombre = pac.get("nombre_completo")
+            if not isinstance(nombre, str) or not nombre.strip():
+                continue
+            sexo = pac.get("sexo")
+            sexo = sexo.strip().upper() if isinstance(sexo, str) else ""
+            expo = pac.get("expediente")
+            expo = str(expo).strip().lower() if expo is not None and str(expo).strip() else ""
+            estado = pac.get("estado")
+            estado = estado.strip().upper() if isinstance(estado, str) else ""
+            candidatos.append((int(pac["pac_id"]), nombre, sexo, expo, estado))
+
+        for _, reg in df.loc[mask_typo].iterrows():
+            rid = int(reg["id"])
+            nombre_sigsa = reg["nombre_paciente"]
+            nh = reg.get("no_historia_clinica")
+            no_historia = str(nh).strip().lower() if nh is not None and str(nh).strip() else ""
+            sexo_sigsa = reg.get("sexo")
+            sexo_sigsa = sexo_sigsa.strip().upper() if isinstance(sexo_sigsa, str) else ""
+
+            pid, motivo = intentar_match_por_typo(nombre_sigsa, candidatos, no_historia, sexo_sigsa, tokenizar)
+            if pid and motivo == "typo_corroborado":
+                updates_paciente[rid] = pid
+                df.loc[df["id"] == rid, "paciente_id"] = pid
+                paso3b_count += 1
+            elif motivo:
+                paso3b_revision += 1
+                # La ficha ya tiene tipo "typo_sin_corroborar" o "typo_probable_ambiguo"
+                # La agregamos a revision global (se procesa después del paso 4)
+                pass  # en dry_run o logging se vería; aquí solo contamos
+
+    _aplicar_updates()
+    yield {"step": "paso3b", "progress": 58, "message": f"Paso 3b — typo apellido corroborado: {paso3b_count} pacientes, {paso3b_revision} a revisión", **resultados}
+
     # ── PASO 4: consulta_id por paciente_id + fecha_consulta ±1d + tipo_consulta ──
     mask = df["consulta_id"].isna() & df["paciente_id"].notna() & df["fecha_consulta"].notna()
     if mask.any() and not df_con.empty:

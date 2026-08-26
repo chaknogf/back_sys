@@ -63,6 +63,25 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_censo_camas_servicio_fecha
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_cie10_descripcion_trgm
     ON cie10_catalogo USING gin (descripcion gin_trgm_ops);
 
+-- 14. Función IMMUTABLE de unaccent (unaccent() es STABLE y no se puede indexar).
+--     Las queries de pacientes y consultas usan f_unaccent(lower(nombre_completo));
+--     la expresión del índice debe coincidir exactamente para que el planner la use.
+CREATE OR REPLACE FUNCTION public.f_unaccent(text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+STRICT
+PARALLEL SAFE
+AS $$
+    SELECT public.unaccent('public.unaccent', $1);
+$$;
+
+-- 15. GIN trigram sobre el nombre normalizado (lower + unaccent)
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_pacientes_nombre_norm_trgm
+    ON pacientes USING gin ((public.f_unaccent(lower(nombre_completo))) gin_trgm_ops);
+
+ANALYZE pacientes;
+
 COMMIT;
 
 -- Verificar índices creados

@@ -44,7 +44,7 @@ def normalizar_metadatos(paciente):
             m["registro"] = m["registro"].isoformat()
 
 
-nombre_completo_col = func.unaccent(func.lower(PacienteModel.nombre_completo))
+nombre_completo_col = func.f_unaccent(func.lower(PacienteModel.nombre_completo))
 
 
 def filtro_nombre_campo(campo: str, valor: str):

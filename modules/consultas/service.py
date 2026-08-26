@@ -7,6 +7,7 @@ from typing import Optional, List
 from datetime import datetime, date, time, timedelta
 
 from modules.pacientes.models import PacienteModel
+from modules.pacientes.service import quitar_tildes
 from modules.consultas.models import ConsultaModel, ConsultaHistorialModel
 from modules.ciclos.models import CiclosConsulta
 from modules.laboratorios.models import Laboratorios
@@ -112,28 +113,15 @@ def buscar_consultas_activas(
     if cui is not None:
         query = query.filter(PacienteModel.cui == cui)
 
-    if primer_nombre:
+    palabras_nombre = [
+        p.strip()
+        for p in (primer_nombre, segundo_nombre, primer_apellido, segundo_apellido)
+        if p and p.strip()
+    ]
+    if palabras_nombre:
+        col = func.f_unaccent(func.lower(PacienteModel.nombre_completo))
         query = query.filter(
-            cast(PacienteModel.nombre["primer_nombre"], String)
-            .ilike(f"%{primer_nombre}%")
-        )
-
-    if segundo_nombre:
-        query = query.filter(
-            cast(PacienteModel.nombre["segundo_nombre"], String)
-            .ilike(f"%{segundo_nombre}%")
-        )
-
-    if primer_apellido:
-        query = query.filter(
-            cast(PacienteModel.nombre["primer_apellido"], String)
-            .ilike(f"%{primer_apellido}%")
-        )
-
-    if segundo_apellido:
-        query = query.filter(
-            cast(PacienteModel.nombre["segundo_apellido"], String)
-            .ilike(f"%{segundo_apellido}%")
+            *[col.ilike(f"%{quitar_tildes(p)}%") for p in palabras_nombre]
         )
 
     from sqlalchemy import func as sa_func

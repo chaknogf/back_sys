@@ -690,9 +690,10 @@ def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes):
     3. Homónimo exacto (2+ pacientes): se desambigua por número de historia
        exacto o por sexo; si quedan varios → zona gris (reportado, y se marca
        como posible duplicado de pacientes).
-    4. Submatch por apellido de casada/abreviado (firma ⊆ paciente, 1-2
-       tokens): candidato único con score combinado ≥ zona match → asocia,
-       aunque el expediente de SIGSA-3 esté desactualizado.
+    4. Submatch por apellido de casada/abreviado (firma ⊆ paciente o
+       paciente ⊆ firma, diferencia de 1-2 tokens): candidato único con
+       score combinado ≥ zona match → asocia, aunque el expediente de
+       SIGSA-3 esté desactualizado.
     5. Excluye coincidencias de parentesco (HIJO/HIJA/HO/) y todo caso dudoso
        se enumera en 'revision' para revisión humana (zona gris/minimizar FP).
     """
@@ -785,12 +786,23 @@ def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes):
             s = sig_con_token[token]
             sigs_cand = s if sigs_cand is None else (sigs_cand & s)
         if not sigs_cand:
+            # Dirección inversa: el registro trae tokens que el paciente no
+            # (p.ej. apellido de casada 'DE LEÓN' solo en SIGSA-3). Busca firmas
+            # contenidas en la firma del registro, partiendo del token más raro
+            # para no barrer todo el corpus.
+            raro = min(set(firma), key=lambda t: idf.get(t, 1.0))
+            sigs_cand = {
+                key for key in sig_con_token[raro]
+                if len(key) < len(firma) <= len(key) + 2 and set(key) < set(firma)
+            }
+        if not sigs_cand:
             continue
         candidatos = []
         for key in sigs_cand:
-            if len(key) == len(firma) or len(key) - len(firma) > 2:
+            dif = len(key) - len(firma)
+            if dif == 0 or abs(dif) > 2:
                 continue
-            if not set(firma) <= set(key):
+            if not (set(firma) <= set(key) or set(key) <= set(firma)):
                 continue
             candidatos.extend(por_sign[key])
         by_nombre: dict[str, set] = defaultdict(set)  # nombre -> set(pid)

@@ -154,12 +154,13 @@ def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50)
 
     q = filters.get("q")
     if q:
-        palabras = [quitar_tildes(p) for p in q.split() if p.strip()]
+        termino = q.strip()
+        palabras = [quitar_tildes(p) for p in termino.split() if p.strip()]
         filtros_nombre = [nombre_completo_col.ilike(f"%{palabra}%") for palabra in palabras]
         query = query.filter(
             or_(
-                cast(PacienteModel.cui, String).ilike(f"%{q.strip()}%"),
-                PacienteModel.expediente.ilike(f"%{q.strip()}%"),
+                cast(PacienteModel.cui, String).ilike(f"%{termino}%"),
+                PacienteModel.expediente.ilike(f"%{termino}%"),
                 and_(*filtros_nombre)
             )
         )

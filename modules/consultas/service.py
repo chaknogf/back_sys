@@ -119,7 +119,7 @@ def buscar_consultas_activas(
         if p and p.strip()
     ]
     if palabras_nombre:
-        col = func.f_unaccent(func.lower(PacienteModel.nombre_completo))
+        col = func.unaccent(func.lower(PacienteModel.nombre_completo))
         query = query.filter(
             *[col.ilike(f"%{quitar_tildes(p)}%") for p in palabras_nombre]
         )

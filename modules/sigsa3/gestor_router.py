@@ -9,7 +9,11 @@ import json
 
 from core.dependencies import get_db, get_current_user, get_current_admin_user
 from modules.users.models import UserModel
-from .schemas import Sigsa3Out, Sigsa3RegistroOut
+from .schemas import (
+    Sigsa3Out, Sigsa3RegistroOut, PendienteDetalle,
+    ResolverPendienteRequest, ResolverPendienteResponse,
+    ClusterDuplicado, MergeDuplicadosRequest, MergeDuplicadosResponse,
+)
 from .service import (
     eliminar_por_periodo,
     sincronizar_sigsa3,
@@ -17,6 +21,11 @@ from .service import (
     importar_excel_csv,
     asociar_paciente,
     listar_no_asociados,
+    listar_pendientes_detalle,
+    resolver_pendiente,
+    detectar_duplicados,
+    merge_duplicados_sigsa3,
+    crear_indices_sigsa3,
     exportar_csv,
     normalizar as service_normalizar,
 )
@@ -64,6 +73,65 @@ def no_asociados(
     return listar_no_asociados(db, limit)
 
 
+@router.get("/pendientes-detalle", response_model=List[PendienteDetalle])
+def pendientes_detalle(
+    limit: int = Query(50, le=200),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Registros SIGSA-3 sin paciente_id, con top 5 candidatos y scores para revisión humana."""
+    return listar_pendientes_detalle(db, limit)
+
+
+@router.post("/resolver-pendiente", response_model=ResolverPendienteResponse)
+def resolver(
+    data: ResolverPendienteRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Asocia manualmente un paciente a un registro SIGSA-3 pendiente."""
+    return resolver_pendiente(db, data.sigsa3_id, data.paciente_id)
+
+
+@router.get("/duplicados", response_model=List[ClusterDuplicado])
+def duplicados(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Detecta clusters de pacientes con el mismo nombre (duplicados potenciales).
+    Retorna clusters ordenados por impacto (más registros SIGSA-3 pendientes primero)."""
+    return detectar_duplicados(db)
+
+
+@router.post("/merge-duplicados", response_model=MergeDuplicadosResponse)
+def merge_duplicados(
+    data: MergeDuplicadosRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Fusiona pacientes duplicados, reasignando consultas, SIGSA-3, citas,
+    defunciones y nacimientos al paciente principal. Los duplicados se desactivan."""
+    return merge_duplicados_sigsa3(
+        db, data.principal_id, data.duplicado_ids, data.reasignar_sigsa3
+    )
+
+
+@router.post("/crear-indices")
+def crear_indices(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_admin_user),
+):
+    """Crea índices de BD recomendados para acelerar el pipeline. Ejecutar una sola vez."""
+    return crear_indices_sigsa3(db)
+
+
+@router.get("/cache-stats")
+def cache_stats():
+    """Estadísticas del cache vectorial de nombres."""
+    from modules.common.vector_cache import get_vector_cache
+    return get_vector_cache().stats()
+
+
 @router.get("/exportar-csv")
 def exportar_csv_endpoint(
     db: Session = Depends(get_db),
@@ -100,11 +168,15 @@ def sincronizar_medico_especialidad(
 
 @router.post("/asociar-pacientes-masivo")
 def asociar_pacientes_masivo(
+    umbral_submatch: float = Query(None, ge=0.5, le=1.0, description="Mínimo score nombre para auto-asociar (default 0.82)"),
+    zona_match: float = Query(None, ge=0.5, le=1.0, description="Score >= este valor → match automático (default 0.85)"),
+    zona_revision: float = Query(None, ge=0.5, le=1.0, description="Score >= este valor → zona gris (default 0.70)"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
     try:
-        gen = asociar_paciente_y_consulta(db)
+        gen = asociar_paciente_y_consulta(db, umbral_submatch=umbral_submatch,
+                                          zona_match=zona_match, zona_revision=zona_revision)
         for evento in gen:
             if evento.get("step") == "done":
                 return evento
@@ -122,11 +194,15 @@ def asociar_pacientes_masivo(
 
 @router.post("/asociar-pacientes-masivo-stream")
 def asociar_pacientes_masivo_stream(
+    umbral_submatch: float = Query(None, ge=0.5, le=1.0, description="Mínimo score nombre para auto-asociar (default 0.82)"),
+    zona_match: float = Query(None, ge=0.5, le=1.0, description="Score >= este valor → match automático (default 0.85)"),
+    zona_revision: float = Query(None, ge=0.5, le=1.0, description="Score >= este valor → zona gris (default 0.70)"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
     def _eventos():
-        for evento in asociar_paciente_y_consulta(db):
+        for evento in asociar_paciente_y_consulta(db, umbral_submatch=umbral_submatch,
+                                                   zona_match=zona_match, zona_revision=zona_revision):
             yield f"data: {json.dumps(evento, default=str)}\n\n"
 
     return StreamingResponse(_eventos(), media_type="text/event-stream")

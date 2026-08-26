@@ -33,7 +33,7 @@ engine = create_engine(
     pool_recycle=DB_POOL_RECYCLE,
     connect_args={
         "connect_timeout": 10,
-        "options": "-c client_encoding=UTF8"
+        "options": "-c client_encoding=UTF8 -c statement_timeout=300000"
     }
 )
 

@@ -20,9 +20,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
 # Número de workers para producción (uvicorn/gunicorn)
 WORKERS_PER_NODE = int(os.getenv("WORKERS", "4"))
 # Pool de conexiones por worker (pool_size * workers <= max_connections de PostgreSQL)
-DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "10"))
-DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "20"))
-DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "300"))
+DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "20"))
+DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "40"))
+DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "3600"))
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 

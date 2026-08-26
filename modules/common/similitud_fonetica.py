@@ -233,6 +233,7 @@ def intentar_match_por_typo(
     no_historia_sigsa: str,
     sexo_sigsa: str,
     tokenizar_fn,
+    pacientes_pre_tokenizados: dict = None,  # {pid: (tokens_sorted_list, nombre, sexo, expo, estado)}
 ):
     """
     Último recurso: se llama SOLO cuando el match exacto y el submatch por
@@ -242,6 +243,8 @@ def intentar_match_por_typo(
         (pid, motivo) si hay corroboración suficiente -> puede ir a asociaciones
         (None, ficha_revision) si es solo sospecha -> va a revision, no a match directo
         (None, None) si no hay candidatos
+
+    Si se provee pacientes_pre_tokenizados, se usa en vez de tokenizar cada nombre.
     """
     tokens_sigsa = tokenizar_fn(nombre_sigsa)
     if len(tokens_sigsa) < 2:
@@ -250,23 +253,44 @@ def intentar_match_por_typo(
     # Heurística simple: último token = apellido principal
     # (el tokenizar ya elimina stopwords, así que el último suele ser el apellido)
     nombre_sigsa_tokens, apellido_sigsa = tokens_sigsa[:-1], [tokens_sigsa[-1]]
+    sorted_nombre_sigsa = tuple(sorted(nombre_sigsa_tokens))
 
     mejores = []
-    for pid, nombre_pac, sexo_pac, expo_pac, estado_pac in candidatos_pacientes:
-        tokens_pac = tokenizar_fn(nombre_pac)
-        if len(tokens_pac) < 2:
-            continue
-        nombre_pac_tokens, apellido_pac = tokens_pac[:-1], [tokens_pac[-1]]
+    if pacientes_pre_tokenizados is not None:
+        # Modo batch: buscar por nombre de pila exacto primero, luego verificar typo
+        # agrupar candidatos por nombre de pila (tokens sorted)
+        # El pre-tokenizado tiene pid -> (tokens_sorted, nombre, sexo, expo, estado)
+        for pid, (tokens_pac_tuple, nombre_pac, sexo_pac, expo_pac, estado_pac) in pacientes_pre_tokenizados.items():
+            if len(tokens_pac_tuple) < 2:
+                continue
+            nombre_pac_tokens = list(tokens_pac_tuple[:-1])
+            apellido_pac = [tokens_pac_tuple[-1]]
 
-        # 1) El nombre de pila debe ser EXACTO (no fuzzy) -> evita Maria/Marta
-        if sorted(nombre_sigsa_tokens) != sorted(nombre_pac_tokens):
-            continue
+            # 1) El nombre de pila debe ser EXACTO (no fuzzy) -> evita Maria/Marta
+            if tuple(sorted(nombre_pac_tokens)) != sorted_nombre_sigsa:
+                continue
 
-        # 2) El apellido puede tener typo
-        if not _es_apellido_probable_typo(apellido_sigsa, apellido_pac):
-            continue
+            # 2) El apellido puede tener typo
+            if not _es_apellido_probable_typo(apellido_sigsa, apellido_pac):
+                continue
 
-        mejores.append((pid, nombre_pac, sexo_pac, expo_pac, estado_pac))
+            mejores.append((pid, nombre_pac, sexo_pac, expo_pac, estado_pac))
+    else:
+        for pid, nombre_pac, sexo_pac, expo_pac, estado_pac in candidatos_pacientes:
+            tokens_pac = tokenizar_fn(nombre_pac)
+            if len(tokens_pac) < 2:
+                continue
+            nombre_pac_tokens, apellido_pac = tokens_pac[:-1], [tokens_pac[-1]]
+
+            # 1) El nombre de pila debe ser EXACTO (no fuzzy) -> evita Maria/Marta
+            if sorted(nombre_pac_tokens) != sorted_nombre_sigsa:
+                continue
+
+            # 2) El apellido puede tener typo
+            if not _es_apellido_probable_typo(apellido_sigsa, apellido_pac):
+                continue
+
+            mejores.append((pid, nombre_pac, sexo_pac, expo_pac, estado_pac))
 
     if not mejores:
         return None, None

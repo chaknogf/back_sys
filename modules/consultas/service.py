@@ -300,6 +300,8 @@ def registrar_consulta(datos: RegistroConsultaCreate, db: Session, current_user)
         "arma_blanca": indicadores_dict.get("arma_blanca", False),
         "ambulancia": indicadores_dict.get("ambulancia", False),
         "embarazo": indicadores_dict.get("embarazo", False),
+        "viene_referido": indicadores_dict.get("viene_referido"),
+        "fue_referido": indicadores_dict.get("fue_referido"),
     }
 
     hoy = date.today()

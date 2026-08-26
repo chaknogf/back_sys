@@ -20,6 +20,8 @@ class Indicador(BaseModel):
     arma_blanca: Optional[bool] = None
     ambulancia: Optional[bool] = None
     embarazo: Optional[bool] = None
+    viene_referido: Optional[str] = None
+    fue_referido: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

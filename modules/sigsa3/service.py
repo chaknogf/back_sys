@@ -634,6 +634,13 @@ CASTIGO_SEXO_CONFLICTO = -0.50     # sexo divergente: evidencia en contra (madre
 ZONA_MATCH = 0.85                  # score ≥ 0.85 → match automático
 ZONA_REVISION = 0.70               # 0.70 ≤ score < 0.85 → zona gris, revisión humana
 
+# Configurable desde request; valores por defecto preservan el comportamiento actual
+_UMBRALES_DEFAULT = {
+    "umbral_submatch": _UMBRAL_SUBMATCH,
+    "zona_match": ZONA_MATCH,
+    "zona_revision": ZONA_REVISION,
+}
+
 
 def _evidencia_expediente(no_historia: str, expediente: str) -> float:
     """Igualdad exacta (normalizada) de número de historia: la evidencia más
@@ -680,7 +687,8 @@ def _es_relacion_familiar(nombre_a: str, nombre_b: str) -> bool:
     return kin(nombre_a) != kin(nombre_b)
 
 
-def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes):
+def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes,
+                                            umbral_submatch=None, zona_match_override=None):
     """Devuelve (asociaciones, revision).
 
     Record linkage SIGSA-3 → pacientes, discriminando por evidencia combinada:
@@ -688,15 +696,20 @@ def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes):
     2. Identidad exacta: un único paciente → match (aunque el sexo discrepe, se
        reporta para corregir el dato).
     3. Homónimo exacto (2+ pacientes): se desambigua por número de historia
-       exacto o por sexo; si quedan varios → zona gris (reportado, y se marca
-       como posible duplicado de pacientes).
+       exacto, por sexo, o por score combinado con margen mínimo.
     4. Submatch por apellido de casada/abreviado (firma ⊆ paciente o
        paciente ⊆ firma, diferencia de 1-2 tokens): candidato único con
        score combinado ≥ zona match → asocia, aunque el expediente de
        SIGSA-3 esté desactualizado.
     5. Excluye coincidencias de parentesco (HIJO/HIJA/HO/) y todo caso dudoso
        se enumera en 'revision' para revisión humana (zona gris/minimizar FP).
+
+    Parámetros opcionales:
+    - umbral_submatch: mínimo score de nombre para auto-asociar (default _UMBRAL_SUBMATCH)
+    - zona_match_override: score >= este valor → match automático (default ZONA_MATCH)
     """
+    _umbral = umbral_submatch if umbral_submatch is not None else _UMBRAL_SUBMATCH
+    _zona_match = zona_match_override if zona_match_override is not None else ZONA_MATCH
     from collections import defaultdict
 
     por_sign: dict[tuple, list] = defaultdict(list)   # firma -> [(pid, nombre, sexo, exp)]
@@ -720,17 +733,21 @@ def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes):
             sig_con_token[token].add(firma)
         corpus.append(firma)
     idf = idf_por_token(corpus)
-    perfiles: dict[str, tuple] = {}
 
     asociaciones: dict[int, int] = {}
     revision: list[dict] = []
 
+    from modules.common.vector_cache import get_vector_cache
+    _cache = get_vector_cache()
+
     def _perfil(nombre):
-        perfil = perfiles.get(nombre)
-        if perfil is None:
-            perfil = (tokenizar(nombre), pesado_por_idf(tokenizar(nombre), idf))
-            perfiles[nombre] = perfil
-        return perfil
+        cached = _cache.get(nombre)
+        if cached:
+            return cached
+        tokens = tokenizar(nombre)
+        pesos = pesado_por_idf(tokens, idf)
+        _cache.set(nombre, tokens, pesos)
+        return (tokens, pesos)
 
     def _ficha(rid, **campos):
         campos.setdefault("sigsa3_id", rid)
@@ -739,7 +756,11 @@ def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes):
     pendientes = df_sigsa[
         df_sigsa["paciente_id"].isna() & df_sigsa["nombre_paciente"].notna()
     ]
-    for _, registro in pendientes.iterrows():
+    total_pend = len(pendientes)
+    _log_cada = max(500, total_pend // 10)  # log cada 10% o 500 registros
+    for idx, (_, registro) in enumerate(pendientes.iterrows()):
+        if idx % _log_cada == 0:
+            print(f"  [Paso 3] progreso: {idx}/{total_pend} ({len(asociaciones)} asociados, {len(revision)} revisión)")
         nombre_sigsa = registro["nombre_paciente"]
         tokens = tokenizar(nombre_sigsa)
         if len(tokens) < 2:
@@ -763,22 +784,53 @@ def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes):
             continue
 
         if len(ident) > 1:
+            # Estrategia 1: expediente exacto desambigua
             por_hist = [c for c in ident if _evidencia_expediente(no_historia, c[3]) == PESO_EXPEDIENTE_COINCIDE]
             if len(por_hist) == 1:
                 asociaciones[rid] = por_hist[0][0]
                 continue
+
+            # Estrategia 2: estado (V/F) único desambigua
             por_estado = [c for c in ident if c[4] in ("V", "F")]
             if len(por_estado) == 1:
                 asociaciones[rid] = por_estado[0][0]
                 continue
+
+            # Estrategia 3: sexo coincide y deja solo 1 candidato
             por_sex = [c for c in ident if not sexo_sigsa or not c[2] or sexo_sigsa == c[2]]
             por_sex = [c for c in por_sex if c[4] in ("V", "F")] or por_sex
             if len(por_sex) == 1:
                 asociaciones[rid] = por_sex[0][0]
                 continue
+
+            # Estrategia 4: score combinado SOLO si hay datos diferenciadores
+            # (sexo o expediente con valores reales). Si todos los candidatos
+            # tienen sexo='' y expediente='', el score será idéntico → margen=0,
+            # no hay ganador → saltar directo a revisión.
+            tiene_datos = bool(
+                (sexo_sigsa and any(c[2] for c in ident))
+                or (no_historia and any(c[3] for c in ident))
+            )
+            if tiene_datos and len(ident) <= 3:
+                candidatos_score = []
+                for c in ident:
+                    pid_c, _, sexo_pac, expo_pac, _est = c
+                    sc = _score_combinado(1.0, no_historia, expo_pac, sexo_sigsa, sexo_pac)
+                    candidatos_score.append((sc, pid_c, c[1]))
+                candidatos_score.sort(reverse=True)
+                if len(candidatos_score) >= 2:
+                    margen = candidatos_score[0][0] - candidatos_score[1][0]
+                    if margen >= 0.10:
+                        asociaciones[rid] = candidatos_score[0][1]
+                        continue
+
             _ficha(rid, tipo="homonimo", nombre_sigsa=nombre_sigsa,
                    sexo_sigsa=sexo_sigsa,
-                   pacientes=sorted({c[1] for c in ident if c[4] in ("V", "F")}))
+                   pacientes=sorted({c[1] for c in ident if c[4] in ("V", "F")}),
+                   candidatos=[{
+                       "pac_id": c[0], "nombre": c[1], "sexo": c[2],
+                       "expediente": c[3], "estado": c[4]
+                   } for c in ident])
             continue
 
         sigs_cand = None
@@ -812,6 +864,13 @@ def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes):
         unicos = [n for n in unicos if not _es_relacion_familiar(nombre_sigsa, n)]
         if not unicos:
             continue
+        # Limitar a top-20 candidatos por IDF (evita barrer cientos de nombres)
+        if len(unicos) > 20:
+            tokens_set = set(tokens)
+            def _idf_sum(nombre):
+                return sum(idf.get(t, 1.0) for t in tokenizar(nombre) if t in tokens_set)
+            unicos.sort(key=_idf_sum, reverse=True)
+            unicos = unicos[:20]
         pesos = pesado_por_idf(tokens, idf)
         puntuados = []
         for nombre in unicos:
@@ -826,7 +885,7 @@ def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes):
         score = _score_combinado(mejor_score, no_historia, expo_pac, sexo_sigsa, sexo_pac)
         zona = _zona_decision(score)
 
-        if mejor_score >= _UMBRAL_SUBMATCH or zona == "match":
+        if mejor_score >= _umbral or zona == "match":
             if sexo_sigsa and sexo_pac and sexo_sigsa != sexo_pac:
                 _ficha(rid, tipo="sexo_discrepante", nombre_sigsa=nombre_sigsa,
                        sexo_sigsa=sexo_sigsa, nombre_paciente=mejor_nombre,
@@ -836,6 +895,9 @@ def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes):
             _ficha(rid, tipo="submatch_bajo_score", nombre_sigsa=nombre_sigsa,
                    nombre_paciente=mejor_nombre, score=round(score, 3),
                    zona=zona,
+                   pac_id=pid,
+                   expediente_sigsa=no_historia, expediente_paciente=expo_pac,
+                   sexo_sigsa=sexo_sigsa, sexo_paciente=sexo_pac,
                    evolucion={
                        "nombre": round(mejor_score, 3),
                        "expediente": _evidencia_expediente(no_historia, expo_pac),
@@ -971,9 +1033,131 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
     }
 
 
-def asociar_paciente_y_consulta(db: Session):
+# =====================================================================
+# OPTIMIZACIONES: batch updates, índices dict, cache
+# =====================================================================
+
+def _actualizar_batch_sql(
+    db: Session,
+    updates: dict,
+    campo: str,
+    tabla: str = "sigsa3",
+    batch_size: int = 5000,
+) -> int:
+    """Actualiza en lotes usando CASE-WHEN en lugar de N UPDATEs individuales.
+    Reduce 50K updates individuales a ~10 queries batch."""
+    if not updates:
+        return 0
+
+    items = list(updates.items())
+    total_actualizados = 0
+
+    for batch_start in range(0, len(items), batch_size):
+        batch = items[batch_start:batch_start + batch_size]
+        when_clauses = " ".join(
+            f"WHEN {rid} THEN {pid}" for rid, pid in batch
+        )
+        ids_batch = [rid for rid, _ in batch]
+        result = db.execute(
+            text(f"""
+                UPDATE {tabla}
+                SET {campo} = CASE id {when_clauses} ELSE {campo} END
+                WHERE id = ANY(:ids)
+            """),
+            {"ids": ids_batch},
+        )
+        total_actualizados += result.rowcount
+
+    db.commit()
+    return total_actualizados
+
+
+def _construir_indice_consultas(df_con):
+    """Construye índices dict para búsquedas O(1) en pasos 4-6.
+    Reemplaza pandas.concat+merge (lento) por dict lookup."""
+    import pandas as pd
+
+    idx_pac_fecha = {}
+    idx_doc_fecha = {}
+
+    for _, con in df_con.iterrows():
+        fecha = pd.Timestamp(con["fecha_consulta"]).date() if pd.notna(con["fecha_consulta"]) else None
+
+        if fecha and pd.notna(con.get("paciente_id")):
+            k = (int(con["paciente_id"]), fecha)
+            if k not in idx_pac_fecha:
+                idx_pac_fecha[k] = []
+            idx_pac_fecha[k].append(con)
+
+        doc = con.get("documento")
+        if fecha and doc and pd.notna(doc):
+            k = (str(doc).strip(), fecha)
+            if k not in idx_doc_fecha:
+                idx_doc_fecha[k] = []
+            idx_doc_fecha[k].append(con)
+
+    return idx_pac_fecha, idx_doc_fecha
+
+
+# SQL de índices recomendados para la BD
+INDICES_SQL = """
+CREATE INDEX IF NOT EXISTS idx_sigsa3_nombre_paciente
+  ON sigsa3(nombre_paciente COLLATE "C")
+  WHERE nombre_paciente IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_sigsa3_no_historia_clinica
+  ON sigsa3(no_historia_clinica COLLATE "C")
+  WHERE no_historia_clinica IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_sigsa3_paciente_id
+  ON sigsa3(paciente_id) WHERE paciente_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_sigsa3_consulta_id
+  ON sigsa3(consulta_id) WHERE consulta_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_sigsa3_fecha_consulta
+  ON sigsa3(fecha_consulta);
+CREATE INDEX IF NOT EXISTS idx_pacientes_nombre_completo
+  ON pacientes(nombre_completo COLLATE "C")
+  WHERE nombre_completo IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_pacientes_expediente
+  ON pacientes(expediente COLLATE "C")
+  WHERE expediente IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_pacientes_estado ON pacientes(estado);
+CREATE INDEX IF NOT EXISTS idx_consultas_paciente_id ON consultas(paciente_id);
+CREATE INDEX IF NOT EXISTS idx_consultas_documento_fecha
+  ON consultas(documento COLLATE "C", fecha_consulta)
+  WHERE documento IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_consultas_tipo_consulta ON consultas(tipo_consulta);
+CREATE INDEX IF NOT EXISTS idx_sigsa3_registros_paciente_id ON sigsa3_registros(paciente_id);
+CREATE INDEX IF NOT EXISTS idx_sigsa3_registros_fecha ON sigsa3_registros(fecha_consulta);
+CREATE INDEX IF NOT EXISTS idx_sigsa3_registros_sigsa3_id
+  ON sigsa3_registros(sigsa3_id) WHERE sigsa3_id IS NOT NULL;
+"""
+
+
+def crear_indices_sigsa3(db: Session) -> dict:
+    """Crea todos los índices recomendados. Ejecutar una sola vez."""
+    created = []
+    for stmt in INDICES_SQL.split(";"):
+        stmt = stmt.strip()
+        if not stmt:
+            continue
+        idx_name = None
+        for part in stmt.split():
+            if part.upper().startswith("IDX_"):
+                idx_name = part
+                break
+        try:
+            db.execute(text(stmt))
+            created.append(idx_name or stmt[:40])
+        except Exception as e:
+            created.append(f"{idx_name}: {e}")
+    db.commit()
+    return {"indices_creados": created}
+
+
+def asociar_paciente_y_consulta(db: Session, umbral_submatch: float = None,
+                                zona_match: float = None, zona_revision: float = None):
     """Ejecuta el pipeline en exclusión mutua para evitar asociaciones
-    concurrentes sobre los mismos registros SIGSA-3."""
+    concurrentes sobre los mismos registros SIGSA-3.
+    Parámetros opcionales permiten ajustar umbrales de decisión."""
     bloqueado = db.execute(
         text("SELECT pg_try_advisory_lock(hashtext('sigsa3_asociar_pacientes_masivo'))")
     ).scalar()
@@ -983,12 +1167,16 @@ def asociar_paciente_y_consulta(db: Session):
             detail="Ya hay una asociación masiva SIGSA-3 en ejecución",
         )
     try:
-        yield from _asociar_paciente_y_consulta_pipeline(db)
+        yield from _asociar_paciente_y_consulta_pipeline(
+            db, umbral_submatch=umbral_submatch,
+            zona_match=zona_match, zona_revision=zona_revision
+        )
     finally:
         db.execute(text("SELECT pg_advisory_unlock(hashtext('sigsa3_asociar_pacientes_masivo'))"))
 
 
-def _asociar_paciente_y_consulta_pipeline(db: Session):
+def _asociar_paciente_y_consulta_pipeline(db: Session, umbral_submatch: float = None,
+                                          zona_match: float = None, zona_revision: float = None):
     """Pipeline completo usando pandas para asociación masiva.
     Generador que yield eventos de progreso como dicts.
     1. nombre_paciente = nombre_completo AND no_historia_clinica = expediente → paciente_id
@@ -999,7 +1187,16 @@ def _asociar_paciente_y_consulta_pipeline(db: Session):
     5. no_historia_clinica = documento + fecha ±1d → consulta_id (+ paciente_id si faltaba)
     6a. paciente_id + fecha ±1d (cualquier tipo) → consulta_id (rezagados)
     6b. reservado para revisión humana: no se autoasocian nombres ambiguos.
+
+    Umbrales opcionales (override de los valores por defecto):
+    - umbral_submatch: mínimo score de nombre para auto-asociar (default 0.82)
+    - zona_match: score >= este valor → match automático (default 0.85)
+    - zona_revision: score >= este valor → zona gris (default 0.70)
     """
+    # Aplicar overrides de umbrales si se proporcionaron
+    _umbral_submatch = umbral_submatch if umbral_submatch is not None else _UMBRAL_SUBMATCH
+    _zona_match = zona_match if zona_match is not None else ZONA_MATCH
+    _zona_revision = zona_revision if zona_revision is not None else ZONA_REVISION
     import pandas as pd
     from datetime import datetime
     from sqlalchemy import text
@@ -1111,7 +1308,9 @@ def _asociar_paciente_y_consulta_pipeline(db: Session):
     )
 
     # ── PASO 3: nombre vectorial; solo candidatos inequívocos ──
-    paso3, revision = _asociar_pacientes_por_nombre_vectorial(df, df_pac)
+    paso3, revision = _asociar_pacientes_por_nombre_vectorial(
+        df, df_pac, umbral_submatch=_umbral_submatch, zona_match_override=_zona_match
+    )
     for rid, pid in paso3.items():
         updates_paciente[rid] = pid
         df.loc[df["id"] == rid, "paciente_id"] = pid
@@ -1129,7 +1328,10 @@ def _asociar_paciente_y_consulta_pipeline(db: Session):
             f"Expediente desactualizado o nombre ambiguo; ej: {ejemplos}. "
             f"Los homónimos exactos suelen ser pacientes duplicados (merge)."
         )
-        print(f"[PIPELINE] {aviso3}")
+        try:
+            print(f"[PIPELINE] {aviso3}")
+        except UnicodeEncodeError:
+            print(f"[PIPELINE] {len(revision)} pendientes para revisar")
     yield {"step": "paso3", "progress": 55, "message": f"Paso 3 — nombre vectorial inequívoco: {resultados['paso3_paciente']} pacientes", "aviso": aviso3, **resultados}
 
     # ── PASO 3b: tolerancia a typos en apellido (último recurso) ──
@@ -1140,20 +1342,34 @@ def _asociar_paciente_y_consulta_pipeline(db: Session):
     mask_typo = df["paciente_id"].isna() & df["nombre_paciente"].notna()
     paso3b_count = 0
     paso3b_revision = 0
-    if mask_typo.any() and not df_pac.empty:
-        # Preparar candidatos: lista de tuplas (pid, nombre_completo, sexo, expediente, estado)
-        candidatos = []
-        for _, pac in df_pac.iterrows():
-            nombre = pac.get("nombre_completo")
-            if not isinstance(nombre, str) or not nombre.strip():
+
+    # Pre-tokenizar pacientes una vez: {pid: (tokens_sorted_tuple, nombre, sexo, expo, estado)}
+    pacientes_pre_tokenizados = {}
+    for _, pac in df_pac.iterrows():
+        nombre = pac.get("nombre_completo")
+        if not isinstance(nombre, str) or not nombre.strip():
+            continue
+        tokens = tuple(sorted(tokenizar(nombre)))
+        if not tokens:
+            continue
+        sexo = pac.get("sexo")
+        sexo = sexo.strip().upper() if isinstance(sexo, str) else ""
+        expo = pac.get("expediente")
+        expo = str(expo).strip().lower() if expo is not None and str(expo).strip() else ""
+        estado = pac.get("estado")
+        estado = estado.strip().upper() if isinstance(estado, str) else ""
+        pacientes_pre_tokenizados[int(pac["pac_id"])] = (tokens, nombre, sexo, expo, estado)
+
+    if mask_typo.any() and pacientes_pre_tokenizados:
+        from collections import defaultdict
+        # Usar pre-tokenizados: construir índice invertido por nombre de pila
+        # {tokens_nombre_pila_sorted_tuple: [(pid, tokens_completo, nombre, sexo, expo, estado)]}
+        idx_nombre_pila = defaultdict(list)
+        for pid, (tokens_tuple, nombre, sexo, expo, estado) in pacientes_pre_tokenizados.items():
+            if len(tokens_tuple) < 2:
                 continue
-            sexo = pac.get("sexo")
-            sexo = sexo.strip().upper() if isinstance(sexo, str) else ""
-            expo = pac.get("expediente")
-            expo = str(expo).strip().lower() if expo is not None and str(expo).strip() else ""
-            estado = pac.get("estado")
-            estado = estado.strip().upper() if isinstance(estado, str) else ""
-            candidatos.append((int(pac["pac_id"]), nombre, sexo, expo, estado))
+            nombre_pila = tuple(sorted(tokens_tuple[:-1]))  # todos menos el último (apellido)
+            idx_nombre_pila[nombre_pila].append((pid, tokens_tuple, nombre, sexo, expo, estado))
 
         for _, reg in df.loc[mask_typo].iterrows():
             rid = int(reg["id"])
@@ -1163,104 +1379,110 @@ def _asociar_paciente_y_consulta_pipeline(db: Session):
             sexo_sigsa = reg.get("sexo")
             sexo_sigsa = sexo_sigsa.strip().upper() if isinstance(sexo_sigsa, str) else ""
 
-            pid, motivo = intentar_match_por_typo(nombre_sigsa, candidatos, no_historia, sexo_sigsa, tokenizar)
-            if pid and motivo == "typo_corroborado":
+            tokens_sigsa = tokenizar(nombre_sigsa)
+            if len(tokens_sigsa) < 2:
+                continue
+            nombre_pila_sigsa = tuple(sorted(tokens_sigsa[:-1]))
+            apellido_sigsa = tokens_sigsa[-1]
+
+            # Buscar candidatos con mismo nombre de pila (O(1) lookup)
+            candidatos_mismo_pila = idx_nombre_pila.get(nombre_pila_sigsa, [])
+            if not candidatos_mismo_pila:
+                continue
+
+            # Verificar typo en apellido
+            mejores = []
+            for pid, tokens_pac, nombre_pac, sexo_pac, expo_pac, estado_pac in candidatos_mismo_pila:
+                apellido_pac = [tokens_pac[-1]]
+                from modules.common.similitud_fonetica import _es_apellido_probable_typo
+                if _es_apellido_probable_typo([apellido_sigsa], apellido_pac):
+                    mejores.append((pid, nombre_pac, sexo_pac, expo_pac, estado_pac))
+
+            if not mejores:
+                continue
+
+            if len(mejores) > 1:
+                paso3b_revision += 1
+                continue
+
+            pid, nombre_pac, sexo_pac, expo_pac, _estado = mejores[0]
+            hist_coincide = bool(no_historia) and no_historia == str(expo_pac).strip().lower()
+            sexo_coincide = bool(sexo_sigsa) and bool(sexo_pac) and sexo_sigsa == sexo_pac
+
+            if hist_coincide or sexo_coincide:
                 updates_paciente[rid] = pid
                 df.loc[df["id"] == rid, "paciente_id"] = pid
                 paso3b_count += 1
-            elif motivo:
+            else:
                 paso3b_revision += 1
-                # La ficha ya tiene tipo "typo_sin_corroborar" o "typo_probable_ambiguo"
-                # La agregamos a revision global (se procesa después del paso 4)
-                pass  # en dry_run o logging se vería; aquí solo contamos
 
     _aplicar_updates()
     yield {"step": "paso3b", "progress": 58, "message": f"Paso 3b — typo apellido corroborado: {paso3b_count} pacientes, {paso3b_revision} a revisión", **resultados}
 
-    # ── PASO 4: consulta_id por paciente_id + fecha_consulta ±1d + tipo_consulta ──
+    # ── Construir índices para pasos 4-6 (O(1) lookups en lugar de pandas merge) ──
+    idx_pac_fecha, idx_doc_fecha = _construir_indice_consultas(df_con)
+
+    # ── PASO 4: paciente_id + fecha_consulta ±1d + tipo_consulta ──
     mask = df["consulta_id"].isna() & df["paciente_id"].notna() & df["fecha_consulta"].notna()
-    if mask.any() and not df_con.empty:
-        sub = df.loc[mask, ["id", "paciente_id", "fecha_consulta", "tipo_consulta"]].copy()
-        sub["tipo_num"] = pd.to_numeric(
-            sub["tipo_consulta"].astype(str).str.strip().str.split(n=1).str[0],
-            errors="coerce"
-        )
-        sub_exp = pd.concat([
-            sub.assign(_match_date=sub["fecha_consulta"] - pd.Timedelta(days=1), _dist=1),
-            sub.assign(_match_date=sub["fecha_consulta"], _dist=0),
-            sub.assign(_match_date=sub["fecha_consulta"] + pd.Timedelta(days=1), _dist=1),
-        ])
+    if mask.any():
+        for _, reg in df.loc[mask].iterrows():
+            rid = int(reg["id"])
+            pid = int(reg["paciente_id"])
+            fecha = pd.Timestamp(reg["fecha_consulta"]).date()
+            tipo_sigsa = str(reg.get("tipo_consulta", "")).strip()
+            tipo_num_sigsa = int(tipo_sigsa.split()[0]) if tipo_sigsa and tipo_sigsa[0].isdigit() else None
 
-        df_con = df_con.copy()
-        df_con["tipo_num"] = df_con["tipo_consulta"]
-
-        merged = sub_exp.merge(df_con, left_on=["paciente_id", "_match_date"],
-                               right_on=["paciente_id", "fecha_consulta"],
-                               how="inner", suffixes=("_sig", "_con"))
-        merged = merged[
-            merged["tipo_num_sig"].isna() | (merged["tipo_num_sig"] == merged["tipo_num_con"])
-        ]
-        # Best match per sigsa3: exact date (_dist=0) preferred over ±1
-        merged = merged.loc[merged.groupby("id")["_dist"].idxmin()]
-        merged = merged.drop_duplicates(subset="id", keep="first")
-
-        for _, row in merged.iterrows():
-            rid = row["id"]
-            updates_consulta[rid] = int(row["con_id"])
-            df.loc[df["id"] == rid, "consulta_id"] = row["con_id"]
-            resultados["paso4_consulta"] += 1
+            for delta in [0, -1, 1]:
+                k = (pid, fecha + pd.Timedelta(days=delta))
+                if k in idx_pac_fecha:
+                    for con in idx_pac_fecha[k]:
+                        tipo_con = con.get("tipo_consulta")
+                        if tipo_num_sigsa is None or (tipo_con is not None and tipo_num_sigsa == tipo_con):
+                            updates_consulta[rid] = int(con["con_id"])
+                            resultados["paso4_consulta"] += 1
+                            break
+                    if rid in updates_consulta:
+                        break
     yield {"step": "paso4", "progress": 70, "message": f"Paso 4 — paciente+fecha±1d+tipo: {resultados['paso4_consulta']} consultas", **resultados}
 
-    # ── PASO 5: consulta_id por no_historia_clinica = documento + fecha_consulta ±1d ──
+    # ── PASO 5: no_historia_clinica = documento + fecha_consulta ±1d ──
     mask = df["consulta_id"].isna() & df["no_historia_clinica"].notna() & df["fecha_consulta"].notna()
-    if mask.any() and not df_con.empty:
-        sub = df.loc[mask, ["id", "no_historia_clinica", "fecha_consulta", "paciente_id"]].copy()
-        sub_exp = pd.concat([
-            sub.assign(_match_date=sub["fecha_consulta"] - pd.Timedelta(days=1), _dist=1),
-            sub.assign(_match_date=sub["fecha_consulta"], _dist=0),
-            sub.assign(_match_date=sub["fecha_consulta"] + pd.Timedelta(days=1), _dist=1),
-        ])
-        merged = sub_exp.merge(df_con, left_on=["no_historia_clinica", "_match_date"],
-                               right_on=["documento", "fecha_consulta"],
-                               how="inner", suffixes=("_sig", "_con"))
-        # Best match per sigsa3: exact date preferred
-        merged = merged.loc[merged.groupby("id")["_dist"].idxmin()]
-        merged = merged.drop_duplicates(subset="id", keep="first")
-        for _, row in merged.iterrows():
-            rid = row["id"]
-            updates_consulta[rid] = int(row["con_id"])
-            df.loc[df["id"] == rid, "consulta_id"] = row["con_id"]
-            resultados["paso5_consulta"] += 1
-            if pd.isna(row["paciente_id_sig"]):
-                updates_paciente[rid] = int(row["paciente_id_con"])
-                df.loc[df["id"] == rid, "paciente_id"] = row["paciente_id_con"]
-                resultados["paso5_paciente"] += 1
-    yield {"step": "paso5", "progress": 85, "message": f"Paso 5 — documento+fecha±1d: {resultados['paso5_consulta']} consultas, {resultados['paso5_paciente']} pacientes adicionales", **resultados}
+    if mask.any():
+        for _, reg in df.loc[mask].iterrows():
+            rid = int(reg["id"])
+            doc = str(reg["no_historia_clinica"]).strip()
+            fecha = pd.Timestamp(reg["fecha_consulta"]).date()
+
+            for delta in [0, -1, 1]:
+                k = (doc, fecha + pd.Timedelta(days=delta))
+                if k in idx_doc_fecha:
+                    con = idx_doc_fecha[k][0]
+                    updates_consulta[rid] = int(con["con_id"])
+                    resultados["paso5_consulta"] += 1
+                    if pd.isna(reg.get("paciente_id")):
+                        updates_paciente[rid] = int(con["paciente_id"])
+                        resultados["paso5_paciente"] += 1
+                    break
+    yield {"step": "paso5", "progress": 85, "message": f"Paso 5 — documento+fecha±1d: {resultados['paso5_consulta']} consultas, {resultados['paso5_paciente']} pacientes", **resultados}
 
     # Commit parcial: pasos 3-5 escritos en DB para que paso 6 vea estado actualizado
     _aplicar_updates()
 
-    # ── PASO 6: barrido final para rezagados ──
-    # 6a: paciente_id sin consulta_id → buscar por paciente_id + fecha ±1d (cualquier tipo)
+    # ── PASO 6a: paciente_id sin consulta_id → paciente_id + fecha ±1d (cualquier tipo) ──
     mask = df["consulta_id"].isna() & df["paciente_id"].notna() & df["fecha_consulta"].notna()
-    if mask.any() and not df_con.empty:
-        sub = df.loc[mask, ["id", "paciente_id", "fecha_consulta"]].copy()
-        sub_exp = pd.concat([
-            sub.assign(_match_date=sub["fecha_consulta"] - pd.Timedelta(days=1), _dist=1),
-            sub.assign(_match_date=sub["fecha_consulta"], _dist=0),
-            sub.assign(_match_date=sub["fecha_consulta"] + pd.Timedelta(days=1), _dist=1),
-        ])
-        merged = sub_exp.merge(df_con, left_on=["paciente_id", "_match_date"],
-                               right_on=["paciente_id", "fecha_consulta"],
-                               how="inner", suffixes=("_sig", "_con"))
-        if not merged.empty:
-            merged = merged.loc[merged.groupby("id")["_dist"].idxmin()]
-            merged = merged.drop_duplicates(subset="id", keep="first")
-        for _, row in merged.iterrows():
-            rid = row["id"]
-            updates_consulta[rid] = int(row["con_id"])
-            df.loc[df["id"] == rid, "consulta_id"] = row["con_id"]
-            resultados["paso6a_consulta"] += 1
+    if mask.any():
+        for _, reg in df.loc[mask].iterrows():
+            rid = int(reg["id"])
+            pid = int(reg["paciente_id"])
+            fecha = pd.Timestamp(reg["fecha_consulta"]).date()
+
+            for delta in [0, -1, 1]:
+                k = (pid, fecha + pd.Timedelta(days=delta))
+                if k in idx_pac_fecha:
+                    con = idx_pac_fecha[k][0]
+                    updates_consulta[rid] = int(con["con_id"])
+                    resultados["paso6a_consulta"] += 1
+                    break
     yield {"step": "paso6a", "progress": 90, "message": f"Paso 6a — paciente+fecha±1d (cualquier tipo): {resultados['paso6a_consulta']} consultas", **resultados}
 
     yield {"step": "paso6b", "progress": 95, "message": "Paso 6b — nombres ambiguos pendientes de revisión", **resultados}
@@ -1452,6 +1674,306 @@ def listar_no_asociados(db: Session, limit: int = 100) -> list[Sigsa3Model]:
         .limit(min(limit, 500))
         .all()
     )
+
+
+def listar_pendientes_detalle(db: Session, limit: int = 100) -> list[dict]:
+    """Devuelve registros sin paciente_id con información contextual para revisión humana."""
+    from modules.common.vector_similarity import tokenizar, idf_por_token, pesado_por_idf, similitud_compuesta
+    from modules.pacientes.models import PacienteModel
+
+    registros = (
+        db.query(Sigsa3Model)
+        .filter(Sigsa3Model.paciente_id.is_(None))
+        .order_by(Sigsa3Model.id)
+        .limit(min(limit, 500))
+        .all()
+    )
+    if not registros:
+        return []
+
+    # Cargar pacientes para buscar candidatos por nombre
+    todos_pac = db.query(
+        PacienteModel.id, PacienteModel.nombre_completo,
+        PacienteModel.expediente, PacienteModel.sexo, PacienteModel.estado
+    ).filter(PacienteModel.nombre_completo.isnot(None)).all()
+
+    corpus = [tuple(sorted(tokenizar(p.nombre_completo or ""))) for _, p, *_ in todos_pac if p]
+    idf = idf_por_token(corpus)
+
+    pac_map = {}
+    for pid, nombre, exp, sex, est in todos_pac:
+        if not nombre:
+            continue
+        pac_map[pid] = {
+            "pid": pid, "nombre": nombre,
+            "expediente": str(exp).strip().lower() if exp else "",
+            "sexo": (sex or "").strip().upper(),
+            "estado": (est or "").strip().upper(),
+        }
+
+    resultado = []
+    for reg in registros:
+        nombre_sigsa = reg.nombre_paciente or ""
+        tokens_sigsa = tokenizar(nombre_sigsa)
+        if len(tokens_sigsa) < 2:
+            continue
+
+        nh = (reg.no_historia_clinica or "").strip().lower()
+        sexo_sigsa = (reg.sexo or "").strip().upper()
+
+        # Buscar top 5 candidatos por score combinado
+        pesos_sigsa = pesado_por_idf(tokens_sigsa, idf)
+        candidatos_score = []
+        for pid, pac in pac_map.items():
+            tokens_pac = tokenizar(pac["nombre"])
+            if len(tokens_pac) < 2:
+                continue
+            pesos_pac = pesado_por_idf(tokens_pac, idf)
+            nombre_sim = similitud_compuesta(pesos_sigsa, pesos_pac)
+            # Solo incluir si comparten al menos 1 token o nombre_sim > 0.3
+            if not (set(tokens_sigsa) & set(tokens_pac)) and nombre_sim < 0.3:
+                continue
+            exp_pac = pac["expediente"]
+            sexo_pac = pac["sexo"]
+            score = _score_combinado(nombre_sim, nh, exp_pac, sexo_sigsa, sexo_pac)
+            zona = _zona_decision(score)
+            candidatos_score.append({
+                "pac_id": pid,
+                "nombre": pac["nombre"],
+                "sexo": pac["sexo"],
+                "expediente": pac["expediente"],
+                "estado": pac["estado"],
+                "score_nombre": round(nombre_sim, 3),
+                "score_total": round(score, 3),
+                "zona": zona,
+            })
+
+        candidatos_score.sort(key=lambda x: x["score_total"], reverse=True)
+        top_candidatos = candidatos_score[:5]
+
+        entry = {
+            "sigsa3_id": reg.id,
+            "nombre_sigsa": nombre_sigsa,
+            "tipo": "pendiente",
+            "sexo_sigsa": reg.sexo,
+            "expediente_sigsa": reg.no_historia_clinica,
+            "fecha_consulta": reg.fecha_consulta,
+            "tipo_consulta": reg.tipo_consulta,
+            "candidatos": top_candidatos,
+            "mejor_score": top_candidatos[0]["score_total"] if top_candidatos else None,
+            "mejor_zona": top_candidatos[0]["zona"] if top_candidatos else None,
+        }
+        resultado.append(entry)
+
+    return resultado
+
+
+def resolver_pendiente(db: Session, sigsa3_id: int, paciente_id: int) -> dict:
+    """Asocia manualmente un paciente a un registro SIGSA-3 pendiente."""
+    reg = db.query(Sigsa3Model).filter(Sigsa3Model.id == sigsa3_id).first()
+    if not reg:
+        raise HTTPException(status_code=404, detail=f"Registro SIGSA-3 #{sigsa3_id} no encontrado")
+    if reg.paciente_id is not None:
+        raise HTTPException(status_code=409, detail=f"Registro SIGSA-3 #{sigsa3_id} ya tiene paciente_id={reg.paciente_id}")
+
+    pac = db.query(PacienteModel).filter(PacienteModel.id == paciente_id).first()
+    if not pac:
+        raise HTTPException(status_code=404, detail=f"Paciente #{paciente_id} no encontrado")
+
+    reg.paciente_id = paciente_id
+    db.commit()
+    db.refresh(reg)
+
+    return {
+        "sigsa3_id": sigsa3_id,
+        "paciente_id": paciente_id,
+        "nombre_paciente": pac.nombre_completo,
+        "message": f"Registro SIGSA-3 #{sigsa3_id} asociado a paciente '{pac.nombre_completo}'",
+    }
+
+
+# =====================================================================
+# DUPLICADOS: detectar y fusionar pacientes duplicados desde SIGSA-3
+# =====================================================================
+
+def detectar_duplicados(db: Session) -> list[dict]:
+    """Detecta clusters de pacientes con el mismo nombre normalizado.
+    Retorna una lista de clusters, cada uno con los pacientes que comparten
+    nombre y no tienen datos diferenciadores (sexo, expediente)."""
+    from modules.common.vector_similarity import tokenizar
+
+    todos = db.query(
+        PacienteModel.id, PacienteModel.nombre_completo,
+        PacienteModel.expediente, PacienteModel.sexo, PacienteModel.estado
+    ).filter(
+        PacienteModel.nombre_completo.isnot(None),
+        PacienteModel.estado != "I",
+    ).all()
+
+    # Agrupar por firma de tokens (nombre normalizado)
+    clusters: dict[tuple, list] = {}
+    for pid, nombre, exp, sex, est in todos:
+        if not nombre:
+            continue
+        firma = tuple(sorted(tokenizar(nombre)))
+        if not firma or len(firma) < 2:
+            continue
+        clusters.setdefault(firma, []).append({
+            "pac_id": pid,
+            "nombre": nombre,
+            "expediente": str(exp).strip().lower() if exp else "",
+            "sexo": (sex or "").strip().upper(),
+            "estado": (est or "").strip().upper(),
+        })
+
+    # Filtrar: solo clusters con 2+ pacientes (duplicados)
+    resultado = []
+    for firma, pacs in clusters.items():
+        if len(pacs) < 2:
+            continue
+        # Contar cuántos registros SIGSA-3 apuntan a cada paciente en este cluster
+        pac_ids = [p["pac_id"] for p in pacs]
+        sigsa3_counts = db.execute(
+            text("SELECT paciente_id, COUNT(*) FROM sigsa3 WHERE paciente_id = ANY(:ids) GROUP BY paciente_id"),
+            {"ids": pac_ids}
+        ).fetchall()
+        count_map = {row[0]: row[1] for row in sigsa3_counts}
+
+        # Ordenar: el que tiene más registros SIGSA-3 es el candidato a principal
+        for p in pacs:
+            p["sigsa3_count"] = count_map.get(p["pac_id"], 0)
+        pacs.sort(key=lambda x: (-x["sigsa3_count"], x["pac_id"]))
+
+        # Calcular datos faltantes para ver si hay desambiguación posible
+        con_sexo = [p for p in pacs if p["sexo"]]
+        con_expediente = [p for p in pacs if p["expediente"]]
+
+        resultado.append({
+            "nombre": pacs[0]["nombre"],
+            "firma": list(firma),
+            "total_pacientes": len(pacs),
+            "total_sigsa3_pendientes": sum(p["sigsa3_count"] for p in pacs),
+            "con_sexo_diferente": len(set(p["sexo"] for p in con_sexo)) > 1,
+            "con_expediente_diferente": len(set(p["expediente"] for p in con_expediente)) > 1,
+            "candidato_principal": pacs[0],  # el que tiene más registros SIGSA-3
+            "duplicados": pacs[1:],
+            "pueden_desambiguarse": len(con_sexo) > 1 or len(con_expediente) > 1,
+        })
+
+    # Ordenar por total de registros SIGSA-3 pendientes (mayor Impacto primero)
+    resultado.sort(key=lambda x: -x["total_sigsa3_pendientes"])
+    return resultado
+
+
+def merge_duplicados_sigsa3(
+    db: Session,
+    principal_id: int,
+    duplicado_ids: list[int],
+    reasignar_sigsa3: bool = True,
+) -> dict:
+    """Fusiona pacientes duplicados, reasignando consultas Y registros SIGSA-3
+    al paciente principal. Los duplicados se desactivan (estado='I').
+
+    Args:
+        principal_id: ID del paciente que sobrevive
+        duplicado_ids: IDs de los pacientes a fusionar en el principal
+        reasignar_sigsa3: Si True, también mueve sigsa3.paciente_id
+    """
+    if principal_id in duplicado_ids:
+        raise HTTPException(status_code=400, detail="principal_id no puede estar en duplicado_ids")
+
+    principal = db.query(PacienteModel).filter(PacienteModel.id == principal_id).first()
+    if not principal:
+        raise HTTPException(status_code=404, detail=f"Paciente principal #{principal_id} no encontrado")
+    if principal.estado == "I":
+        raise HTTPException(status_code=400, detail=f"Paciente principal #{principal_id} está inactivo")
+
+    duplicados = db.query(PacienteModel).filter(PacienteModel.id.in_(duplicado_ids)).all()
+    encontrados = {d.id for d in duplicados}
+    faltantes = set(duplicado_ids) - encontrados
+    if faltantes:
+        raise HTTPException(status_code=404, detail=f"Pacientes no encontrados: {faltantes}")
+
+    resultados_merge = []
+    for dup in duplicados:
+        if dup.estado == "I":
+            continue
+
+        # 1. Reasignar consultas
+        consultas_movidas = 0
+        if hasattr(dup, 'consultas'):
+            for c in dup.consultas:
+                c.paciente_id = principal_id
+                consultas_movidas += 1
+
+        # 2. Reasignar registros SIGSA-3 (staging)
+        sigsa3_movidos = 0
+        if reasignar_sigsa3:
+            sigsa3_movidos = db.execute(
+                text("UPDATE sigsa3 SET paciente_id = :pid WHERE paciente_id = :dup_id RETURNING id"),
+                {"pid": principal_id, "dup_id": dup.id}
+            ).rowcount
+
+        # 3. Reasignar registros SIGSA-3 normalizados
+        sigsa3_reg_movidos = 0
+        if reasignar_sigsa3:
+            sigsa3_reg_movidos = db.execute(
+                text("UPDATE sigsa3_registros SET paciente_id = :pid WHERE paciente_id = :dup_id RETURNING id"),
+                {"pid": principal_id, "dup_id": dup.id}
+            ).rowcount
+
+        # 4. Reasignar citas
+        citas_movidas = db.execute(
+            text("UPDATE citas SET paciente_id = :pid WHERE paciente_id = :dup_id RETURNING id"),
+            {"pid": principal_id, "dup_id": dup.id}
+        ).rowcount
+
+        # 5. Reasignar defunciones
+        defunciones_movidas = db.execute(
+            text("UPDATE defunciones SET paciente_id = :pid WHERE paciente_id = :dup_id RETURNING id"),
+            {"pid": principal_id, "dup_id": dup.id}
+        ).rowcount
+
+        # 6. Reasignar nacimientos
+        nacimientos_movidos = db.execute(
+            text("UPDATE nacimientos SET paciente_id = :pid WHERE paciente_id = :dup_id RETURNING id"),
+            {"pid": principal_id, "dup_id": dup.id}
+        ).rowcount
+
+        # 7. Completar datos faltantes del principal desde el duplicado
+        campos_completados = []
+        for campo in ["sexo", "fecha_nacimiento", "nacionalidad", "lugar_nacimiento"]:
+            val_dup = getattr(dup, campo, None)
+            val_princ = getattr(principal, campo, None)
+            if val_dup and not val_princ:
+                setattr(principal, campo, val_dup)
+                campos_completados.append(campo)
+
+        # 8. Desactivar duplicado
+        dup.estado = "I"
+        dup.expediente = None
+        dup.cui = None
+
+        resultados_merge.append({
+            "duplicado_id": dup.id,
+            "nombre": dup.nombre_completo,
+            "consultas_movidas": consultas_movidas,
+            "sigsa3_staging_movidos": sigsa3_movidos,
+            "sigsa3_registros_movidos": sigsa3_reg_movidos,
+            "citas_movidas": citas_movidas,
+            "defunciones_movidas": defunciones_movidas,
+            "nacimientos_movidos": nacimientos_movidos,
+            "campos_completados": campos_completados,
+        })
+
+    db.commit()
+
+    return {
+        "principal_id": principal_id,
+        "nombre_principal": principal.nombre_completo,
+        "fusiones": resultados_merge,
+        "total_duplicados_fusionados": len(resultados_merge),
+    }
 
 
 # =====================================================================

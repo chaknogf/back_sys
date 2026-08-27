@@ -232,13 +232,13 @@ def merge_referencias(principal, duplicado):
 
     refs_existentes = set()
     for ref in referencias_actuales:
-        nombre = ref.get("nombre", "").strip().upper()
-        parentesco = ref.get("parentesco", "").strip().lower()
+        nombre = (ref.get("nombre") or "").strip().upper()
+        parentesco = (ref.get("parentesco") or "").strip().lower()
         refs_existentes.add((nombre, parentesco))
 
     for ref_dup in duplicado.referencias:
-        nombre = ref_dup.get("nombre", "").strip().upper()
-        parentesco = ref_dup.get("parentesco", "").strip().lower()
+        nombre = (ref_dup.get("nombre") or "").strip().upper()
+        parentesco = (ref_dup.get("parentesco") or "").strip().lower()
 
         if (nombre, parentesco) not in refs_existentes:
             referencias_actuales.append(ref_dup)

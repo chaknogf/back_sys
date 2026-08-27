@@ -143,7 +143,6 @@ def buscar_personal_hospital(db: Session, filters: dict | None = None, skip: int
 
 
 def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50):
-    from sqlalchemy import func, and_
     from modules.prestamos.models import Prestamo
 
     _LIST_COLS = [
@@ -153,123 +152,113 @@ def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50)
         PacienteModel.datos_extra,
     ]
 
-    # Subquery: most recent active loan per patient (includes fecha_prestamo)
-    most_recent_loan_subq = (
+    # JOIN con prestamos activos por paciente_id — último préstamo activo por paciente
+    # prestamos.id_paciente = pacientes.id AND prestamos.activo = true
+    latest_loan_subq = (
         db.query(
             Prestamo.id_paciente,
             func.max(Prestamo.fecha_prestamo).label("max_fecha"),
         )
-        .filter(Prestamo.activo == True)
+        .filter(Prestamo.activo.is_(True))
         .group_by(Prestamo.id_paciente)
         .subquery()
     )
-
-    # Get solicitante for the most recent active loan (includes fecha_prestamo)
-    loan_solicitante_subq = (
+    loan_subq = (
         db.query(
             Prestamo.id_paciente,
             Prestamo.fecha_prestamo,
             Prestamo.solicitante,
         )
-        .filter(Prestamo.activo == True)
-        .subquery("loan_solicitante")
+        .filter(Prestamo.activo.is_(True))
+        .subquery("loan_activo")
     )
 
-    query = db.query(PacienteModel).options(
-        load_only(*_LIST_COLS),
+    def _apply_filters(q):
+        q = q.filter(PacienteModel.estado != "I")
+        v = filters.get("q")
+        if v:
+            termino = v.strip()
+            palabras = [quitar_tildes(p) for p in termino.split() if p.strip()]
+            filtros_nombre = [nombre_completo_col.ilike(f"%{palabra}%") for palabra in palabras]
+            q = q.filter(
+                or_(
+                    cast(PacienteModel.cui, String).ilike(f"%{termino}%"),
+                    PacienteModel.expediente.ilike(f"%{termino}%"),
+                    and_(*filtros_nombre),
+                )
+            )
+        v = filters.get("nombre")
+        if v:
+            palabras = [quitar_tildes(p) for p in v.split() if p.strip()]
+            filtros = [nombre_completo_col.ilike(f"%{p}%") for p in palabras]
+            q = q.filter(and_(*filtros))
+        for campo in ["primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido"]:
+            val = filters.get(campo)
+            if val:
+                q = q.filter(filtro_nombre_campo(campo, val))
+        v = filters.get("cui")
+        if v:
+            if v.isdigit():
+                q = q.filter(PacienteModel.cui == int(v))
+            else:
+                q = q.filter(cast(PacienteModel.cui, String).ilike(f"%{v}%"))
+        v = filters.get("expediente")
+        if v:
+            q = q.filter(PacienteModel.expediente == v)
+        v = filters.get("id")
+        if v:
+            q = q.filter(PacienteModel.id == v)
+        v = filters.get("sexo")
+        if v:
+            q = q.filter(PacienteModel.sexo == v.upper())
+        v = filters.get("estado")
+        if v:
+            q = q.filter(PacienteModel.estado == v.upper())
+        v = filters.get("fecha_nac")
+        if v:
+            try:
+                q = q.filter(PacienteModel.fecha_nacimiento == v)
+            except:
+                pass
+        return q
+
+    # Query para total (solo pacientes, no duplica por join)
+    count_q = db.query(func.count(func.distinct(PacienteModel.id))).select_from(PacienteModel).outerjoin(
+        latest_loan_subq, PacienteModel.id == latest_loan_subq.c.id_paciente
     ).outerjoin(
-        most_recent_loan_subq, PacienteModel.id == most_recent_loan_subq.c.id_paciente
-    ).outerjoin(
-        loan_solicitante_subq,
+        loan_subq,
         and_(
-            loan_solicitante_subq.c.id_paciente == PacienteModel.id,
-            loan_solicitante_subq.c.fecha_prestamo == most_recent_loan_subq.c.max_fecha,
+            loan_subq.c.id_paciente == PacienteModel.id,
+            loan_subq.c.fecha_prestamo == latest_loan_subq.c.max_fecha,
         ),
-    ).filter(
-        PacienteModel.estado != "I",
     )
+    count_q = _apply_filters(count_q)
+    total = count_q.scalar() or 0
 
-    q = filters.get("q")
-    if q:
-        termino = q.strip()
-        palabras = [quitar_tildes(p) for p in termino.split() if p.strip()]
-        filtros_nombre = [nombre_completo_col.ilike(f"%{palabra}%") for palabra in palabras]
-        query = query.filter(
-            or_(
-                cast(PacienteModel.cui, String).ilike(f"%{termino}%"),
-                PacienteModel.expediente.ilike(f"%{termino}%"),
-                and_(*filtros_nombre)
-            )
+    # Query para datos — JOIN que trae fecha_prestamo + solicitante del préstamo activo
+    data_q = (
+        db.query(PacienteModel, loan_subq.c.fecha_prestamo, loan_subq.c.solicitante)
+        .select_from(PacienteModel)
+        .outerjoin(latest_loan_subq, PacienteModel.id == latest_loan_subq.c.id_paciente)
+        .outerjoin(
+            loan_subq,
+            and_(
+                loan_subq.c.id_paciente == PacienteModel.id,
+                loan_subq.c.fecha_prestamo == latest_loan_subq.c.max_fecha,
+            ),
         )
+        .options(load_only(*_LIST_COLS))
+        .order_by(desc(PacienteModel.id))
+    )
+    data_q = _apply_filters(data_q)
+    rows = data_q.offset(skip).limit(limit).all()
 
-    nombre = filters.get("nombre")
-    if nombre:
-        palabras = [quitar_tildes(p) for p in nombre.split() if p.strip()]
-        filtros = [nombre_completo_col.ilike(f"%{p}%") for p in palabras]
-        query = query.filter(and_(*filtros))
-
-    for campo in ["primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido"]:
-        val = filters.get(campo)
-        if val:
-            query = query.filter(filtro_nombre_campo(campo, val))
-
-    cui = filters.get("cui")
-    if cui:
-        if cui.isdigit():
-            query = query.filter(PacienteModel.cui == int(cui))
-        else:
-            query = query.filter(cast(PacienteModel.cui, String).ilike(f"%{cui}%"))
-
-    expediente = filters.get("expediente")
-    if expediente:
-        query = query.filter(PacienteModel.expediente == expediente)
-
-    pid = filters.get("id")
-    if pid:
-        query = query.filter(PacienteModel.id == pid)
-
-    sexo = filters.get("sexo")
-    if sexo:
-        query = query.filter(PacienteModel.sexo == sexo.upper())
-
-    estado = filters.get("estado")
-    if estado:
-        query = query.filter(PacienteModel.estado == estado.upper())
-
-    fecha_nac = filters.get("fecha_nac")
-    if fecha_nac:
-        try:
-            query = query.filter(PacienteModel.fecha_nacimiento == fecha_nac)
-        except:
-            pass
-
-    total = query.count()
-    pacientes = query.offset(skip).limit(limit).all()
-
-    # Map results including loan info
     result_pacientes = []
-    for p in pacientes:
-        # Access loan attributes that were selected in the query
-        fecha_prestamo = getattr(p, "fecha_prestamo", None)
-        solicitante = getattr(p, "solicitante", None)
-        result_pacientes.append(
-            PacientesResumen(
-                id=p.id,
-                cui=p.cui,
-                expediente=p.expediente,
-                pasaporte=p.pasaporte,
-                nombre=p.nombre,
-                nombre_completo=p.nombre_completo,
-                sexo=p.sexo,
-                fecha_nacimiento=p.fecha_nacimiento,
-                estado=p.estado,
-                defuncion=getattr(p, "defuncion", None),
-                personal_hospital=getattr(p, "personal_hospital", None),
-                ultima_consulta=getattr(p, "ultima_consulta", None),
-                fecha_prestamo=fecha_prestamo,
-                solicitante=solicitante,
-            )
-        )
+    for paciente, fecha_prestamo, solicitante in rows:
+        # Inyectar campos de préstamo para que PacientesResumen los lea vía from_attributes
+        paciente.fecha_prestamo = fecha_prestamo
+        paciente.solicitante = solicitante
+        result_pacientes.append(PacientesResumen.model_validate(paciente))
 
     return PacienteListResponse(total=total, pacientes=result_pacientes)
 

@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 
 from modules.pacientes.models import PacienteModel
-from modules.pacientes.schemas import PacienteCreate, PacienteUpdate, PacienteListResponse
+from modules.pacientes.schemas import PacienteCreate, PacienteUpdate, PacienteListResponse, PacientesResumen
 from modules.expediente.service import generar_expediente
 
 
@@ -143,14 +143,51 @@ def buscar_personal_hospital(db: Session, filters: dict | None = None, skip: int
 
 
 def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50):
+    from sqlalchemy import func, and_
+    from modules.prestamos.models import Prestamo
+
     _LIST_COLS = [
         PacienteModel.id, PacienteModel.cui, PacienteModel.expediente,
         PacienteModel.pasaporte, PacienteModel.nombre, PacienteModel.nombre_completo,
         PacienteModel.sexo, PacienteModel.fecha_nacimiento, PacienteModel.estado,
         PacienteModel.datos_extra,
     ]
-    query = db.query(PacienteModel).options(load_only(*_LIST_COLS)).order_by(desc(PacienteModel.id))
-    query = query.filter(PacienteModel.estado != "I")
+
+    # Subquery: most recent active loan per patient (includes fecha_prestamo)
+    most_recent_loan_subq = (
+        db.query(
+            Prestamo.id_paciente,
+            func.max(Prestamo.fecha_prestamo).label("max_fecha"),
+        )
+        .filter(Prestamo.activo == True)
+        .group_by(Prestamo.id_paciente)
+        .subquery()
+    )
+
+    # Get solicitante for the most recent active loan (includes fecha_prestamo)
+    loan_solicitante_subq = (
+        db.query(
+            Prestamo.id_paciente,
+            Prestamo.fecha_prestamo,
+            Prestamo.solicitante,
+        )
+        .filter(Prestamo.activo == True)
+        .subquery("loan_solicitante")
+    )
+
+    query = db.query(PacienteModel).options(
+        load_only(*_LIST_COLS),
+    ).outerjoin(
+        most_recent_loan_subq, PacienteModel.id == most_recent_loan_subq.c.id_paciente
+    ).outerjoin(
+        loan_solicitante_subq,
+        and_(
+            loan_solicitante_subq.c.id_paciente == PacienteModel.id,
+            loan_solicitante_subq.c.fecha_prestamo == most_recent_loan_subq.c.max_fecha,
+        ),
+    ).filter(
+        PacienteModel.estado != "I",
+    )
 
     q = filters.get("q")
     if q:
@@ -208,7 +245,33 @@ def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50)
 
     total = query.count()
     pacientes = query.offset(skip).limit(limit).all()
-    return PacienteListResponse(total=total, pacientes=pacientes)
+
+    # Map results including loan info
+    result_pacientes = []
+    for p in pacientes:
+        # Access loan attributes that were selected in the query
+        fecha_prestamo = getattr(p, "fecha_prestamo", None)
+        solicitante = getattr(p, "solicitante", None)
+        result_pacientes.append(
+            PacientesResumen(
+                id=p.id,
+                cui=p.cui,
+                expediente=p.expediente,
+                pasaporte=p.pasaporte,
+                nombre=p.nombre,
+                nombre_completo=p.nombre_completo,
+                sexo=p.sexo,
+                fecha_nacimiento=p.fecha_nacimiento,
+                estado=p.estado,
+                defuncion=getattr(p, "defuncion", None),
+                personal_hospital=getattr(p, "personal_hospital", None),
+                ultima_consulta=getattr(p, "ultima_consulta", None),
+                fecha_prestamo=fecha_prestamo,
+                solicitante=solicitante,
+            )
+        )
+
+    return PacienteListResponse(total=total, pacientes=result_pacientes)
 
 
 def obtener_paciente(db: Session, paciente_id: int):

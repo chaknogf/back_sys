@@ -214,7 +214,10 @@ def gestionar_paciente(
         )
 
         for key, value in datos_update.items():
-            setattr(paciente, key, value)
+            if key == "datos_extra" and paciente.datos_extra:
+                paciente.datos_extra = {**paciente.datos_extra, **value}
+            else:
+                setattr(paciente, key, value)
 
         agregar_evento(
             paciente,

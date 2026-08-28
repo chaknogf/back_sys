@@ -136,7 +136,8 @@ def _validar_fks(db: Session, data) -> None:
     """Valida existencia de todas las FKs de un registro normalizado
     contra sus tablas de catálogo (coincidencias garantizadas)."""
     _validar_fk_existe(db, PacienteModel, data.paciente_id, "paciente_id", "pacientes")
-    _validar_fk_existe(db, MedicoModel, data.medico_id, "medico_id", "medicos")
+    if data.medico_id is not None:
+        _validar_fk_existe(db, MedicoModel, data.medico_id, "medico_id", "medicos")
     _validar_fk_existe(db, PersonalSaludModel, data.personal_salud_id, "personal_salud_id", "personal_salud")
     _validar_fk_existe(db, ConsultaModel, data.consulta_id, "consulta_id", "consultas")
     _validar_fk_existe(db, TipoConsultaSigsa3Model, data.tipo_consulta_id, "tipo_consulta_id", "tipos_consulta_sigsa3")
@@ -264,7 +265,8 @@ def actualizar_registro(registro_id: int, data: Sigsa3RegistroUpdate, db: Sessio
               "tipo_consulta_id", "codigo_cie_10_id", "especialidad_id")
     finales = {k: update_data.get(k, getattr(registro, k)) for k in campos}
     _validar_fk_existe(db, PacienteModel, finales["paciente_id"], "paciente_id", "pacientes")
-    _validar_fk_existe(db, MedicoModel, finales["medico_id"], "medico_id", "medicos")
+    if finales["medico_id"] is not None:
+        _validar_fk_existe(db, MedicoModel, finales["medico_id"], "medico_id", "medicos")
     _validar_fk_existe(db, PersonalSaludModel, finales["personal_salud_id"], "personal_salud_id", "personal_salud")
     _validar_fk_existe(db, ConsultaModel, finales["consulta_id"], "consulta_id", "consultas")
     _validar_fk_existe(db, TipoConsultaSigsa3Model, finales["tipo_consulta_id"], "tipo_consulta_id", "tipos_consulta_sigsa3")

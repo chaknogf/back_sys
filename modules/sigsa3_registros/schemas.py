@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 class Sigsa3RegistroBase(BaseModel):
     paciente_id: int = Field(..., description="ID del paciente (obligatorio)")
-    medico_id: int = Field(..., description="ID del médico (obligatorio)")
+    medico_id: Optional[int] = Field(None, description="ID del médico (opcional)")
     personal_salud_id: Optional[int] = None
     consulta_id: Optional[int] = None
     fecha_consulta: date = Field(..., description="Fecha de la consulta (obligatorio)")

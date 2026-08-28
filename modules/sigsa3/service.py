@@ -2,7 +2,7 @@ import csv
 import io
 import re
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import text, or_
+from sqlalchemy import text, or_, func
 from sqlalchemy.orm import Session
 from typing import List, Optional as Opt
 from datetime import date, datetime
@@ -546,6 +546,20 @@ def _build_personal_salud_map(db: Session) -> dict:
     return mapa
 
 
+def _resolver_medico_desde_medicos(db: Session, nombre: str) -> tuple | None:
+    """Busca médico directamente en la tabla medicos por nombre (match exacto normalizado).
+    Devuelve (medico_id, especialidad_id) o None."""
+    if not nombre:
+        return None
+    from modules.medicos.models import MedicoModel
+    medico = db.query(MedicoModel).filter(
+        func.lower(func.trim(MedicoModel.nombre)) == nombre.strip().lower()
+    ).first()
+    if medico:
+        return (medico.id, medico.especialidad_id)
+    return None
+
+
 def _resolver_personal_salud(mapa: dict, nombre: str) -> tuple | None:
     """Resuelve un nombre de personal_salud contra el mapa puente.
     Devuelve (personal_salud_id, medico_id, especialidad_id) o None.
@@ -976,18 +990,41 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
 
     # ── Paso masivo en SQL (match exacto) para los ~500K con nombre ──
     # personal_salud.nombre es la clave depurada; su medico_id es el id de medicos.
+    # Si personal_salud.medico_id es NULL, intenta resolver desde medicos por nombre.
     res = db.execute(
         text("""
             UPDATE sigsa3 s
             SET personal_salud_id = ps.id,
-                medico_id = COALESCE(s.medico_id, ps.medico_id),
-                especialidad_id = COALESCE(s.especialidad_id, ps.especialidad_id)
+                medico_id = COALESCE(
+                    s.medico_id,
+                    ps.medico_id,
+                    (SELECT m.id FROM medicos m
+                     WHERE LOWER(TRIM(m.nombre)) = LOWER(TRIM(ps.nombre))
+                     LIMIT 1)
+                ),
+                especialidad_id = COALESCE(
+                    s.especialidad_id,
+                    ps.especialidad_id,
+                    (SELECT m.especialidad_id FROM medicos m
+                     WHERE LOWER(TRIM(m.nombre)) = LOWER(TRIM(ps.nombre))
+                     AND m.especialidad_id IS NOT NULL
+                     LIMIT 1)
+                )
             FROM personal_salud ps
             WHERE LOWER(TRIM(s.personal_salud)) = LOWER(TRIM(ps.nombre))
               AND s.personal_salud IS NOT NULL
               AND (s.personal_salud_id IS DISTINCT FROM ps.id
-                   OR s.medico_id IS DISTINCT FROM COALESCE(s.medico_id, ps.medico_id)
-                   OR s.especialidad_id IS DISTINCT FROM COALESCE(s.especialidad_id, ps.especialidad_id))
+                   OR s.medico_id IS DISTINCT FROM COALESCE(
+                       s.medico_id, ps.medico_id,
+                       (SELECT m.id FROM medicos m
+                        WHERE LOWER(TRIM(m.nombre)) = LOWER(TRIM(ps.nombre))
+                        LIMIT 1))
+                   OR s.especialidad_id IS DISTINCT FROM COALESCE(
+                       s.especialidad_id, ps.especialidad_id,
+                       (SELECT m.especialidad_id FROM medicos m
+                        WHERE LOWER(TRIM(m.nombre)) = LOWER(TRIM(ps.nombre))
+                        AND m.especialidad_id IS NOT NULL
+                        LIMIT 1)))
         """)
     ).rowcount
     db.commit()
@@ -1013,6 +1050,13 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
         ps_id = match["id"]
         medico_id = match["medico_id"]
         personal_esp_id = match["especialidad_id"]
+        # Fallback: si el bridge no tiene medico_id, buscar directo en medicos
+        if medico_id is None and reg.personal_salud:
+            fallback = _resolver_medico_desde_medicos(db, reg.personal_salud)
+            if fallback:
+                medico_id = fallback[0]
+                if personal_esp_id is None:
+                    personal_esp_id = fallback[1]
         if ps_id is not None and reg.personal_salud_id != ps_id:
             reg.personal_salud_id = ps_id
         if medico_id is not None and reg.medico_id != medico_id:
@@ -2137,8 +2181,8 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
              ids: list[int] | None = None, max_registros: int | None = None) -> dict:
     """Migra registros de sigsa3 (staging) a sigsa3_registros (normalizado).
 
-    - Solo migra registros con paciente_id + medico_id (ambos obligatorios).
-      consulta_id es opcional.
+    - Solo migra registros con paciente_id (obligatorio).
+      medico_id y consulta_id son opcionales.
     - Copia sigsa3_id (id del staging) en sigsa3_registros para trazabilidad.
     - NO borra en línea: al final purga de sigsa3 los id migrados (los que
       tienen sigsa3_id en sigsa3_registros). En staging solo quedan huérfanos.
@@ -2159,8 +2203,6 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
     base_filter = [
         Sigsa3Model.paciente_id.isnot(None),
         Sigsa3Model.paciente_id != 0,
-        Sigsa3Model.medico_id.isnot(None),
-        Sigsa3Model.medico_id != 0,
     ]
     if ids:
         base_filter.append(Sigsa3Model.id.in_(ids))

@@ -1,0 +1,961 @@
+{
+  "total_subsections": 60,
+  "total_variables": 655,
+  "subsections": [
+    {
+      "name": "Centro Transfuncional",
+      "variables": [
+        "Transfunciones Efectuadas",
+        "Celulas Empacadas",
+        "Plasma Fresco Congelado",
+        "Paquete Globular",
+        "Concentrado Plaquetario",
+        "Plaquetas por Aferesis",
+        "Crioprecipitados",
+        "Unidades Descartadas",
+        "Reacciones diversasa la transfusión"
+      ]
+    },
+    {
+      "name": "Estudios de Laboratorio transmisibles y no transmisibles",
+      "variables": [
+        "Estudios Lab. Cirugia",
+        "Estudios Lab. Emergencia",
+        "Estudios Lab. Maternidad",
+        "Estudios Lab. Medicina General",
+        "Estudios Lab. Medicina",
+        "Estudios Lab. Pediatria",
+        "Estudios Lab. Traumatologia",
+        "Estudios Lab. UCIA",
+        "Estudios Lab. CRN",
+        "Estudios Lab. UCIN",
+        "Estudios Lab. SOP",
+        "Estudios Lab. Otros",
+        "total"
+      ]
+    },
+    {
+      "name": "Estudios de Laboratorio",
+      "variables": [
+        "Estudios Lab. Cirugia",
+        "Estudios Lab. Emergencia",
+        "Estudios Lab. Maternidad",
+        "Estudios Lab. Medicina General",
+        "Estudios Lab. Medicina",
+        "Estudios Lab. Pediatria",
+        "Estudios Lab. Traumatologia",
+        "Estudios Lab. UCIA",
+        "Estudios Lab. CRN",
+        "Estudios Lab. UCIN",
+        "Estudios Lab. SOP",
+        "Otros",
+        "Estudios Realizados",
+        "Estadisticas Multianual"
+      ]
+    },
+    {
+      "name": "Personas atendidas en laboratorio",
+      "variables": [
+        "Personas Lab. Cirugia",
+        "Personas Lab. Emergencia",
+        "Personas Lab. Maternidad",
+        "Personas Consulta Externa",
+        "Personas Lab. Medicina",
+        "Personas Lab. Pediatria",
+        "Personas Lab. Traumatologia",
+        "Personas Lab. UCIA",
+        "Personas Lab. CRN",
+        "Personas Lab. UCIN",
+        "Personas Lab. SOP",
+        "Personas Lab. Otros",
+        "Personas atendidas",
+        "Estadisticas Multianual"
+      ]
+    },
+    {
+      "name": "Pruebas No reclamadas",
+      "variables": [
+        "Cirugia",
+        "Emergencia",
+        "Maternidad",
+        "Medicina General",
+        "Medicina Interna",
+        "Pediatria",
+        "Traumatologia",
+        "total"
+      ]
+    },
+    {
+      "name": "Bacterología",
+      "variables": [
+        "Urocultivo",
+        "Coprocultivo",
+        "Hemocultivo",
+        "Secreciones Varias",
+        "Orocultivos",
+        "Secreción Vaginal",
+        "Otros(BK)",
+        "KOH",
+        "Estudios realizados"
+      ]
+    },
+    {
+      "name": "Reactivos",
+      "variables": [
+        "ACIDO URICO UNIDAD",
+        "BLIRRUBINA DIRECTA",
+        "BILIRRUBINA TOTAL",
+        "COLESTEROL TOTAL UNIDAD",
+        "CREATININA UNIDAD",
+        "GLUCOSA",
+        "NITROGENO DE UREA",
+        "PROTEINA TOTAL",
+        "TGO UNIDAD",
+        "TGP UNIDAD",
+        "HDL UNIDAD",
+        "TRIGLICERIDOS UNIDAD",
+        "FOSFATASA ALCALINA UNIDAD",
+        "ALBUMINA UNIDAD",
+        "AMILASA",
+        "LIPASA",
+        "CALCIO",
+        "CK-MB",
+        "CPK",
+        "GGT",
+        "COLESTEROL LDL",
+        "DESHIDROGENASA LACTICA",
+        "TOTAL"
+      ]
+    },
+    {
+      "name": "Prueba de Laboratorio",
+      "variables": [
+        "Casos VIH",
+        "Casos HCV",
+        "Casos Sifilis",
+        "Casos de hepatitis A",
+        "Casos de hepatitis B",
+        "Tuberculosis 1",
+        "Tuberculosis 2",
+        "Tuberculosis 3",
+        "Examenes de sangre",
+        "Examenes de orina",
+        "Examenes de heces"
+      ]
+    },
+    {
+      "name": "Personas atendidas Rayos X",
+      "variables": [
+        "Traumatologia",
+        "Cirugia",
+        "Pediatria",
+        "Medicina Interna",
+        "Ginecologia",
+        "CRN",
+        "EMERGENCIA",
+        "ENCAMAMIENTO",
+        "COEX",
+        "SOP",
+        "total"
+      ]
+    },
+    {
+      "name": "Estudios realizados por especialidad",
+      "variables": [
+        "Traumatologia",
+        "Cirugia",
+        "Pediatria",
+        "Medicina Interna",
+        "Ginecologia",
+        "CRN",
+        "total",
+        "Estadisticas Multianual"
+      ]
+    },
+    {
+      "name": "Estudios realizados por servicio",
+      "variables": [
+        "Coex",
+        "Emergencia",
+        "Hospitalizacion",
+        "Sop",
+        "total",
+        "Estadisticas Multianual"
+      ]
+    },
+    {
+      "name": "Pacientes Atendidos Rayos X",
+      "variables": [
+        "Emergencia Traumatologia",
+        "Emergencia Cirugia",
+        "Emergencia Pediatria",
+        "Emergencia Medicina Interna",
+        "coex Traumatologia",
+        "coex Cirugia",
+        "coex Pediatria",
+        "coex Medicina Interna",
+        "Encamamiento Traumatologia",
+        "Encamamiento Cirugia",
+        "Encamamiento Pediatria",
+        "Encamamiento Medicina Interna",
+        "SOP Traumatologia",
+        "SOP Cirugia",
+        "SOP Pediatria",
+        "SOP Medicina Interna",
+        "CRN",
+        "Emergencia Ginecologia",
+        "Hosp Ginecologia",
+        "coex ginecologia",
+        "Aislamiento Pediatria",
+        "subtotal"
+      ]
+    },
+    {
+      "name": "Estudios realizados Convencional",
+      "variables": [
+        "Emergencia Traumatologia",
+        "Emergencia Cirugia",
+        "Emergencia Pediatria",
+        "Emergencia Medicina Interna",
+        "Consulta Externa Traumatologia",
+        "Consulta Externa Cirugia",
+        "Consulta Externa Pediatria",
+        "Consulta Externa Medicina Interna",
+        "Encamamiento Traumatologia",
+        "Encamamiento Cirugia",
+        "Encamamiento Pediatria",
+        "Encamamiento Medicina Interna",
+        "SOP Traumatologia",
+        "SOP Cirugia",
+        "SOP Pediatria",
+        "SOP Medicina Interna",
+        "CRN",
+        "Emergencia Ginecologia",
+        "Hosp Ginecologia",
+        "coex ginecologia",
+        "Aislamiento Pediatria",
+        "subtotal"
+      ]
+    },
+    {
+      "name": "Estudios realizados portatil",
+      "variables": [
+        "Emergencia Traumatologia",
+        "emergencia Cirugia",
+        "Emergencia Pediatria",
+        "Emergencia Medicina Interna",
+        "Consulta Externa Traumatologia",
+        "Consulta Externa Cirugia",
+        "Consulta Externa Pediatria",
+        "Consulta Externa Medicina Interna",
+        "Encamamiento Traumatologia",
+        "Encamamiento Cirugia",
+        "Encamamiento Pediatria",
+        "Encamamiento Medicina Interna",
+        "SOP Traumatologia",
+        "SOP Cirugia",
+        "SOP Pediatria",
+        "SOP Medicina Interna",
+        "CRN",
+        "Emergencia Ginecologia",
+        "Encamamiento Ginecologia",
+        "coex ginecologia",
+        "Aislamiento Pediatria",
+        "subtotal"
+      ]
+    },
+    {
+      "name": "Otras Variables de Rayos X",
+      "variables": [
+        "Personas atendidas",
+        "Tipo de enfermedad",
+        "Radigrafias tomadas",
+        "Placas por sexo",
+        "Peliculas usadas"
+      ]
+    },
+    {
+      "name": "ESTUDIOS COMPLEMENTARIOS",
+      "variables": [
+        "ultrasonidos",
+        "electrocardiograma (ekg)",
+        "espirometrias",
+        "papanicolaus",
+        "colposcopias"
+      ]
+    },
+    {
+      "name": "Anestesias",
+      "variables": [
+        "General",
+        "Epidural",
+        "Raquideo",
+        "Bloqueo Anestesico (supraclavicular)",
+        "Sedación",
+        "Local",
+        "Local Odontología",
+        "Anestesias administradas"
+      ]
+    },
+    {
+      "name": "Censo de Procedimientos en Quirofanos (fuente Enfermería SOP)",
+      "variables": [
+        "Cirugia",
+        "Cirugia Pediatrica",
+        "Traumatologia",
+        "Traumatologia Pediatrica",
+        "Ginecología",
+        "Obstetricia",
+        "G y O",
+        "Procedimientos quirofano",
+        "Estadisticas Multianual",
+        "Rendimiento de quirofanos y sala de parto",
+        "salas de parto",
+        "quirofanos",
+        "ameu",
+        "liu",
+        "oxitocina",
+        "manejo 3er periodo",
+        "Episiotomias",
+        "esterilizaciones  muejeres",
+        "esterilizaciones  hombres",
+        "CSTP",
+        "PES",
+        "indice de cesareas",
+        "codigo rojo",
+        "hemorragia 1er trimestre",
+        "hemorragia 2do trimestre",
+        "hemorragia 3er trimestre"
+      ]
+    },
+    {
+      "name": "SIGSA 1 - Nacimientos",
+      "variables": [
+        "Recien nacidos",
+        "Tipo de partos",
+        "Estadisticas Multianual",
+        "RN por PES",
+        "RN por CSTP",
+        "Recien nacidos Vivos",
+        "Recien nacidos Muertos",
+        "Clasificación de Peso Vivos",
+        "Clasificación de Peso Muertos",
+        "RN Vivos por Clasificación de Parto",
+        "RN Muertos por Clasificación de Parto",
+        "RN a Termino Vivos",
+        "RN Prematuros Vivos",
+        "RN Bajo Peso Vivos",
+        "ZINC DIARREA",
+        "ZINC NEUMONIA",
+        "Comité NPH"
+      ]
+    },
+    {
+      "name": "Censo de Procedimientos por Servicios (fuente Medicos)",
+      "variables": [
+        "Procedimientos COEX",
+        "Procedimientos Encamamiento",
+        "Procedimientos Emergencia",
+        "Procedimientos SOP Emergencia",
+        "Procedimientos SOP Electiva",
+        "Procedimientos Menores",
+        "Procedimientos Por Sexo"
+      ]
+    },
+    {
+      "name": "Procedimientos por Especialidad",
+      "variables": [
+        "Procedimientos de Cirugía",
+        "Procedimientos de Ginecología",
+        "Procedimientos Medicina Interna",
+        "Procedimientos Pediatria",
+        "Procedimientos Traumatología",
+        "Procedimientos por Especialidad",
+        "Procedimientos Menores por Especialidad"
+      ]
+    },
+    {
+      "name": "Camas censables",
+      "variables": [
+        "Dias por mes corte",
+        "Medicina",
+        "Cirugia",
+        "Cirugia Pediatrica",
+        "Traumatologia",
+        "Traumatologia Pediatrica",
+        "Ginecologia",
+        "Obstetricia",
+        "Pediatria",
+        "Neonatos",
+        "UCIN",
+        "CRN",
+        "MADRE CANGURO",
+        "UCIA"
+      ]
+    },
+    {
+      "name": "Porcentaje Ocupacional",
+      "variables": [
+        "Medicina",
+        "Cirugia",
+        "Cirugia Pediatrica",
+        "Traumatologia",
+        "Traumatologia Pediatrica",
+        "Ginecologia",
+        "Obstetricia",
+        "Pediatria",
+        "Neonatos",
+        "UCIN",
+        "CRN",
+        "MADRE CANGURO",
+        "UCIA"
+      ]
+    },
+    {
+      "name": "Día de cama Ocupado",
+      "variables": [
+        "Medicina",
+        "Cirugia",
+        "Cirugia Pediatrica",
+        "Traumatologia",
+        "Traumatologia Pediatrica",
+        "Ginecologia",
+        "Obstetricia",
+        "Pediatria",
+        "Neonatos",
+        "UCIN",
+        "CRN",
+        "MADRE CANGURO",
+        "UCIA",
+        "subtotal"
+      ]
+    },
+    {
+      "name": "Día de cama Desocupado",
+      "variables": [
+        "Medicina",
+        "Cirugia",
+        "Cirugia Pediatrica",
+        "Traumatologia",
+        "Traumatologia Pediatrica",
+        "Ginecologia",
+        "Obstetricia",
+        "Pediatria",
+        "Neonatos",
+        "UCIN",
+        "CRN",
+        "MADRE CANGURO",
+        "UCIA",
+        "subtotal"
+      ]
+    },
+    {
+      "name": "Día de Estancia",
+      "variables": [
+        "Medicina",
+        "Cirugia",
+        "Cirugia Pediatrica",
+        "Traumatologia",
+        "Traumatologia Pediatrica",
+        "Ginecologia",
+        "Obstetricia",
+        "Pediatria",
+        "Neonatos",
+        "UCIN",
+        "CRN",
+        "MADRE CANGURO",
+        "UCIA",
+        "subtotal"
+      ]
+    },
+    {
+      "name": "Egresos",
+      "variables": [
+        "Medicina",
+        "Cirugia",
+        "Cirugia Pediatrica",
+        "Traumatologia",
+        "Traumatologia Pediatrica",
+        "Ginecologia",
+        "Obstetricia",
+        "Pediatria",
+        "Neonatos",
+        "UCIN",
+        "CRN",
+        "MADRE CANGURO",
+        "UCIA",
+        "subtotal"
+      ]
+    },
+    {
+      "name": "Indice de Rotación de Camas",
+      "variables": [
+        "Medicina",
+        "Cirugia",
+        "Cirugia Pediatrica",
+        "Traumatologia",
+        "Traumatologia Pediatrica",
+        "Ginecologia",
+        "Obstetricia",
+        "Pediatria",
+        "Neonatos",
+        "UCIN",
+        "CRN",
+        "MADRE CANGURO",
+        "UCIA",
+        "subtotal"
+      ]
+    },
+    {
+      "name": "Ingresos",
+      "variables": [
+        "Medicina",
+        "Cirugia",
+        "Cirugia Pediatrica",
+        "Traumatologia",
+        "Traumatologia Pediatrica",
+        "Ginecologia",
+        "Obstetricia",
+        "Pediatria",
+        "Neonatos",
+        "UCIN",
+        "CRN",
+        "MADRE CANGURO",
+        "UCIA",
+        "subtotal"
+      ]
+    },
+    {
+      "name": "Egresos por Genero",
+      "variables": [
+        "Medicina",
+        "Cirugia",
+        "Cirugia Pedia",
+        "Traumatologia",
+        "Trauma Pedia",
+        "Ginecologia",
+        "Obstetricia",
+        "Pediatria",
+        "Neonatos",
+        "UCIN",
+        "CRN",
+        "Alojamiento conjunto",
+        "MADRE CANGURO",
+        "UCIA"
+      ]
+    },
+    {
+      "name": "Variables de Insumos Despachados",
+      "variables": [
+        "Medicamentos",
+        "Requisiones Oxigeno",
+        "Requisiones de Suministros",
+        "Productos Afines",
+        "Requisiones",
+        "Salida de Medicamentos Controlados",
+        "Unidades Despachadas M.Q Renglon-295",
+        "Valor Despachado M.Q Renglon-295",
+        "Unidades Despachadas Medicamento Renglon-266",
+        "Valor Despachado Medicamentos Renglon-266"
+      ]
+    },
+    {
+      "name": "Planificación familiar",
+      "variables": [
+        "Metodo Inyectable",
+        "Metodo DIU",
+        "Metodo Pildora",
+        "Metodo Condon",
+        "Metodo Implante"
+      ]
+    },
+    {
+      "name": "Producción SIGSA 3H",
+      "variables": [
+        "Primeras",
+        "Reconsultas",
+        "Emergencias",
+        "Interconsultas",
+        "Total de consultas"
+      ]
+    },
+    {
+      "name": "Consultas por especialidad",
+      "variables": [
+        "Cirugía",
+        "Medicina General",
+        "Ginecología",
+        "Medicina Interna",
+        "Nutrición",
+        "Pediatría",
+        "Psicología",
+        "Terapia Respiratoria",
+        "Traumatología",
+        "Consejeria de Nutrición y Lactancia Materna",
+        "Odontología",
+        "por genero"
+      ]
+    },
+    {
+      "name": "Primeras Consultas por Especialidad",
+      "variables": [
+        "Cirugía",
+        "Medicina General",
+        "Ginecología",
+        "Medicina Interna",
+        "Nutrición",
+        "Pediatría",
+        "Psicología",
+        "Terapia Respiratoria",
+        "Traumatología",
+        "Consejeria de Nutrición y Lactancia Materna",
+        "Odontología",
+        "por genero"
+      ]
+    },
+    {
+      "name": "Reconsultas por Especialidad",
+      "variables": [
+        "Cirugía",
+        "Medicina General",
+        "Ginecología",
+        "Medicina Interna",
+        "Nutrición",
+        "Pediatría",
+        "Psicología",
+        "Terapia Respiratoria",
+        "Traumatología",
+        "Consejeria de Nutrición y Lactancia Materna",
+        "Odontología",
+        "por genero"
+      ]
+    },
+    {
+      "name": "Emergencias por Especialidad",
+      "variables": [
+        "Cirugía",
+        "Medicina General",
+        "Ginecología",
+        "Medicina Interna",
+        "Nutrición",
+        "Pediatría",
+        "Psicología",
+        "Terapia Respiratoria",
+        "Traumatología",
+        "Consejeria de Nutrición y Lactancia Materna",
+        "Odontología",
+        "por genero"
+      ]
+    },
+    {
+      "name": "Interconsultas por Especialidad",
+      "variables": [
+        "Cirugía",
+        "Medicina General",
+        "Ginecología",
+        "Medicina Interna",
+        "Nutrición",
+        "Pediatría",
+        "Psicología",
+        "Terapia Respiratoria",
+        "Traumatología",
+        "Consejeria de Nutrición y Lactancia Materna",
+        "Odontología",
+        "por genero"
+      ]
+    },
+    {
+      "name": "Promedio diario de consultas",
+      "variables": [
+        "Cirugía",
+        "Medicina General",
+        "Ginecología",
+        "Medicina Interna",
+        "Nutrición",
+        "Pediatría",
+        "Psicología",
+        "Terapia Respiratoria",
+        "Traumatología",
+        "Odontología"
+      ]
+    },
+    {
+      "name": "Analisis Multianual de Consultas",
+      "variables": [
+        "Total Consultas",
+        "Primeras",
+        "Emergencias"
+      ]
+    },
+    {
+      "name": "Otras consultas de comités",
+      "variables": [
+        "Primeras Consultas Adecuaciones menores de 5 años",
+        "Emergencias Consultas Adecuaciones menores de 5 años",
+        "Reconsultas Adecuaciones menores de 5 años",
+        "Interconsultas Adecuaciones menores de 5 años",
+        "Controles de lactantes sanos Z:76:2",
+        "Primeros Controles Prenatales Z:34:1",
+        "Segundos Controles Prenatales Z:34:2",
+        "Terceros Controles PrenatalesZ:34:3",
+        "Cuartos Controles PrenatalesZ:34:4",
+        "Atención despues del parto Z:39:x",
+        "Examen ginecologico normal Z:01:4",
+        "Supervicsión del embarazo normal Z:34"
+      ]
+    },
+    {
+      "name": "Mortalidad General por Grupo de Edad y Sexo",
+      "variables": [
+        "0 a 28 días",
+        "menor a 5 años",
+        "5 a 18 años",
+        "19 a 59 años",
+        "mayor a 60 años",
+        "Mortalidad general"
+      ]
+    },
+    {
+      "name": "Indice de Mortalidad Neonatal y Perinatal al Corte",
+      "variables": [
+        "Mortalidad Neonatal Inmediata (24 horas)",
+        "Mortalidad Neonatal Temprana (7 dias)",
+        "Mortalidad Neonatal Tardia (7 a 28 dias)",
+        "Mortalidad Neonatal Total",
+        "Muertes Fetales",
+        "tasa de Mortalidad Perinatal y Neonatal",
+        "tasa de Muertes Fetales",
+        "tasa de Mortalidad Neonatal Inmediata",
+        "tasa de mortalidad Neonatal Temprana",
+        "tasa de Mortalidad Neonatal Tardia"
+      ]
+    },
+    {
+      "name": "Consultas Registradas",
+      "variables": [
+        "Promedio demendada diaria COEX",
+        "Pacientes atendidos en COEX",
+        "Pacientes atendidos en EMERGENCIA",
+        "Pacientes ingresados a HOSPITALIZACION",
+        "Pacientes Atendidos",
+        "Cantidad de Reingresos",
+        "Indice de Reingresos",
+        "Estudiantes Escuela Publica",
+        "Personal de Salud",
+        "Estadisticas Multianual Consulta Externa"
+      ]
+    },
+    {
+      "name": "Promedio diario de consultas Especialidad",
+      "variables": [
+        "Cirugía",
+        "Medicina General",
+        "Ginecología",
+        "Medicina Interna",
+        "Nutrición",
+        "Pediatría",
+        "Psicología",
+        "Odontología",
+        "Traumatología"
+      ]
+    },
+    {
+      "name": "Operativos",
+      "variables": [
+        "Guardiania",
+        "Jardineria",
+        "Costurería",
+        "Lavanderia",
+        "Insumos Utilizados",
+        "Mantenimiento"
+      ]
+    },
+    {
+      "name": "Intendencia",
+      "variables": [
+        "Común",
+        "Inorganico",
+        "Punzocortante",
+        "Organo Patologico",
+        "Especial",
+        "Desecho Farmaceutico Vencidos Solidos",
+        "áreas limpiadas intendencia",
+        "Desechos Desagregados"
+      ]
+    },
+    {
+      "name": "Transportes",
+      "variables": [
+        "Ambulancia 042BBT",
+        "Ambulancia 036BBT",
+        "Ambulancias",
+        "Pick Up",
+        "Transporte",
+        "Referencias"
+      ]
+    },
+    {
+      "name": "Raciones entregadas a pacientes",
+      "variables": [
+        "Pediatria",
+        "Encamamiento Mujeres",
+        "Encamamiento Hombres",
+        "Maternidad",
+        "Centro de Recuperación Nutricional  ( CRN )",
+        "UNIDAD DE CUIDADOS INTENSIVOS NEONATALES ( UCIN )",
+        "Emergencia",
+        "Acompañantes Pedia",
+        "Acompañantes Encamamiento",
+        "ACOMPAÑANTES MENORES DE 15 AÑOS",
+        "Acompañantes CRN",
+        "Acompañantes UCIN",
+        "Acompañantes EMERGENCIA"
+      ]
+    },
+    {
+      "name": "Raciones",
+      "variables": [
+        "desyunos",
+        "refaccion matutina",
+        "almuerzo",
+        "refaccion despertina",
+        "cena",
+        "refaccion nocturna",
+        "alimentacion enteral",
+        "formulas",
+        "subtotal"
+      ]
+    },
+    {
+      "name": "Servicios Atendidos",
+      "variables": [
+        "Pediatria",
+        "Enc. Mujeres",
+        "Enc. Hombres",
+        "Maternidad",
+        "CRN",
+        "UCIN",
+        "Emergencia",
+        "Acomp. Pedia",
+        "Acomp. Encam",
+        "Acomp. 15 años",
+        "Acomp. CRN",
+        "Acomp. UCIN",
+        "Acomp. Emerg",
+        "total"
+      ]
+    },
+    {
+      "name": "Produccion de Enfermería - Emergencia y COEX",
+      "variables": [
+        "Hipodermias",
+        "Curaciones",
+        "Suturas",
+        "Retiro de puntos",
+        "Terapia tradicionales"
+      ]
+    },
+    {
+      "name": NaN,
+      "variables": [
+        "aux. enfermeria",
+        "enfermero profesional",
+        "total"
+      ]
+    },
+    {
+      "name": "Central de Equipo",
+      "variables": [
+        "cantidad",
+        "libras",
+        "sop",
+        "emergencia"
+      ]
+    },
+    {
+      "name": "Camilleros",
+      "variables": [
+        "Pediatria",
+        "Ginecología y Obstetricia",
+        "Area Roja",
+        "Medicina Interna",
+        "Cirugía",
+        "Traumatología",
+        "Aislamiento",
+        "Camillas de transporte"
+      ]
+    },
+    {
+      "name": "Trabajo Social",
+      "variables": [
+        "Consejerias VIH-SIDA",
+        "VSVS",
+        "Embarazo < 14",
+        "Intrafamiliar",
+        "Actividades Realizadas",
+        "Seguimientos de casos",
+        "Hojas de madre canguro",
+        "Contraindicados"
+      ]
+    },
+    {
+      "name": "Programa 13",
+      "variables": [
+        "000-012 Servicios De Apoyo A La Recuperación De La Salud",
+        "000-012-0001 Servicios De Apoyo A La Recuperación De La Salud",
+        "000-012-0004 Servicios De Apoyo Diagnóstico",
+        "000-028 Personas Atendidas En Servicios De Recuperación De La Salud",
+        "000-028-0001 Personas Atendidas En Consulta Externa",
+        "000-028-0002 Personas Atendidas En La Emergencia",
+        "000-028-0003 Personas Atendidas En Los Servicios De Hospitalización",
+        "000-035 Niños Y Jóvenes De Escuelas Públicas Beneficiados Con Servicios De Salud",
+        "000-035-0001 Niños Y Jóvenes De Escuelas Públicas Beneficiados Con Servicios De Salud",
+        "000-036 Personas Atendidas Con Diagnóstico Y Tratamiento Oncológico",
+        "000-036-0001 Personas Atendidas Con Diagnóstico Oncológico",
+        "Programa 13",
+        "MES EJECUTADO"
+      ]
+    },
+    {
+      "name": "Programa 14",
+      "variables": [
+        "001-009 Niño Y Niña Menor De 5 Años Atendido Por Infección Respiratoria Aguda",
+        "001-009-0001 Niño Y Niña Menor De 5 Años Atendido Por Infección Respiratoria Aguda",
+        "001-010 Niño Y Niña Menor De 5 Años Atendido Por Enfermedad Diarreica Aguda",
+        "001-010-0001 Niño Y Niña Menor De 5 Años Atendido Por Enfermedad Diarreica Aguda",
+        "001-012 Niño Y Niña Menor De 5 Años Con Diagnóstico Y Tratamiento De La Desnutrición Aguda",
+        "001-012-0001 Niño Y Niña Menor De 5 Años Con Diagnóstico Y Tratamiento De La Desnutrición Aguda Moderada",
+        "001-012-0002 Niño Y Niña Menor De 5 Años Con Diagnóstico Y Tratamiento De La Desnutrición Aguda Severa",
+        "Programa 14"
+      ]
+    },
+    {
+      "name": "Programa 15",
+      "variables": [
+        "002-001 Mujer Que Recibe Atención Prenatal Oportuna",
+        "002-001-0003 Mujer Atendida Por Complicaciones Obstétricas",
+        "002-002 Mujer Que Recibe Atención Del Parto Limpio Y Seguro",
+        "002-002-0002 Mujer Atendida Durante El Parto Limpio Y Seguro",
+        "002-002-0003 Mujer Atendida Por Urgencias Obstétricas Durante El Parto",
+        "002-002-0004 Mujer Atendida Durante El Puerperio",
+        "002-003 Recién Nacido O Neonato Atendido",
+        "002-003-0002 Neonato Atendido En Las Primeras 24 Horas De Vida",
+        "002-003-0003 Neonato Atendido De 1 A Menor De 28 Días De Nacido",
+        "002-004 Población Con Acceso A Métodos De Planificación Familiar",
+        "002-004-0001 Población En Edad Reproductiva Beneficiada Con Métodos De Planificación Familiar",
+        "002-004-0002 Mujer Con Tamizaje Para La Detección Temprana Del Cáncer De Cérvix",
+        "Programa 15"
+      ]
+    },
+    {
+      "name": "Programa 16",
+      "variables": [
+        "003-001 Persona Atendida Para La Prevención De Its, Vih/Sida",
+        "003-001-0004 Persona Adolescente, Adulto, Adulto Mayor Y Mujer Embarazada, Que Recibe Consejería Sobre Formas De Prevención De Las Its, Vih/Sida Y El Uso Correcto Del Condón",
+        "003-003 Víctima/Sobreviviente Atendida Por Violencia Sexual",
+        "003-003-0001 Víctima/Sobreviviente Atendida Por Violencia Sexual",
+        "Programa 16"
+      ]
+    }
+  ]
+}

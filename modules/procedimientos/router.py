@@ -472,6 +472,7 @@ def eliminar_procedimiento_medico(
 def obtener_estadisticas(
     anio: int = Query(..., ge=2000, le=2100),
     mes: Optional[int] = Query(None, ge=1, le=12),
+    nombre: Optional[str] = Query(None),
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -492,10 +493,14 @@ def obtener_estadisticas(
         ProceMedicoModel.fecha <= fecha_fin
     )
     
+    if nombre:
+        query = query.join(ProcedimientoModel, ProcedimientoModel.id == ProceMedicoModel.id_procedimiento)
+        query = query.filter(ProcedimientoModel.nombre.ilike(f"%{nombre}%"))
+    
     total_procedimientos = query.count()
     total_cantidad = query.with_entities(func.sum(ProceMedicoModel.cantidad)).scalar() or 0
     
-    top_procedimientos = (
+    top_query = (
         db.query(
             ProcedimientoModel.nombre,
             func.count(ProceMedicoModel.id).label('total')
@@ -505,6 +510,12 @@ def obtener_estadisticas(
             ProceMedicoModel.fecha >= fecha_inicio,
             ProceMedicoModel.fecha <= fecha_fin
         )
+    )
+    if nombre:
+        top_query = top_query.filter(ProcedimientoModel.nombre.ilike(f"%{nombre}%"))
+    
+    top_procedimientos = (
+        top_query
         .group_by(ProcedimientoModel.id)
         .order_by(func.count(ProceMedicoModel.id).desc())
         .limit(5)
@@ -529,6 +540,7 @@ def obtener_estadisticas(
     return {
         "anio": anio,
         "mes": mes,
+        "nombre": nombre,
         "fecha_inicio": fecha_inicio,
         "fecha_fin": fecha_fin,
         "total_registros": total_procedimientos,

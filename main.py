@@ -74,6 +74,7 @@ from modules.chat.router import router as chat_router
 from modules.agente.router import router as agente_router
 from modules.especialidades.router import router as especialidades_router
 from modules.quirofano.router import router as quirofano_router
+from modules.variables.router import router as variables_router
 
 app = FastAPI(
     lifespan=lifespan,
@@ -174,6 +175,7 @@ app.include_router(chat_router)
 app.include_router(agente_router)
 app.include_router(especialidades_router)
 app.include_router(quirofano_router)
+app.include_router(variables_router)
 
 
 @app.get("/", include_in_schema=False)

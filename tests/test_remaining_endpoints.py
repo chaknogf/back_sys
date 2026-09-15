@@ -222,6 +222,51 @@ class TestCensoCamas:
         r = client.post("/censo-camas/importar-csv")
         assert r.status_code in (400, 422)
 
+    def test_hospitalizacion_por_especialidad(self, client):
+        desde = (date.today() - timedelta(days=30)).isoformat()
+        hasta = date.today().isoformat()
+        r = client.get(
+            f"/censo-camas/hospitalizacion-por-especialidad?desde={desde}&hasta={hasta}"
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert "desde" in data
+        assert "hasta" in data
+        assert "total_hospitalizados" in data
+        assert isinstance(data["especialidades"], list)
+
+    def test_hospitalizacion_por_especialidad_invalid_range(self, client):
+        r = client.get(
+            "/censo-camas/hospitalizacion-por-especialidad?desde=2026-01-02&hasta=2026-01-01"
+        )
+        assert r.status_code in (400, 200)
+
+    def test_copiar_dia_anterior(self, client):
+        if not TestCensoCamas.SERVICIO_ID:
+            pytest.skip("No servicio created")
+        ayer = (date.today() - timedelta(days=1)).isoformat()
+        hoy = date.today().isoformat()
+        r = client.post(
+            "/censo-camas/copiar-dia-anterior",
+            json={"origen": ayer, "destino": hoy, "servicio_id": TestCensoCamas.SERVICIO_ID},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["origen"] == ayer
+        assert data["destino"] == hoy
+        assert isinstance(data["copiados"], int)
+        assert isinstance(data["actualizados"], int)
+
+    def test_copiar_dia_anterior_todos_servicios(self, client):
+        ayer = (date.today() - timedelta(days=1)).isoformat()
+        mañana = (date.today() + timedelta(days=1)).isoformat()
+        r = client.post(
+            "/censo-camas/copiar-dia-anterior",
+            json={"origen": ayer, "destino": mañana},
+        )
+        assert r.status_code == 200
+        assert "sin_datos" in r.json()
+
 
 # =====================================================================
 # CIE-10

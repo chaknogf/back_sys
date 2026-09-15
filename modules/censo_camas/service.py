@@ -7,7 +7,11 @@ import csv
 import io
 
 from modules.censo_camas.models import CensoCamasModel
-from modules.censo_camas.schemas import CensoCamasCreate, CensoCamasUpdate
+from modules.censo_camas.schemas import (
+    CensoCamasCreate,
+    CensoCamasUpdate,
+    HospitalizacionEspecialidadItem,
+)
 
 
 def _calc_egresos_totales(egresos: int, fallecidos: int, referido: int, traslado: int, contraindicados: int) -> int:
@@ -457,4 +461,151 @@ def importar_csv(contenido_csv: str, db: Session) -> dict:
         "creados": creados,
         "actualizados": actualizados,
         "errores": errores,
+    }
+
+
+def hospitalizacion_por_especialidad(desde: date, hasta: date, db: Session) -> dict:
+    """Hospitalizaciones activas (tipo_consulta=2) agrupadas por especialidad.
+
+    Cruza `consultas` activas con `pacientes` (sexo, días de estancia) y
+    `especialidades`. Además intenta asociar cada especialidad a un servicio de
+    encamamiento comparando `consultas.servicio` (texto) contra
+    `encamamiento.nombre_servicio` (catálogo) de forma case-insensitive.
+    """
+    from modules.encamamiento.models import EncamamientoModel
+
+    rows = db.execute(text("""
+        SELECT
+            COALESCE(e.nombre, c.especialidad, 'Sin especialidad') AS especialidad,
+            COUNT(*) FILTER (WHERE p.sexo = 'M') AS masculinos,
+            COUNT(*) FILTER (WHERE p.sexo = 'F') AS femeninos,
+            COUNT(*) AS total,
+            COALESCE(AVG(CURRENT_DATE - c.fecha_consulta), 0) AS dias_promedio,
+            c.servicio
+        FROM consultas c
+        JOIN pacientes p ON p.id = c.paciente_id
+        LEFT JOIN especialidades e ON e.id = c.especialidad_id
+        WHERE c.tipo_consulta = 2
+          AND c.activo = true
+          AND c.fecha_consulta BETWEEN :desde AND :hasta
+        GROUP BY COALESCE(e.nombre, c.especialidad, 'Sin especialidad'), c.servicio
+        ORDER BY COUNT(*) DESC
+    """), {"desde": desde, "hasta": hasta}).mappings().all()
+
+    servicios = db.query(EncamamientoModel).filter(
+        EncamamientoModel.activo == True
+    ).all()
+    norm: dict[str, str] = {}
+    for svc in servicios:
+        clave = svc.nombre_servicio.upper().strip()
+        norm.setdefault(clave, svc.nombre_servicio)
+
+    def _match_servicio(servicio_texto: Optional[str]) -> Optional[str]:
+        if not servicio_texto:
+            return None
+        clave = servicio_texto.upper().strip()
+        if clave in norm:
+            return norm[clave]
+        for k, nombre in norm.items():
+            if clave in k or k in clave:
+                return nombre
+        return None
+
+    agrupado: dict[str, dict] = {}
+    for r in rows:
+        esp = str(r["especialidad"])
+        entry = agrupado.setdefault(esp, {
+            "especialidad": esp,
+            "masculinos": 0,
+            "femeninos": 0,
+            "total": 0,
+            "dias_promedio_estancia": 0.0,
+            "servicio_encamamiento": None,
+        })
+        entry["masculinos"] += int(r["masculinos"] or 0)
+        entry["femeninos"] += int(r["femeninos"] or 0)
+        entry["total"] += int(r["total"] or 0)
+        dias = float(r["dias_promedio"] or 0)
+        entry["dias_promedio_estancia"] = dias
+        if entry["servicio_encamamiento"] is None:
+            entry["servicio_encamamiento"] = _match_servicio(r["servicio"])
+
+    especialidades = [dict(a) for a in agrupado.values()]
+    total_hospitalizados = sum(int(e["total"]) for e in especialidades)
+
+    return {
+        "desde": desde,
+        "hasta": hasta,
+        "total_hospitalizados": total_hospitalizados,
+        "especialidades": especialidades,
+    }
+
+
+def copiar_dia_anterior(origen: date, destino: date, servicio_id: Optional[int], db: Session) -> dict:
+    """Copia registros de censo de una fecha origen a una fecha destino.
+
+    - Si el par (destino, servicio, sexo) ya existe, se actualiza con los valores del origen.
+    - Si no existe, se crea.
+    - `servicio_id` opcional: si se omite, se copian todos los servicios del día origen.
+    """
+    query = db.query(CensoCamasModel).filter(CensoCamasModel.fecha == origen)
+    if servicio_id:
+        query = query.filter(CensoCamasModel.servicio_id == servicio_id)
+    origen_rows = query.all()
+
+    copiados = 0
+    actualizados = 0
+
+    for src in origen_rows:
+        existe = db.query(CensoCamasModel).filter(
+            CensoCamasModel.fecha == destino,
+            CensoCamasModel.servicio_id == src.servicio_id,
+            CensoCamasModel.sexo == src.sexo,
+        ).first()
+
+        datos = {
+            "ocupados": src.ocupados,
+            "egresos": src.egresos,
+            "fallecidos": src.fallecidos,
+            "referido": src.referido,
+            "traslado": src.traslado,
+            "contraindicados": src.contraindicados,
+            "otro_ingresos": src.otro_ingresos,
+            "ingresos": src.ingresos,
+            "huespedes": src.huespedes,
+            "emergencia": src.emergencia,
+        }
+        egresos_totales = _calc_egresos_totales(
+            datos["egresos"], datos["fallecidos"], datos["referido"],
+            datos["traslado"], datos["contraindicados"],
+        )
+        datos["egresos_totales"] = egresos_totales
+        datos["camas_ocupadas"] = _calc_camas_ocupadas(
+            datos["ocupados"], datos["otro_ingresos"], datos["ingresos"],
+            datos["huespedes"], datos["emergencia"], egresos_totales,
+        )
+
+        if existe:
+            for key, value in datos.items():
+                setattr(existe, key, value)
+            actualizados += 1
+        else:
+            nuevo = CensoCamasModel(
+                fecha=destino,
+                servicio_id=src.servicio_id,
+                sexo=src.sexo,
+                **datos,
+            )
+            db.add(nuevo)
+            copiados += 1
+
+    if copiados or actualizados:
+        db.commit()
+
+    return {
+        "origen": origen,
+        "destino": destino,
+        "copiados": copiados,
+        "actualizados": actualizados,
+        "sin_datos": 0 if (copiados or actualizados) else len(origen_rows),
     }

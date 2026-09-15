@@ -81,6 +81,40 @@ class CensoCamasListResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class HospitalizacionEspecialidadItem(BaseModel):
+    especialidad: str
+    masculinos: int
+    femeninos: int
+    total: int
+    dias_promedio_estancia: float = Field(default=0.0, description="Promedio de días de estancia de pacientes activos")
+    servicio_encamamiento: Optional[str] = Field(None, description="Servicio de encamamiento asociado (match por nombre)")
+
+
+class HospitalizacionEspecialidadResponse(BaseModel):
+    desde: date
+    hasta: date
+    total_hospitalizados: int
+    especialidades: list[HospitalizacionEspecialidadItem]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CopiarDiaRequest(BaseModel):
+    origen: date = Field(..., description="Fecha origen de la que se copian los registros")
+    destino: date = Field(..., description="Fecha destino a la que se copian")
+    servicio_id: Optional[int] = Field(None, description="Filtrar solo este servicio; omitir para todos")
+
+
+class CopiarDiaResponse(BaseModel):
+    origen: date
+    destino: date
+    copiados: int
+    actualizados: int
+    sin_datos: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class EstadisticaServicio(BaseModel):
     servicio_id: int
     servicio_nombre: str

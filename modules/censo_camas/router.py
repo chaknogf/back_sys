@@ -1,10 +1,20 @@
 from datetime import date
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, UploadFile, File, status
+from fastapi import APIRouter, Depends, Query, UploadFile, File, status, HTTPException
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from .schemas import CensoCamasCreate, CensoCamasUpdate, CensoCamasOut, CensoCamasListResponse, CensoDiarioResumen, CensoEstadisticasResponse
+from .schemas import (
+    CensoCamasCreate,
+    CensoCamasUpdate,
+    CensoCamasOut,
+    CensoCamasListResponse,
+    CensoDiarioResumen,
+    CensoEstadisticasResponse,
+    HospitalizacionEspecialidadResponse,
+    CopiarDiaRequest,
+    CopiarDiaResponse,
+)
 from .service import (
     crear_registro as service_crear,
     upsert_registro as service_upsert,
@@ -16,6 +26,8 @@ from .service import (
     bulk_create as service_bulk,
     estadisticas as service_estadisticas,
     importar_csv as service_importar_csv,
+    hospitalizacion_por_especialidad as service_hospitalizacion,
+    copiar_dia_anterior as service_copiar_dia,
 )
 
 router = APIRouter(
@@ -68,6 +80,20 @@ def listar_registros(
 @router.get("/resumen/{fecha}", response_model=CensoDiarioResumen)
 def resumen_diario(fecha: date, db: Session = Depends(get_db)):
     return service_resumen(fecha, db)
+
+
+@router.get("/hospitalizacion-por-especialidad", response_model=HospitalizacionEspecialidadResponse)
+def hospitalizacion_por_especialidad(
+    desde: date = Query(..., description="Fecha desde (YYYY-MM-DD)"),
+    hasta: date = Query(..., description="Fecha hasta (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+):
+    return service_hospitalizacion(desde, hasta, db)
+
+
+@router.post("/copiar-dia-anterior", response_model=CopiarDiaResponse)
+def copiar_dia_anterior(data: CopiarDiaRequest, db: Session = Depends(get_db)):
+    return service_copiar_dia(data.origen, data.destino, data.servicio_id, db)
 
 
 @router.get("/estadisticas", response_model=CensoEstadisticasResponse)

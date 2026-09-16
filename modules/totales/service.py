@@ -19,97 +19,92 @@ def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
         fecha_consulta = date.today()
 
     query = text("""
+        WITH occupancy AS (
+            SELECT COALESCE(SUM(cc.camas_ocupadas), 0) AS ocupadas
+            FROM censo_camas cc
+            WHERE cc.fecha = :fecha
+        ),
+        capacity AS (
+            SELECT COALESCE(SUM(camas_censables), 0) AS total_camas
+            FROM encamamiento
+            WHERE activo = true
+        )
         SELECT entidad, total FROM (
-            SELECT 'pacientes' AS entidad, COUNT(*) AS total, 1 AS orden
-            FROM pacientes
-            
-            UNION ALL
-            
-            SELECT 'pacientes_activos' AS entidad, COUNT(*) AS total, 2 AS orden
+            SELECT 'pacientes_activos' AS entidad, COUNT(*) AS total, 1 AS orden
             FROM pacientes
             WHERE estado = 'A'
-            
+
             UNION ALL
-            
-            SELECT 'consultas' AS entidad, COUNT(*) AS total, 3 AS orden
+
+            SELECT 'coex_hoy' AS entidad, COUNT(*) AS total, 2 AS orden
             FROM consultas
-            
-            UNION ALL
-            
-            SELECT 'consultas_fecha' AS entidad, COUNT(*) AS total, 4 AS orden
-            FROM consultas
-            WHERE fecha_consulta = :fecha
-            
-            UNION ALL
-            
-            SELECT 'coex_fecha' AS entidad, COUNT(*) AS total, 5 AS orden
-            FROM consultas
-            WHERE tipo_consulta = 1 
+            WHERE tipo_consulta = 1
               AND fecha_consulta = :fecha
-            
+
             UNION ALL
-            
-            SELECT 'hospitalizaciones_fecha' AS entidad, COUNT(*) AS total, 6 AS orden
+
+            SELECT 'hospitalizaciones_hoy' AS entidad, COUNT(*) AS total, 3 AS orden
             FROM consultas
-            WHERE tipo_consulta = 2 
+            WHERE tipo_consulta = 2
               AND fecha_consulta = :fecha
-            
+
             UNION ALL
-            
-            SELECT 'emergencias_fecha' AS entidad, COUNT(*) AS total, 7 AS orden
+
+            SELECT 'emergencias_hoy' AS entidad, COUNT(*) AS total, 4 AS orden
             FROM consultas
-            WHERE tipo_consulta = 3 
+            WHERE tipo_consulta = 3
               AND fecha_consulta = :fecha
+
+            UNION ALL
+
+            SELECT 'porcentaje_ocupacional' AS entidad,
+                   ROUND(occupancy.ocupadas * 100.0 / NULLIF(capacity.total_camas, 0), 1)::float AS total,
+                   5 AS orden
+            FROM occupancy, capacity
         ) AS totales_ordenados
         ORDER BY orden;
     """)
 
     resultado = db.execute(query, {"fecha": fecha_consulta}).fetchall()
 
-    iconos_map = {
-        'pacientes': 'users',
-        'pacientes_activos': 'user-check',
-        'consultas': 'file-medical',
-        'consultas_fecha': 'calendar-check',
-        'coex_fecha': 'stethoscope',
-        'hospitalizaciones_fecha': 'bed',
-        'emergencias_fecha': 'ambulance'
-    }
-
-    colores_map = {
-        'pacientes': 'blue',
-        'pacientes_activos': 'purple',
-        'consultas': 'green',
-        'consultas_fecha': 'teal',
-        'coex_fecha': 'cyan',
-        'hospitalizaciones_fecha': 'orange',
-        'emergencias_fecha': 'red'
-    }
-
     es_hoy = fecha_consulta == date.today()
     sufijo = "Hoy" if es_hoy else fecha_consulta.strftime("%d/%m/%Y")
 
+    iconos_map = {
+        'pacientes_activos': 'user-check',
+        'coex_hoy': 'stethoscope',
+        'hospitalizaciones_hoy': 'bed',
+        'emergencias_hoy': 'ambulance',
+        'porcentaje_ocupacional': 'bed',
+    }
+
+    colores_map = {
+        'pacientes_activos': 'purple',
+        'coex_hoy': 'cyan',
+        'hospitalizaciones_hoy': 'orange',
+        'emergencias_hoy': 'red',
+        'porcentaje_ocupacional': 'green',
+    }
+
     nombres_map = {
-        'pacientes': 'Pacientes Totales',
         'pacientes_activos': 'Pacientes Activos',
-        'consultas': 'Consultas Totales',
-        'consultas_fecha': f'Consultas {sufijo}',
-        'coex_fecha': f'COEX {sufijo}',
-        'hospitalizaciones_fecha': f'Hospitalizaciones {sufijo}',
-        'emergencias_fecha': f'Emergencias {sufijo}'
+        'coex_hoy': f'COEX {sufijo}',
+        'hospitalizaciones_hoy': f'Hospitalizaciones {sufijo}',
+        'emergencias_hoy': f'Emergencias {sufijo}',
+        'porcentaje_ocupacional': f'Ocupación Camas {sufijo}',
     }
 
     totales = [
         TotalesItem(
             entidad=nombres_map.get(row.entidad, row.entidad.capitalize()),
-            total=row.total,
+            total=float(row.total) if row.entidad == 'porcentaje_ocupacional' else int(row.total),
             icono=iconos_map.get(row.entidad, "bar-chart"),
-            color=colores_map.get(row.entidad, "gray")
+            color=colores_map.get(row.entidad, "gray"),
         )
         for row in resultado
     ]
 
     return TotalesResponse(
         totales=totales,
-        generado_en=datetime.now().isoformat()
+        generado_en=datetime.now().isoformat(),
     )

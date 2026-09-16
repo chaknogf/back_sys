@@ -1532,7 +1532,7 @@ class TestTotales:
         data = r.json()
         assert "totales" in data
         assert "generado_en" in data
-        assert len(data["totales"]) == 7
+        assert len(data["totales"]) == 5
 
     def test_get_totales_with_fecha(self, client, auth_headers):
         r = client.get("/totales/?fecha=2025-01-01", headers=auth_headers)

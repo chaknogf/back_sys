@@ -4,7 +4,7 @@ from typing import List
 
 class TotalesItem(BaseModel):
     entidad: str = Field(..., description="Nombre de la entidad contada")
-    total: int = Field(..., ge=0, description="Cantidad total")
+    total: int | float = Field(..., ge=0, description="Cantidad total (porcentaje cuando aplica)")
     icono: str | None = Field(None, description="Icono para frontend (ej: 'users', 'file-medical')")
     color: str | None = Field(None, description="Color del card (ej: 'blue', 'green')")
 

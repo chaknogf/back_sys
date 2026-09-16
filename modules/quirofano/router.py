@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import date
 
-from core.dependencies import get_db, get_current_admin_user
+from core.dependencies import get_db, get_current_admin_user, get_current_user
 from modules.users.models import UserModel
 
 from . import schemas as sch
@@ -22,7 +23,7 @@ router = APIRouter(
 def listar_formatos(
     activos: bool = Query(True, description="Solo activos"),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     return svc.listar_formatos(db, solo_activos=activos)
 
@@ -31,7 +32,7 @@ def listar_formatos(
 def obtener_formato(
     formato_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     return svc.obtener_formato(formato_id, db)
 
@@ -73,7 +74,7 @@ def eliminar_formato(
 def listar_estados_cirugia(
     activos: bool = Query(True, description="Solo activos"),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     return svc.listar_estados_cirugia(db, solo_activos=activos)
 
@@ -82,7 +83,7 @@ def listar_estados_cirugia(
 def obtener_estado_cirugia(
     estado_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     return svc.obtener_estado_cirugia(estado_id, db)
 
@@ -124,7 +125,7 @@ def eliminar_estado_cirugia(
 def listar_rangos_especialista(
     activos: bool = Query(True, description="Solo activos"),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     return svc.listar_rangos_especialista(db, solo_activos=activos)
 
@@ -133,7 +134,7 @@ def listar_rangos_especialista(
 def obtener_rango_especialista(
     rango_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     return svc.obtener_rango_especialista(rango_id, db)
 
@@ -175,7 +176,7 @@ def eliminar_rango_especialista(
 def listar_procedencias(
     activos: bool = Query(True, description="Solo activos"),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     return svc.listar_procedencias(db, solo_activos=activos)
 
@@ -184,7 +185,7 @@ def listar_procedencias(
 def obtener_procedencia(
     procedencia_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     return svc.obtener_procedencia(procedencia_id, db)
 
@@ -219,6 +220,57 @@ def eliminar_procedencia(
 
 
 # ========================
+# Número de Quirófano
+# ========================
+@router.get("/quirofanos-numero", response_model=List[sch.QuirofanoNumeroOut])
+@router.get("/quirofanos-numero/", response_model=List[sch.QuirofanoNumeroOut])
+def listar_quirofanos_numero(
+    activos: bool = Query(True, description="Solo activos"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return svc.listar_quirofanos_numero(db, solo_activos=activos)
+
+
+@router.get("/quirofanos-numero/{qn_id}", response_model=sch.QuirofanoNumeroOut)
+def obtener_quirofano_numero(
+    qn_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return svc.obtener_quirofano_numero(qn_id, db)
+
+
+@router.post("/quirofanos-numero", response_model=sch.QuirofanoNumeroOut, status_code=status.HTTP_201_CREATED)
+@router.post("/quirofanos-numero/", response_model=sch.QuirofanoNumeroOut, status_code=status.HTTP_201_CREATED)
+def crear_quirofano_numero(
+    data: sch.QuirofanoNumeroCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_admin_user),
+):
+    return svc.crear_quirofano_numero(data, db)
+
+
+@router.put("/quirofanos-numero/{qn_id}", response_model=sch.QuirofanoNumeroOut)
+def actualizar_quirofano_numero(
+    qn_id: int,
+    data: sch.QuirofanoNumeroUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_admin_user),
+):
+    return svc.actualizar_quirofano_numero(qn_id, data, db)
+
+
+@router.delete("/quirofanos-numero/{qn_id}")
+def eliminar_quirofano_numero(
+    qn_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_admin_user),
+):
+    return svc.eliminar_quirofano_numero(qn_id, db)
+
+
+# ========================
 # Categoría Procedimiento
 # ========================
 @router.get("/categorias", response_model=List[sch.CategoriaProcedimientoOut])
@@ -226,7 +278,7 @@ def eliminar_procedencia(
 def listar_categorias(
     activos: bool = Query(True, description="Solo activos"),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     return svc.listar_categorias(db, solo_activos=activos)
 
@@ -235,7 +287,7 @@ def listar_categorias(
 def obtener_categoria(
     categoria_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     return svc.obtener_categoria(categoria_id, db)
 
@@ -244,7 +296,7 @@ def obtener_categoria(
 def obtener_categoria_con_tipos(
     categoria_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     from .models import CategoriaProcedimientoModel
     reg = db.query(CategoriaProcedimientoModel).filter(
@@ -295,7 +347,7 @@ def listar_tipos_procedimiento(
     categoria_id: Optional[int] = Query(None, description="Filtrar por categoría"),
     q: Optional[str] = Query(None, description="Buscar por nombre o código"),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     return svc.listar_tipos_procedimiento(db, solo_activos=activos, categoria_id=categoria_id, q=q)
 
@@ -304,7 +356,7 @@ def listar_tipos_procedimiento(
 def obtener_tipo_procedimiento(
     tipo_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
     from .models import TipoProcedimientoModel
     reg = db.query(TipoProcedimientoModel).filter(
@@ -336,6 +388,26 @@ def actualizar_tipo_procedimiento(
     return svc.actualizar_tipo_procedimiento(tipo_id, data, db)
 
 
+@router.delete("/tipos/truncar")
+def truncar_tipos(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_admin_user),
+):
+    return svc.truncar_tipos(db)
+
+
+@router.post("/tipos/importar-csv")
+async def importar_csv_tipos(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_admin_user),
+):
+    if not file.filename or not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="El archivo debe ser un CSV (.csv)")
+    contenido = (await file.read()).decode("utf-8")
+    return svc.importar_csv_tipos(contenido, db)
+
+
 @router.delete("/tipos/{tipo_id}")
 def eliminar_tipo_procedimiento(
     tipo_id: int,
@@ -343,3 +415,69 @@ def eliminar_tipo_procedimiento(
     current_user: UserModel = Depends(get_current_admin_user),
 ):
     return svc.eliminar_tipo_procedimiento(tipo_id, db)
+
+
+# ========================
+# Intervención Quirúrgica
+# ========================
+@router.get("/intervenciones", response_model=sch.IntervencionQuirurgicaListResponse)
+@router.get("/intervenciones/", response_model=sch.IntervencionQuirurgicaListResponse)
+def listar_intervenciones(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    expediente: Optional[str] = Query(None),
+    fecha_desde: Optional[date] = Query(None, alias="fecha_desde"),
+    fecha_hasta: Optional[date] = Query(None, alias="fecha_hasta"),
+    activos: Optional[bool] = Query(True),
+    q: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return svc.listar_intervenciones(
+        db,
+        skip=skip,
+        limit=limit,
+        expediente=expediente,
+        fecha_desde=fecha_desde.isoformat() if fecha_desde else None,
+        fecha_hasta=fecha_hasta.isoformat() if fecha_hasta else None,
+        activo=activos,
+        q=q,
+    )
+
+
+@router.get("/intervenciones/{intervencion_id}", response_model=sch.IntervencionQuirurgicaOut)
+def obtener_intervencion(
+    intervencion_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return svc.obtener_intervencion(intervencion_id, db)
+
+
+@router.post("/intervenciones", response_model=sch.IntervencionQuirurgicaOut, status_code=status.HTTP_201_CREATED)
+@router.post("/intervenciones/", response_model=sch.IntervencionQuirurgicaOut, status_code=status.HTTP_201_CREATED)
+def crear_intervencion(
+    data: sch.IntervencionQuirurgicaCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return svc.crear_intervencion(data, db, created_by=current_user.username)
+
+
+@router.put("/intervenciones/{intervencion_id}", response_model=sch.IntervencionQuirurgicaOut)
+def actualizar_intervencion(
+    intervencion_id: int,
+    data: sch.IntervencionQuirurgicaUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return svc.actualizar_intervencion(intervencion_id, data, db)
+
+
+@router.delete("/intervenciones/{intervencion_id}")
+def eliminar_intervencion(
+    intervencion_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return svc.eliminar_intervencion(intervencion_id, db)

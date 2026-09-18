@@ -163,16 +163,52 @@ class TestUsers:
         assert r.status_code == 200
         assert r.json()["nombre"] == "Test Updated"
 
-    def test_recover_password(self, client, auth_headers):
-        r = client.patch(
-            "/users/recuperar",
-            headers=auth_headers,
+    def test_solicitar_recuperacion(self, client, auth_headers, monkeypatch):
+        import sys
+        router_mod = sys.modules["modules.users.router"]
+        monkeypatch.setattr(
+            router_mod,
+            "send_reset_password_email",
+            lambda *a, **kw: None,
+        )
+        r = client.post(
+            "/users/recuperar/solicitar",
+            json={"email": "test_integration@hospital.com"},
+        )
+        assert r.status_code == 200
+        assert "enlace" in r.json()["message"]
+
+    def test_solicitar_recuperacion_email_no_registrado(self, client, auth_headers):
+        r = client.post(
+            "/users/recuperar/solicitar",
+            json={"email": "sin_registro@hospital.com"},
+        )
+        assert r.status_code == 200
+        assert "revisa tu bandeja" in r.json()["message"].lower()
+
+    def test_confirmar_recuperacion(self, client, auth_headers):
+        from core.security import create_password_reset_token
+        token = create_password_reset_token("test_integration@hospital.com")
+        r = client.post(
+            "/users/recuperar/confirmar",
             json={
                 "email": "test_integration@hospital.com",
+                "token": token,
                 "password": "NewPass123!",
             },
         )
         assert r.status_code == 200
+
+    def test_confirmar_recuperacion_token_invalido(self, client, auth_headers):
+        r = client.post(
+            "/users/recuperar/confirmar",
+            json={
+                "email": "test_integration@hospital.com",
+                "token": "token.invalido.sin.emitir",
+                "password": "NewPass123!",
+            },
+        )
+        assert r.status_code == 400
 
     def test_delete_user(self, client, auth_headers):
         if not created_ids["users"]:

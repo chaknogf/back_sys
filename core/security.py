@@ -57,6 +57,28 @@ def create_access_token(
     return jwt.encode({"alg": ALGORITHM}, to_encode, _jwt_key)
 
 
+PASSWORD_RESET_EXPIRE_MINUTES = 30
+
+
+def create_password_reset_token(email: str) -> str:
+    """JWT de un solo uso para restablecer contraseña (30 min)."""
+    return create_access_token(
+        {"sub": email, "purpose": "password_reset"},
+        expires_delta=timedelta(minutes=PASSWORD_RESET_EXPIRE_MINUTES),
+    )
+
+
+def verify_password_reset_token(token: str) -> str | None:
+    """Devuelve el email si el token de reseteo es válido; si no, None."""
+    try:
+        payload = jwt.decode(token, _jwt_key).claims
+    except JoseError:
+        return None
+    if payload.get("purpose") != "password_reset":
+        return None
+    return payload.get("sub")
+
+
 def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     db: Session = Depends(get_db),

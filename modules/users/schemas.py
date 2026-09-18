@@ -32,6 +32,16 @@ class RecuperarPassword(BaseModel):
     password: str = Field(..., min_length=4)
 
 
+class SolicitarRecuperacion(BaseModel):
+    email: EmailStr
+
+
+class ConfirmarRecuperacion(BaseModel):
+    email: EmailStr
+    token: str = Field(..., min_length=10)
+    password: str = Field(..., min_length=4)
+
+
 class UserResponse(UserBase):
     id: Optional[int] = None
     nombre: Optional[str] = None

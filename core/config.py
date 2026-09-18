@@ -14,6 +14,15 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
+# URL pública de la app Angular (raíz donde se sirve la app, ya con el subpath
+# de despliegue, p. ej. https://www.htecpan.com/medicapp). Se usa en los
+# enlaces generados en correos.
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:4200")
+
+# Base de los enlaces de la app en correos (sin barra final). Se puede
+# sobreescribir con APP_BASE_URL si el frontend vive en otra ruta.
+APP_BASE_URL = os.getenv("APP_BASE_URL", FRONTEND_URL.rstrip("/"))
+
 # ────────────────────────────────
 # CONCURRENCIA Y ESCALABILIDAD
 # ────────────────────────────────

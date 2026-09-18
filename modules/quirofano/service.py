@@ -369,29 +369,53 @@ def importar_csv_procedimientos(contenido_csv: str, db: Session) -> dict:
     """Importa procedimientos de quirófano desde CSV.
 
     Columnas: `referencia_especialidad` (o su alias `especialidad`) y
-    `procedimiento`. La especialidad debe existir en la tabla `especialidades`
-    (se busca por nombre) y el `nombre` del procedimiento se guarda SOLO con el
-    nombre del procedimiento. Si `referencia_especialidad` viene vacía, el
-    procedimiento se guarda como "Todas (mixta)" (especialidad_id NULL). Es
+    `procedimiento` (o su alias `procedimientos`). La especialidad debe existir en la tabla `especialidades`
+    (se busca por nombre, sin acentos ni mayúsculas) y el `nombre` del procedimiento se guarda SOLO con el
+    nombre del procedimiento. La especialidad es OPCIONAL: si viene vacía, `null` o no
+    coincide con el catálogo, el procedimiento se guarda como "Todas (mixta)"
+    (especialidad_id NULL). Es
     idempotente: la existencia se evalúa por (especialidad, nombre) sin
     distinguir mayúsculas.
     """
     import csv
     import io
 
-    reader = csv.DictReader(io.StringIO(contenido_csv))
-    campos = {c.strip().lower() for c in (reader.fieldnames or [])}
-    col_ref = "referencia_especialidad" if "referencia_especialidad" in campos else "especialidad"
-    requeridos = {col_ref, "procedimiento"}
-    if not requeridos.issubset(campos):
-        faltantes = requeridos - campos
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Faltan columnas en el CSV: "
-                f"{', '.join(sorted(faltantes))} (referencia_especialidad, procedimiento)"
-            ),
+    primera_linea = (contenido_csv or "").splitlines()
+    primera_linea = primera_linea[0] if primera_linea else ""
+    try:
+        delimitador = csv.Sniffer().sniff(
+            (contenido_csv or "")[:8192], delimiters="\t,;|"
+        ).delimiter
+    except csv.Error:
+        delimitador = (
+            "\t" if primera_linea.count("\t") > primera_linea.count(",")
+            else (";" if primera_linea.count(";") > 0 else ",")
         )
+
+    reader = csv.DictReader(io.StringIO(contenido_csv), delimiter=delimitador)
+    fieldnames = [c for c in (reader.fieldnames or []) if c is not None]
+    campos = {c.strip().strip('"').lower() for c in fieldnames}
+
+    def _hallar_columna(*alias):
+        for c in campos:
+            if any(a in c for a in alias):
+                return c
+        return None
+
+    col_ref = _hallar_columna("referencia_especialidad", "especialidad", "especial")
+    col_proc = _hallar_columna("procedimiento")
+    if col_ref is None or col_proc is None:
+        if len(fieldnames) == 2:
+            col_ref = (fieldnames[0] or "").strip().strip('"').lower()
+            col_proc = (fieldnames[1] or "").strip().strip('"').lower()
+        if not col_ref or not col_proc:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Faltan columnas en el CSV: "
+                    "especialidad, procedimiento (referencia_especialidad, procedimiento)"
+                ),
+            )
 
     creados = 0
     omitidos = 0
@@ -399,9 +423,11 @@ def importar_csv_procedimientos(contenido_csv: str, db: Session) -> dict:
 
     for i, row in enumerate(reader, start=2):
         try:
-            norm = {k.strip().lower(): v for k, v in row.items() if k}
+            norm = {k.strip().strip('"').lower(): v for k, v in row.items() if k}
             especialidad = " ".join((norm.get(col_ref) or "").split())
-            procedimiento = " ".join((norm.get("procedimiento") or "").split())
+            if especialidad.lower() == "null":
+                especialidad = ""
+            procedimiento = " ".join((norm.get(col_proc) or "").split())
             if not procedimiento:
                 errores.append({"fila": i, "error": "El procedimiento es obligatorio"})
                 continue
@@ -410,16 +436,14 @@ def importar_csv_procedimientos(contenido_csv: str, db: Session) -> dict:
             esp_nombre = None
             if especialidad:
                 esp = db.query(EspecialidadModel).filter(
-                    func.lower(EspecialidadModel.nombre) == especialidad.lower()
+                    func.unaccent(func.lower(EspecialidadModel.nombre))
+                    == func.unaccent(especialidad.lower())
                 ).first()
-                if not esp:
-                    errores.append({
-                        "fila": i,
-                        "error": f"La especialidad '{especialidad}' no existe en el catálogo de especialidades",
-                    })
-                    continue
-                esp_id = esp.id
-                esp_nombre = esp.nombre
+                if esp:
+                    esp_id = esp.id
+                    esp_nombre = esp.nombre
+                # Especialidad opcional: si el valor no coincide con el catálogo
+                # (o viene vacío/null), el procedimiento se importa como mixta.
 
             existe_query = db.query(ProcedimientoQuirofanoModel).filter(
                 func.lower(ProcedimientoQuirofanoModel.nombre) == procedimiento.lower(),

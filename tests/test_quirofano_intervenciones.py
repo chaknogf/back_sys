@@ -330,6 +330,34 @@ class TestIntervencionesQuirurgicas:
             [f"Procedimiento Test {s}", f"Otro Test {s}"]
         )
 
+    def test_importar_csv_especialidad_sin_acentos_null_mixta(self, client, auth_headers):
+        s = _sufijo()
+        csv_content = (
+            "especialidad,procedimientos\n"
+            f"cirugia,Acento Insensible {s}\n"
+            f"NULL,NULL Sin Acento {s}\n"
+        )
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/importar-csv",
+            headers=auth_headers,
+            files={"file": ("tipos.csv", csv_content.encode("utf-8"), "text/csv")},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["creados"] == 2
+        assert data["errores"] == []
+
+        r = client.get(
+            "/quirofano/procedimientos-quirofano/", headers=auth_headers, params={"q": "Acento"}
+        )
+        assert r.status_code == 200
+        registros = {t["nombre"]: t for t in r.json()}
+        assert "Acento Insensible " + s in registros
+        assert registros["Acento Insensible " + s]["especialidad_nombre"] == "Cirugía"
+        assert registros["NULL Sin Acento " + s]["especialidad_id"] is None
+
+        self._registrar_tipos_creados([f"Acento Insensible {s}", f"NULL Sin Acento {s}"])
+
     def test_importar_csv_faltan_columnas(self, client, auth_headers):
         csv_content = "procedimiento\nApendicectomía\n"
         r = client.post(
@@ -367,7 +395,7 @@ class TestIntervencionesQuirurgicas:
 
         self._registrar_tipos_creados([proc, proc])
 
-    def test_importar_csv_especialidad_inexistente(self, client, auth_headers):
+    def test_importar_csv_especialidad_inexistente_es_opcional(self, client, auth_headers):
         s = _sufijo()
         csv_content = (
             "referencia_especialidad,procedimiento\n"
@@ -380,8 +408,18 @@ class TestIntervencionesQuirurgicas:
         )
         assert r.status_code == 200
         data = r.json()
-        assert data["creados"] == 0
-        assert len(data["errores"]) == 1
+        assert data["creados"] == 1
+        assert data["errores"] == []
+
+        r = client.get(
+            "/quirofano/procedimientos-quirofano/", headers=auth_headers, params={"q": f"Procedimiento Fantasma {s}"}
+        )
+        assert r.status_code == 200
+        registros = [t for t in r.json() if t["nombre"] == f"Procedimiento Fantasma {s}"]
+        assert len(registros) == 1
+        assert registros[0]["especialidad_id"] is None
+
+        self._registrar_tipos_creados([f"Procedimiento Fantasma {s}"])
 
     def test_crear_procedimiento_quirofano_codigo_automatico(self, client, auth_headers):
         db = SessionLocal()
@@ -501,6 +539,116 @@ class TestIntervencionesQuirurgicas:
         assert len(registros) == 1
         assert registros[0]["especialidad_id"] is None
         assert registros[0]["especialidad_nombre"] is None
+
+        self._registrar_tipos_creados([nombre])
+
+    def test_importar_csv_encabezados_alias_especialidad_procedimientos(self, client, auth_headers):
+        s = _sufijo()
+        nombre = f"Alias Headers Test {s}"
+        csv_content = (
+            "especialidad,procedimientos\n"
+            f",{nombre}\n"
+        )
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/importar-csv",
+            headers=auth_headers,
+            files={"file": ("tipos.csv", csv_content.encode("utf-8"), "text/csv")},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["creados"] == 1
+        assert data["errores"] == []
+
+        r = client.get(
+            "/quirofano/procedimientos-quirofano/", headers=auth_headers, params={"q": nombre}
+        )
+        assert r.status_code == 200
+        registros = [t for t in r.json() if t["nombre"] == nombre]
+        assert len(registros) == 1
+        assert registros[0]["especialidad_id"] is None
+        assert registros[0]["especialidad_nombre"] is None
+
+        self._registrar_tipos_creados([nombre])
+
+    def test_importar_csv_cp1252(self, client, auth_headers):
+        s = _sufijo()
+        nombre = f"Cp1252 Test {s}"
+        csv_content = (
+            "especialidad,procedimientos\n"
+            f",{nombre} — con guión\n"
+        )
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/importar-csv",
+            headers=auth_headers,
+            files={"file": ("tipos.csv", csv_content.encode("cp1252"), "text/csv")},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["creados"] == 1
+        assert data["errores"] == []
+
+        r = client.get(
+            "/quirofano/procedimientos-quirofano/", headers=auth_headers, params={"q": nombre}
+        )
+        assert r.status_code == 200
+        registros = [t for t in r.json() if t["nombre"] == f"{nombre} — con guión"]
+        assert len(registros) == 1
+        assert registros[0]["especialidad_id"] is None
+
+        self._registrar_tipos_creados([f"{nombre} — con guión"])
+
+    def test_importar_csv_separado_por_tabulador(self, client, auth_headers):
+        s = _sufijo()
+        nombre = f"TSV Test {s}"
+        csv_content = (
+            "especialidad\tprocedimientos\n"
+            f"\t{nombre}\n"
+        )
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/importar-csv",
+            headers=auth_headers,
+            files={"file": ("tipos.csv", csv_content.encode("utf-8"), "text/csv")},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["creados"] == 1
+        assert data["errores"] == []
+
+        r = client.get(
+            "/quirofano/procedimientos-quirofano/", headers=auth_headers, params={"q": nombre}
+        )
+        assert r.status_code == 200
+        registros = [t for t in r.json() if t["nombre"] == nombre]
+        assert len(registros) == 1
+        assert registros[0]["especialidad_id"] is None
+
+        self._registrar_tipos_creados([nombre])
+
+    def test_importar_csv_encabezados_entre_comillas_y_bom(self, client, auth_headers):
+        s = _sufijo()
+        nombre = f"Quoted Headers Test {s}"
+        csv_content = (
+            '\ufeff"especialidad"\t"procedimientos"\n'
+            f'null\t"{nombre}"\n'
+        )
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/importar-csv",
+            headers=auth_headers,
+            files={"file": ("tipos.csv", csv_content.encode("utf-8"), "text/csv")},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["creados"] == 1
+        assert data["errores"] == []
+        assert data["omitidos"] == 0
+
+        r = client.get(
+            "/quirofano/procedimientos-quirofano/", headers=auth_headers, params={"q": nombre}
+        )
+        assert r.status_code == 200
+        registros = [t for t in r.json() if t["nombre"] == nombre]
+        assert len(registros) == 1
+        assert registros[0]["especialidad_id"] is None
 
         self._registrar_tipos_creados([nombre])
 

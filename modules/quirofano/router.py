@@ -163,7 +163,11 @@ async def importar_csv_procedimientos(
 ):
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="El archivo debe ser un CSV (.csv)")
-    contenido = (await file.read()).decode("utf-8")
+    raw = await file.read()
+    try:
+        contenido = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        contenido = raw.decode("cp1252", errors="replace")
     return svc.importar_csv_procedimientos(contenido, db)
 
 

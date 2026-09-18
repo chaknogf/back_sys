@@ -1,15 +1,16 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, text
+from sqlalchemy import func, desc, text, inspect as sa_inspect
 from fastapi import HTTPException, status
 from datetime import date
+
+from modules.especialidades.models import EspecialidadModel
 
 from .models import (
     FormatoProcedimientoModel,
     EstadoCirugiaModel,
     RangoEspecialistaModel,
     ProcedenciaProcedimientoModel,
-    CategoriaProcedimientoModel,
-    TipoProcedimientoModel,
+    ProcedimientoQuirofanoModel,
     QuirofanoNumeroModel,
     IntervencionQuirurgicaModel,
 )
@@ -22,10 +23,8 @@ from .schemas import (
     RangoEspecialistaUpdate,
     ProcedenciaProcedimientoCreate,
     ProcedenciaProcedimientoUpdate,
-    CategoriaProcedimientoCreate,
-    CategoriaProcedimientoUpdate,
-    TipoProcedimientoCreate,
-    TipoProcedimientoUpdate,
+    ProcedimientoQuirofanoCreate,
+    ProcedimientoQuirofanoUpdate,
     QuirofanoNumeroCreate,
     QuirofanoNumeroUpdate,
     IntervencionQuirurgicaCreate,
@@ -36,10 +35,19 @@ from .schemas import (
 # ========================
 # Helpers genéricos
 # ========================
+def _pk_field(model) -> str | None:
+    try:
+        return sa_inspect(model).primary_key[0].key
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _verificar_unicidad(db: Session, model, campo: str, valor: str, exclude_id: int = None):
     query = db.query(model).filter(getattr(model, campo) == valor)
-    if exclude_id:
-        query = query.filter(model.id != exclude_id) if hasattr(model, 'id') else query
+    if exclude_id is not None:
+        pk = _pk_field(model)
+        if pk:
+            query = query.filter(getattr(model, pk) != exclude_id)
     if query.first():
         raise HTTPException(status_code=409, detail=f"El {campo} '{valor}' ya existe")
 
@@ -228,94 +236,91 @@ def eliminar_procedencia(procedencia_id: int, db: Session) -> dict:
 
 
 # ========================
-# Categoría Procedimiento
+# Procedimiento Quirófano
 # ========================
-def listar_categorias(db: Session, solo_activos: bool = True) -> list:
-    query = db.query(CategoriaProcedimientoModel)
-    if solo_activos:
-        query = query.filter(CategoriaProcedimientoModel.activo == True)
-    return query.order_by(CategoriaProcedimientoModel.codigo).all()
+def _obtener_especialidad_o_404(especialidad_id: int, db: Session) -> EspecialidadModel:
+    esp = db.query(EspecialidadModel).filter(EspecialidadModel.id == especialidad_id).first()
+    if not esp:
+        raise HTTPException(status_code=404, detail="Especialidad no encontrada")
+    return esp
 
 
-def obtener_categoria(categoria_id: int, db: Session) -> CategoriaProcedimientoModel:
-    return _obtener_o_404(db, CategoriaProcedimientoModel, "categoria_procedimiento_id", categoria_id)
+def _verificar_duplicado_esp_nombre(
+    db: Session, especialidad_id: int | None, nombre: str, exclude_id: int | None = None
+) -> None:
+    query = db.query(ProcedimientoQuirofanoModel).filter(
+        func.lower(ProcedimientoQuirofanoModel.nombre) == nombre.strip().lower(),
+    )
+    if especialidad_id is None:
+        query = query.filter(ProcedimientoQuirofanoModel.especialidad_id.is_(None))
+        donde = "en 'Todas (mixta)'"
+    else:
+        query = query.filter(ProcedimientoQuirofanoModel.especialidad_id == especialidad_id)
+        donde = "en esa especialidad"
+    if exclude_id:
+        query = query.filter(ProcedimientoQuirofanoModel.procedimiento_quirofano_id != exclude_id)
+    if query.first():
+        raise HTTPException(
+            status_code=409,
+            detail=f"El procedimiento '{nombre}' ya existe {donde}",
+        )
 
 
-def crear_categoria(data: CategoriaProcedimientoCreate, db: Session) -> CategoriaProcedimientoModel:
-    _verificar_unicidad(db, CategoriaProcedimientoModel, "codigo", data.codigo)
-    reg = CategoriaProcedimientoModel(codigo=data.codigo, nombre=data.nombre, activo=data.activo)
-    db.add(reg)
-    db.commit()
-    db.refresh(reg)
-    return reg
-
-
-def actualizar_categoria(categoria_id: int, data: CategoriaProcedimientoUpdate, db: Session) -> CategoriaProcedimientoModel:
-    reg = obtener_categoria(categoria_id, db)
-    if data.codigo is not None:
-        _verificar_unicidad(db, CategoriaProcedimientoModel, "codigo", data.codigo, exclude_id=categoria_id)
-        reg.codigo = data.codigo
-    if data.nombre is not None:
-        reg.nombre = data.nombre
-    if data.activo is not None:
-        reg.activo = data.activo
-    db.commit()
-    db.refresh(reg)
-    return reg
-
-
-def eliminar_categoria(categoria_id: int, db: Session) -> dict:
-    reg = obtener_categoria(categoria_id, db)
-    # Verificar si tiene tipos asociados
-    count = db.query(func.count(TipoProcedimientoModel.tipo_procedimiento_id)).filter(
-        TipoProcedimientoModel.categoria_procedimiento_id == categoria_id
-    ).scalar()
-    if count > 0:
-        raise HTTPException(status_code=409, detail=f"No se puede eliminar: tiene {count} tipo(s) de procedimiento asociados")
-    db.delete(reg)
-    db.commit()
-    return {"eliminado": True}
-
-
-# ========================
-# Tipo Procedimiento
-# ========================
-def listar_tipos_procedimiento(
+def listar_procedimientos_quirofano(
     db: Session,
     solo_activos: bool = True,
-    categoria_id: int = None,
+    especialidad_id: int = None,
+    incluir_mixtos: bool = False,
     q: str = None,
 ) -> list:
-    query = db.query(TipoProcedimientoModel)
+    query = db.query(ProcedimientoQuirofanoModel)
     if solo_activos:
-        query = query.filter(TipoProcedimientoModel.activo == True)
-    if categoria_id:
-        query = query.filter(TipoProcedimientoModel.categoria_procedimiento_id == categoria_id)
+        query = query.filter(ProcedimientoQuirofanoModel.activo == True)
+    if especialidad_id:
+        filtro = ProcedimientoQuirofanoModel.especialidad_id == especialidad_id
+        if incluir_mixtos:
+            filtro = filtro | ProcedimientoQuirofanoModel.especialidad_id.is_(None)
+        query = query.filter(filtro)
     if q:
         search = f"%{q.lower()}%"
         query = query.filter(
-            func.lower(TipoProcedimientoModel.nombre).like(search) |
-            func.lower(TipoProcedimientoModel.codigo).like(search)
+            func.lower(ProcedimientoQuirofanoModel.nombre).like(search) |
+            func.lower(ProcedimientoQuirofanoModel.codigo).like(search)
         )
-    return query.order_by(TipoProcedimientoModel.codigo).all()
+    return query.order_by(ProcedimientoQuirofanoModel.codigo).all()
 
 
-def obtener_tipo_procedimiento(tipo_id: int, db: Session) -> TipoProcedimientoModel:
-    return _obtener_o_404(db, TipoProcedimientoModel, "tipo_procedimiento_id", tipo_id)
+def obtener_procedimiento_quirofano(proc_id: int, db: Session) -> ProcedimientoQuirofanoModel:
+    return _obtener_o_404(db, ProcedimientoQuirofanoModel, "procedimiento_quirofano_id", proc_id)
 
 
-def crear_tipo_procedimiento(data: TipoProcedimientoCreate, db: Session) -> TipoProcedimientoModel:
-    _verificar_unicidad(db, TipoProcedimientoModel, "codigo", data.codigo)
-    # Verificar que la categoría existe
-    cat = db.query(CategoriaProcedimientoModel).filter(
-        CategoriaProcedimientoModel.categoria_procedimiento_id == data.categoria_procedimiento_id
-    ).first()
-    if not cat:
-        raise HTTPException(status_code=404, detail="Categoría de procedimiento no encontrada")
-    reg = TipoProcedimientoModel(
-        codigo=data.codigo,
+def _generar_codigo_procedimiento(especialidad: str | None, nombre: str, db: Session) -> str:
+    ref = especialidad or "MIXTA"
+    base = f"TP{abs(hash(f'{ref} || {nombre}')) % 1000000:06d}"
+    codigo = base
+    i = 1
+    while db.query(ProcedimientoQuirofanoModel).filter(
+        ProcedimientoQuirofanoModel.codigo == codigo
+    ).first():
+        codigo = f"{base}-{i}"[:10]
+        i += 1
+    return codigo
+
+
+def crear_procedimiento_quirofano(data: ProcedimientoQuirofanoCreate, db: Session) -> ProcedimientoQuirofanoModel:
+    esp = None
+    if data.especialidad_id is not None:
+        esp = _obtener_especialidad_o_404(data.especialidad_id, db)
+    _verificar_duplicado_esp_nombre(db, data.especialidad_id, data.nombre)
+    codigo = (data.codigo or "").strip()
+    if codigo:
+        _verificar_unicidad(db, ProcedimientoQuirofanoModel, "codigo", codigo)
+    else:
+        codigo = _generar_codigo_procedimiento(esp.nombre if esp else None, data.nombre, db)
+    reg = ProcedimientoQuirofanoModel(
+        codigo=codigo,
         nombre=data.nombre,
-        categoria_procedimiento_id=data.categoria_procedimiento_id,
+        especialidad_id=data.especialidad_id,
         activo=data.activo,
     )
     db.add(reg)
@@ -324,52 +329,68 @@ def crear_tipo_procedimiento(data: TipoProcedimientoCreate, db: Session) -> Tipo
     return reg
 
 
-def actualizar_tipo_procedimiento(tipo_id: int, data: TipoProcedimientoUpdate, db: Session) -> TipoProcedimientoModel:
-    reg = obtener_tipo_procedimiento(tipo_id, db)
-    if data.codigo is not None:
-        _verificar_unicidad(db, TipoProcedimientoModel, "codigo", data.codigo, exclude_id=tipo_id)
-        reg.codigo = data.codigo
-    if data.nombre is not None:
-        reg.nombre = data.nombre
-    if data.categoria_procedimiento_id is not None:
-        cat = db.query(CategoriaProcedimientoModel).filter(
-            CategoriaProcedimientoModel.categoria_procedimiento_id == data.categoria_procedimiento_id
-        ).first()
-        if not cat:
-            raise HTTPException(status_code=404, detail="Categoría de procedimiento no encontrada")
-        reg.categoria_procedimiento_id = data.categoria_procedimiento_id
-    if data.activo is not None:
-        reg.activo = data.activo
+def actualizar_procedimiento_quirofano(
+    proc_id: int, data: ProcedimientoQuirofanoUpdate, db: Session
+) -> ProcedimientoQuirofanoModel:
+    reg = obtener_procedimiento_quirofano(proc_id, db)
+    campos = data.model_dump(exclude_unset=True)
+
+    if "especialidad_id" in campos:
+        if campos["especialidad_id"] is not None:
+            _obtener_especialidad_o_404(campos["especialidad_id"], db)
+        reg.especialidad_id = campos["especialidad_id"]
+    if "nombre" in campos:
+        reg.nombre = campos["nombre"]
+
+    if "especialidad_id" in campos or "nombre" in campos:
+        _verificar_duplicado_esp_nombre(
+            db, reg.especialidad_id, reg.nombre, exclude_id=proc_id
+        )
+    if "codigo" in campos:
+        _verificar_unicidad(
+            db, ProcedimientoQuirofanoModel, "codigo", campos["codigo"], exclude_id=proc_id
+        )
+        reg.codigo = campos["codigo"]
+    if "activo" in campos:
+        reg.activo = campos["activo"]
     db.commit()
     db.refresh(reg)
     return reg
 
 
-def eliminar_tipo_procedimiento(tipo_id: int, db: Session) -> dict:
-    reg = obtener_tipo_procedimiento(tipo_id, db)
+def eliminar_procedimiento_quirofano(proc_id: int, db: Session) -> dict:
+    reg = obtener_procedimiento_quirofano(proc_id, db)
     db.delete(reg)
     db.commit()
     return {"eliminado": True}
 
 
-def importar_csv_tipos(contenido_csv: str, db: Session) -> dict:
-    """Importa tipos de procedimiento desde CSV (columnas: especialidad, procedimiento).
+def importar_csv_procedimientos(contenido_csv: str, db: Session) -> dict:
+    """Importa procedimientos de quirófano desde CSV.
 
-    Crea la categoría (especialidad) si no existe y genera el nombre
-    "Especialidad - Procedimiento". Es idempotente: los registros cuyo nombre
-    ya existe se omiten.
+    Columnas: `referencia_especialidad` (o su alias `especialidad`) y
+    `procedimiento`. La especialidad debe existir en la tabla `especialidades`
+    (se busca por nombre) y el `nombre` del procedimiento se guarda SOLO con el
+    nombre del procedimiento. Si `referencia_especialidad` viene vacía, el
+    procedimiento se guarda como "Todas (mixta)" (especialidad_id NULL). Es
+    idempotente: la existencia se evalúa por (especialidad, nombre) sin
+    distinguir mayúsculas.
     """
     import csv
     import io
 
     reader = csv.DictReader(io.StringIO(contenido_csv))
-    campos = set(reader.fieldnames or [])
-    requeridos = {"especialidad", "procedimiento"}
+    campos = {c.strip().lower() for c in (reader.fieldnames or [])}
+    col_ref = "referencia_especialidad" if "referencia_especialidad" in campos else "especialidad"
+    requeridos = {col_ref, "procedimiento"}
     if not requeridos.issubset(campos):
         faltantes = requeridos - campos
         raise HTTPException(
             status_code=400,
-            detail=f"Faltan columnas en el CSV: {', '.join(sorted(faltantes))} (especialidad, procedimiento)",
+            detail=(
+                "Faltan columnas en el CSV: "
+                f"{', '.join(sorted(faltantes))} (referencia_especialidad, procedimiento)"
+            ),
         )
 
     creados = 0
@@ -378,36 +399,48 @@ def importar_csv_tipos(contenido_csv: str, db: Session) -> dict:
 
     for i, row in enumerate(reader, start=2):
         try:
-            especialidad = " ".join((row.get("especialidad") or "").split())
-            procedimiento = " ".join((row.get("procedimiento") or "").split())
-            if not especialidad or not procedimiento:
-                errores.append({"fila": i, "error": "Especialidad y procedimiento son obligatorios"})
+            norm = {k.strip().lower(): v for k, v in row.items() if k}
+            especialidad = " ".join((norm.get(col_ref) or "").split())
+            procedimiento = " ".join((norm.get("procedimiento") or "").split())
+            if not procedimiento:
+                errores.append({"fila": i, "error": "El procedimiento es obligatorio"})
                 continue
 
-            nombre = f"{especialidad} - {procedimiento}"
+            esp_id = None
+            esp_nombre = None
+            if especialidad:
+                esp = db.query(EspecialidadModel).filter(
+                    func.lower(EspecialidadModel.nombre) == especialidad.lower()
+                ).first()
+                if not esp:
+                    errores.append({
+                        "fila": i,
+                        "error": f"La especialidad '{especialidad}' no existe en el catálogo de especialidades",
+                    })
+                    continue
+                esp_id = esp.id
+                esp_nombre = esp.nombre
 
-            # Categoría (especialidad)
-            cat = db.query(CategoriaProcedimientoModel).filter(
-                CategoriaProcedimientoModel.nombre == especialidad
-            ).first()
-            if not cat:
-                cod_cat = f"CAT{abs(hash(especialidad)) % 1000000:06d}"
-                cat = CategoriaProcedimientoModel(codigo=cod_cat, nombre=especialidad, activo=True)
-                db.add(cat)
-                db.flush()
-
-            existe = db.query(TipoProcedimientoModel).filter(
-                TipoProcedimientoModel.nombre == nombre
-            ).first()
-            if existe:
+            existe_query = db.query(ProcedimientoQuirofanoModel).filter(
+                func.lower(ProcedimientoQuirofanoModel.nombre) == procedimiento.lower(),
+            )
+            if esp_id is None:
+                existe_query = existe_query.filter(
+                    ProcedimientoQuirofanoModel.especialidad_id.is_(None)
+                )
+            else:
+                existe_query = existe_query.filter(
+                    ProcedimientoQuirofanoModel.especialidad_id == esp_id
+                )
+            if existe_query.first():
                 omitidos += 1
                 continue
 
-            cod_tipo = f"TP{abs(hash(nombre)) % 1000000:06d}"
-            db.add(TipoProcedimientoModel(
-                codigo=cod_tipo,
-                nombre=nombre,
-                categoria_procedimiento_id=cat.categoria_procedimiento_id,
+            cod_proc = _generar_codigo_procedimiento(esp_nombre, procedimiento, db)
+            db.add(ProcedimientoQuirofanoModel(
+                codigo=cod_proc,
+                nombre=procedimiento,
+                especialidad_id=esp_id,
                 activo=True,
             ))
             creados += 1
@@ -418,10 +451,9 @@ def importar_csv_tipos(contenido_csv: str, db: Session) -> dict:
     return {"creados": creados, "omitidos": omitidos, "errores": errores}
 
 
-def truncar_tipos(db: Session) -> dict:
-    """Elimina TODOS los tipos y categorías de procedimiento del quirófano."""
-    db.execute(text("TRUNCATE TABLE tipo_procedimiento RESTART IDENTITY CASCADE"))
-    db.execute(text("TRUNCATE TABLE categoria_procedimiento RESTART IDENTITY CASCADE"))
+def truncar_procedimientos(db: Session) -> dict:
+    """Elimina TODOS los procedimientos de quirófano."""
+    db.execute(text("TRUNCATE TABLE procedimiento_quirofano RESTART IDENTITY CASCADE"))
     db.commit()
     return {"truncado": True}
 

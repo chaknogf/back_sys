@@ -5,11 +5,11 @@ from datetime import date
 from core.database import SessionLocal
 from modules.pacientes.models import PacienteModel
 from modules.medicos.models import MedicoModel
+from modules.especialidades.models import EspecialidadModel
 from modules.quirofano.models import (
     IntervencionQuirurgicaModel,
     QuirofanoNumeroModel,
-    TipoProcedimientoModel,
-    CategoriaProcedimientoModel,
+    ProcedimientoQuirofanoModel,
 )
 from sqlalchemy import text
 
@@ -19,8 +19,7 @@ created_ids = {
     "pacientes": [],
     "intervenciones": [],
     "quirofanos_numero": [],
-    "tipos": [],
-    "categorias": [],
+    "procedimientos_quirofano": [],
 }
 
 
@@ -39,13 +38,9 @@ def cleanup():
             db.query(QuirofanoNumeroModel).filter(
                 QuirofanoNumeroModel.quirofano_numero_id == qid
             ).delete()
-        for tid in created_ids["tipos"]:
-            db.query(TipoProcedimientoModel).filter(
-                TipoProcedimientoModel.tipo_procedimiento_id == tid
-            ).delete()
-        for cid in created_ids["categorias"]:
-            db.query(CategoriaProcedimientoModel).filter(
-                CategoriaProcedimientoModel.categoria_procedimiento_id == cid
+        for tid in created_ids["procedimientos_quirofano"]:
+            db.query(ProcedimientoQuirofanoModel).filter(
+                ProcedimientoQuirofanoModel.procedimiento_quirofano_id == tid
             ).delete()
         db.commit()
     except Exception:
@@ -287,29 +282,22 @@ class TestIntervencionesQuirurgicas:
         db = SessionLocal()
         try:
             for nombre in nombres:
-                t = db.query(TipoProcedimientoModel).filter(
-                    TipoProcedimientoModel.nombre == nombre
-                ).first()
-                if t:
-                    created_ids["tipos"].append(t.tipo_procedimiento_id)
+                for t in db.query(ProcedimientoQuirofanoModel).filter(
+                    ProcedimientoQuirofanoModel.nombre == nombre
+                ).all():
+                    created_ids["procedimientos_quirofano"].append(t.procedimiento_quirofano_id)
         finally:
             db.close()
 
-    def test_importar_csv_tipos(self, client, auth_headers):
+    def test_importar_csv_procedimientos(self, client, auth_headers):
         s = _sufijo()
-        db = SessionLocal()
-        try:
-            cats_existentes = {c.nombre for c in db.query(CategoriaProcedimientoModel).all()}
-        finally:
-            db.close()
-
         csv_content = (
-            "especialidad,procedimiento\n"
-            f"Cirugía General,Procedimiento Test {s}\n"
-            f"Cirugía General,Otro Test {s}\n"
+            "referencia_especialidad,procedimiento\n"
+            f"Cirugía,Procedimiento Test {s}\n"
+            f"Cirugía,Otro Test {s}\n"
         )
         r = client.post(
-            "/quirofano/tipos/importar-csv",
+            "/quirofano/procedimientos-quirofano/importar-csv",
             headers=auth_headers,
             files={"file": ("tipos.csv", csv_content.encode("utf-8"), "text/csv")},
         )
@@ -321,74 +309,227 @@ class TestIntervencionesQuirurgicas:
 
         # Idempotente: segunda importación omite los ya existentes
         r = client.post(
-            "/quirofano/tipos/importar-csv",
+            "/quirofano/procedimientos-quirofano/importar-csv",
             headers=auth_headers,
             files={"file": ("tipos.csv", csv_content.encode("utf-8"), "text/csv")},
         )
         assert r.status_code == 200
         assert r.json()["omitidos"] == 2
 
-        # El catálogo devuelve los importados con nombre "Especialidad - Procedimiento"
+        # El catálogo guarda SOLO el nombre del procedimiento
         r = client.get(
-            "/quirofano/tipos/",
+            "/quirofano/procedimientos-quirofano/",
             headers=auth_headers,
             params={"q": f"Procedimiento Test {s}"},
         )
         assert r.status_code == 200
         nombres = [t["nombre"] for t in r.json()]
-        assert f"Cirugía General - Procedimiento Test {s}" in nombres
+        assert f"Procedimiento Test {s}" in nombres
 
         self._registrar_tipos_creados(
-            [f"Cirugía General - Procedimiento Test {s}", f"Cirugía General - Otro Test {s}"]
+            [f"Procedimiento Test {s}", f"Otro Test {s}"]
         )
 
-        db = SessionLocal()
-        try:
-            cat = db.query(CategoriaProcedimientoModel).filter(
-                CategoriaProcedimientoModel.nombre == "Cirugía General"
-            ).first()
-            if cat and cat.nombre not in cats_existentes:
-                created_ids["categorias"].append(cat.categoria_procedimiento_id)
-        finally:
-            db.close()
-
     def test_importar_csv_faltan_columnas(self, client, auth_headers):
-        csv_content = "especialidad\nCirugía General\n"
+        csv_content = "procedimiento\nApendicectomía\n"
         r = client.post(
-            "/quirofano/tipos/importar-csv",
+            "/quirofano/procedimientos-quirofano/importar-csv",
             headers=auth_headers,
             files={"file": ("tipos.csv", csv_content.encode("utf-8"), "text/csv")},
         )
         assert r.status_code == 400
 
+    def test_importar_csv_homonimos_distintas_especialidades(self, client, auth_headers):
+        s = _sufijo()
+        proc = f"Circuncisión Test {s}"
+        csv_content = (
+            "referencia_especialidad,procedimiento\n"
+            f"Cirugía,{proc}\n"
+            f"Traumatología,{proc}\n"
+        )
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/importar-csv",
+            headers=auth_headers,
+            files={"file": ("tipos.csv", csv_content.encode("utf-8"), "text/csv")},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["creados"] == 2
+        assert data["omitidos"] == 0
+        assert data["errores"] == []
+
+        # Ambos homónimos existen, cada uno en su especialidad
+        r = client.get("/quirofano/procedimientos-quirofano/", headers=auth_headers, params={"q": proc})
+        assert r.status_code == 200
+        registros = [t for t in r.json() if t["nombre"] == proc]
+        assert len(registros) == 2
+        assert len({t["especialidad_id"] for t in registros}) == 2
+
+        self._registrar_tipos_creados([proc, proc])
+
+    def test_importar_csv_especialidad_inexistente(self, client, auth_headers):
+        s = _sufijo()
+        csv_content = (
+            "referencia_especialidad,procedimiento\n"
+            f"Especialidad Fantasma {s},Procedimiento Fantasma {s}\n"
+        )
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/importar-csv",
+            headers=auth_headers,
+            files={"file": ("tipos.csv", csv_content.encode("utf-8"), "text/csv")},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["creados"] == 0
+        assert len(data["errores"]) == 1
+
+    def test_crear_procedimiento_quirofano_codigo_automatico(self, client, auth_headers):
+        db = SessionLocal()
+        try:
+            esp = db.query(EspecialidadModel).first()
+            esp_id = esp.id
+        finally:
+            db.close()
+        assert esp_id is not None
+
+        s = _sufijo()
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/",
+            headers=auth_headers,
+            json={"nombre": f"Procedimiento Autocódigo {s}", "especialidad_id": esp_id},
+        )
+        assert r.status_code == 201
+        data = r.json()
+        assert data["codigo"].startswith("TP")
+        assert data["especialidad_id"] == esp_id
+        created_ids["procedimientos_quirofano"].append(data["procedimiento_quirofano_id"])
+
+    def test_crear_procedimiento_quirofano_especialidad_inexistente(self, client, auth_headers):
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/",
+            headers=auth_headers,
+            json={"nombre": f"Procedimiento Fantasma {_sufijo()}", "especialidad_id": 999999999},
+        )
+        assert r.status_code == 404
+
+    def test_crear_procedimiento_quirofano_mixta(self, client, auth_headers):
+        s = _sufijo()
+        nombre = f"Procedimiento Mixto {s}"
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/",
+            headers=auth_headers,
+            json={"nombre": nombre, "especialidad_id": None},
+        )
+        assert r.status_code == 201
+        data = r.json()
+        created_ids["procedimientos_quirofano"].append(data["procedimiento_quirofano_id"])
+        assert data["especialidad_id"] is None
+        assert data["especialidad_nombre"] is None
+
+        # Duplicado en 'Todas (mixta)' -> 409
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/",
+            headers=auth_headers,
+            json={"nombre": nombre, "especialidad_id": None},
+        )
+        assert r.status_code == 409
+
+        # Homónimo en una especialidad concreta SÍ se permite
+        db = SessionLocal()
+        try:
+            esp_id = db.query(EspecialidadModel).first().id
+        finally:
+            db.close()
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/",
+            headers=auth_headers,
+            json={"nombre": nombre, "especialidad_id": esp_id},
+        )
+        assert r.status_code == 201
+        created_ids["procedimientos_quirofano"].append(r.json()["procedimiento_quirofano_id"])
+
+    def test_actualizar_procedimiento_quirofano_a_mixta(self, client, auth_headers):
+        db = SessionLocal()
+        try:
+            esp_id = db.query(EspecialidadModel).first().id
+        finally:
+            db.close()
+
+        s = _sufijo()
+        nombre = f"Procedimiento Concreto {s}"
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/",
+            headers=auth_headers,
+            json={"nombre": nombre, "especialidad_id": esp_id},
+        )
+        assert r.status_code == 201
+        proc_id = r.json()["procedimiento_quirofano_id"]
+        created_ids["procedimientos_quirofano"].append(proc_id)
+
+        # PUT con especialidad_id NULL explícito -> mixta
+        r = client.put(
+            f"/quirofano/procedimientos-quirofano/{proc_id}",
+            headers=auth_headers,
+            json={"especialidad_id": None},
+        )
+        assert r.status_code == 200
+        assert r.json()["especialidad_id"] is None
+        assert r.json()["especialidad_nombre"] is None
+
+    def test_importar_csv_sin_referencia_crea_mixta(self, client, auth_headers):
+        s = _sufijo()
+        nombre = f"Sin Especialidad Test {s}"
+        csv_content = (
+            "referencia_especialidad,procedimiento\n"
+            f",{nombre}\n"
+        )
+        r = client.post(
+            "/quirofano/procedimientos-quirofano/importar-csv",
+            headers=auth_headers,
+            files={"file": ("tipos.csv", csv_content.encode("utf-8"), "text/csv")},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["creados"] == 1
+        assert data["errores"] == []
+
+        r = client.get(
+            "/quirofano/procedimientos-quirofano/", headers=auth_headers, params={"q": nombre}
+        )
+        assert r.status_code == 200
+        registros = [t for t in r.json() if t["nombre"] == nombre]
+        assert len(registros) == 1
+        assert registros[0]["especialidad_id"] is None
+        assert registros[0]["especialidad_nombre"] is None
+
+        self._registrar_tipos_creados([nombre])
+
     def test_importar_csv_archivo_invalido(self, client, auth_headers):
         r = client.post(
-            "/quirofano/tipos/importar-csv",
+            "/quirofano/procedimientos-quirofano/importar-csv",
             headers=auth_headers,
             files={"file": ("tipos.txt", b"especialidad,procedimiento\nX,Y", "text/plain")},
         )
         assert r.status_code == 400
 
-    def test_truncar_tipos(self, client, auth_headers):
+    def test_truncar_procedimientos_quirofano(self, client, auth_headers):
         # Snapshot para restaurar tras la truncada
         db = SessionLocal()
         try:
-            cats = db.query(CategoriaProcedimientoModel).all()
-            tips = db.query(TipoProcedimientoModel).all()
-            snapshot_cats = [(c.categoria_procedimiento_id, c.codigo, c.nombre, c.activo) for c in cats]
+            tips = db.query(ProcedimientoQuirofanoModel).all()
             snapshot_tips = [
-                (t.tipo_procedimiento_id, t.codigo, t.nombre, t.categoria_procedimiento_id, t.activo)
+                (t.procedimiento_quirofano_id, t.codigo, t.nombre, t.especialidad_id, t.activo)
                 for t in tips
             ]
         finally:
             db.close()
 
-        r = client.delete("/quirofano/tipos/truncar", headers=auth_headers)
+        r = client.delete("/quirofano/procedimientos-quirofano/truncar", headers=auth_headers)
         assert r.status_code == 200
         assert r.json() == {"truncado": True}
 
         r = client.get(
-            "/quirofano/tipos/",
+            "/quirofano/procedimientos-quirofano/",
             headers=auth_headers,
             params={"activos": False, "limit": 10000},
         )
@@ -398,41 +539,34 @@ class TestIntervencionesQuirurgicas:
         # Restaurar el catálogo (mismos ids) y secuencias
         db = SessionLocal()
         try:
-            for cid, codigo, nombre, activo in snapshot_cats:
-                db.add(CategoriaProcedimientoModel(
-                    categoria_procedimiento_id=cid, codigo=codigo, nombre=nombre, activo=activo
+            for tid, codigo, nombre, esp_id, activo in snapshot_tips:
+                db.add(ProcedimientoQuirofanoModel(
+                    procedimiento_quirofano_id=tid, codigo=codigo, nombre=nombre,
+                    especialidad_id=esp_id, activo=activo,
                 ))
+            # autoflush=False: forzar el INSERT antes de calcular el MAX
             db.flush()
-            for tid, codigo, nombre, cat_id, activo in snapshot_tips:
-                db.add(TipoProcedimientoModel(
-                    tipo_procedimiento_id=tid, codigo=codigo, nombre=nombre,
-                    categoria_procedimiento_id=cat_id, activo=activo,
-                ))
             db.execute(text(
-                "SELECT setval(pg_get_serial_sequence('tipo_procedimiento','tipo_procedimiento_id'), "
-                "(SELECT COALESCE(MAX(tipo_procedimiento_id),1) FROM tipo_procedimiento))"
-            ))
-            db.execute(text(
-                "SELECT setval(pg_get_serial_sequence('categoria_procedimiento','categoria_procedimiento_id'), "
-                "(SELECT COALESCE(MAX(categoria_procedimiento_id),1) FROM categoria_procedimiento))"
+                "SELECT setval(pg_get_serial_sequence('procedimiento_quirofano','procedimiento_quirofano_id'), "
+                "(SELECT COALESCE(MAX(procedimiento_quirofano_id),1) FROM procedimiento_quirofano))"
             ))
             db.commit()
         finally:
             db.close()
 
         r = client.get(
-            "/quirofano/tipos/",
+            "/quirofano/procedimientos-quirofano/",
             headers=auth_headers,
             params={"activos": False},
         )
         assert r.status_code == 200
         assert len(r.json()) == len(snapshot_tips)
 
-    def test_truncar_tipos_requiere_admin(self, client):
-        r = client.delete("/quirofano/tipos/truncar")
+    def test_truncar_procedimientos_quirofano_requiere_admin(self, client):
+        r = client.delete("/quirofano/procedimientos-quirofano/truncar")
         assert r.status_code in (401, 422, 403)
         r = client.post(
-            "/quirofano/tipos/importar-csv",
+            "/quirofano/procedimientos-quirofano/importar-csv",
             files={"file": ("tipos.csv", b"especialidad,procedimiento\nX,Y", "text/csv")},
         )
         assert r.status_code in (401, 422, 403)

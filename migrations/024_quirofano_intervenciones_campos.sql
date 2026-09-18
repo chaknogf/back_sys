@@ -1,7 +1,7 @@
 -- 024_quirofano_intervenciones_campos.sql
 -- Evolución de intervenciones_quirurgicas:
---  - Se reemplaza la referencia tipo_procedimiento_id por procedimiento_1..5 (texto,
---    "Especialidad - Procedimiento") + área del cuerpo intervenida.
+--  - Se reemplaza la referencia tipo_procedimiento_id por procedimiento_principal..5
+--    (texto: solo el nombre del procedimiento) + área del cuerpo intervenida.
 --  - Se elimina la columna genérica `hora` y se agregan 4 horas específicas.
 
 ALTER TABLE intervenciones_quirurgicas
@@ -24,6 +24,7 @@ ALTER TABLE intervenciones_quirurgicas
 DROP INDEX IF EXISTS ix_intervenciones_quirurgicas_tipo_procedimiento_id;
 
 -- Nota: la semilla del catálogo de procedimientos se aplica con
--- scripts/seed_quirofano_procedimientos.py (catálogo auditorio: 022 categorías / 301 tipos).
--- Las intervenciones guardan los procedimientos como texto, por lo que
--- truncar/vaciar el catálogo (DELETE /quirofano/tipos/truncar) no afecta los registros existentes.
+-- scripts/seed_quirofano_procedimientos.py (CSV maestro data/quirofano_procedimientos.csv).
+-- Las intervenciones guardan los procedimientos como texto libre, por lo que
+-- truncar el catálogo (DELETE /quirofano/procedimientos-quirofano/truncar) no
+-- afecta los registros existentes.

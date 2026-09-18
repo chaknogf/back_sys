@@ -46,6 +46,18 @@ CREATE TABLE IF NOT EXISTS tipo_procedimiento (
     activo                     BOOLEAN DEFAULT TRUE
 );
 
+-- FK de intervenciones_quirurgicas a los catálogos (se agregan aquí porque
+-- 021_quirofano_intervenciones.sql se ejecuta antes de que existan).
+ALTER TABLE intervenciones_quirurgicas
+    ADD COLUMN IF NOT EXISTS tipo_procedimiento_id     INTEGER REFERENCES tipo_procedimiento(tipo_procedimiento_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS estado_cirugia_id         INTEGER REFERENCES estado_cirugia(estado_cirugia_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS formato_procedimiento_id  INTEGER REFERENCES formato_procedimiento(formato_procedimiento_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS procedencia_procedimiento_id INTEGER REFERENCES procedencia_procedimiento(procedencia_procedimiento_id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS rango_especialista_id     INTEGER REFERENCES rango_especialista(rango_especialista_id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS ix_intervenciones_quirurgicas_tipo_procedimiento_id ON intervenciones_quirurgicas (tipo_procedimiento_id);
+CREATE INDEX IF NOT EXISTS ix_intervenciones_quirurgicas_estado_cirugia_id ON intervenciones_quirurgicas (estado_cirugia_id);
+
 -- Datos base de los catálogos (idempotente)
 INSERT INTO estado_cirugia (codigo, nombre) VALUES
     ('FIN', 'Finalizada'),
@@ -79,6 +91,9 @@ INSERT INTO procedencia_procedimiento (codigo, nombre) VALUES
     ('HDD', 'Hospital de día')
 ON CONFLICT (codigo) DO NOTHING;
 
--- Nota: las categorías y tipos de procedimiento (especialidad - procedimiento)
--- se siembran con el script: scripts/seed_quirofano_procedimientos.py
--- (022 categorías / 301 tipos, idempotente).
+-- Nota: los procedimientos (nombre = solo el procedimiento) se siembran con el
+-- script scripts/seed_quirofano_procedimientos.py a partir de
+-- data/quirofano_procedimientos.csv (idempotente).
+-- Migraciones posteriores: 025 reemplaza las categorías por `especialidades`,
+-- 027 renombra `tipo_procedimiento` -> `procedimiento_quirofano` y 028 admite
+-- `especialidad_id NULL` ("Todas (mixta)"). Ver migrations/README.md.

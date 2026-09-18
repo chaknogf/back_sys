@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
-from core.dependencies import get_db, get_current_admin_user
+from core.dependencies import get_db, get_current_user, get_current_admin_user
 from modules.users.models import UserModel
 from .schemas import EspecialidadCreate, EspecialidadUpdate, EspecialidadOut
 from . import service as svc
@@ -16,10 +16,12 @@ router = APIRouter(
 @router.get("", response_model=List[EspecialidadOut])
 @router.get("/", response_model=List[EspecialidadOut])
 def listar(
+    estado: Optional[bool] = Query(None, description="Filtrar por estado (activa/inactiva)"),
+    sop: Optional[bool] = Query(None, description="Filtrar por disponibilidad en quirófano"),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_user: UserModel = Depends(get_current_user),
 ):
-    return svc.listar(db)
+    return svc.listar(db, estado=estado, sop=sop)
 
 
 @router.get("/{esp_id}", response_model=EspecialidadOut)

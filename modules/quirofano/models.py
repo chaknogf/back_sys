@@ -88,24 +88,19 @@ class ProcedenciaProcedimientoModel(Base):
     activo = Column(Boolean, default=True)
 
 
-class CategoriaProcedimientoModel(Base):
-    __tablename__ = "categoria_procedimiento"
+class ProcedimientoQuirofanoModel(Base):
+    __tablename__ = "procedimiento_quirofano"
 
-    categoria_procedimiento_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    codigo = Column(String(10), unique=True, nullable=False, index=True)
-    nombre = Column(String(150), nullable=False)
-    activo = Column(Boolean, default=True)
-
-    tipos = relationship("TipoProcedimientoModel", back_populates="categoria")
-
-
-class TipoProcedimientoModel(Base):
-    __tablename__ = "tipo_procedimiento"
-
-    tipo_procedimiento_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    procedimiento_quirofano_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     codigo = Column(String(10), unique=True, nullable=False, index=True)
     nombre = Column(String(200), nullable=False)
-    categoria_procedimiento_id = Column(Integer, ForeignKey("categoria_procedimiento.categoria_procedimiento_id"), nullable=False)
+    especialidad_id = Column(
+        Integer, ForeignKey("especialidades.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     activo = Column(Boolean, default=True)
 
-    categoria = relationship("CategoriaProcedimientoModel", back_populates="tipos")
+    especialidad = relationship("EspecialidadModel", lazy="joined")
+
+    @property
+    def especialidad_nombre(self):
+        return self.especialidad.nombre if self.especialidad else None

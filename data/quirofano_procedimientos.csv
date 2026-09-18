@@ -1,0 +1,332 @@
+# Catálogo maestro del módulo Quirófano.
+# Columnas: referencia_especialidad,procedimiento
+# La especialidad viene de la tabla `especialidades` (mapeo aplicado):
+#   Cirugía General, Cirugía Plástica y Reconstructiva, Otorrinolaringología,
+#   Cirugía de Emergencia, Cirugía Cardiovascular, Nefrología,
+#   Procedimientos Generales/Menores/Endoscópicos, Cirugía Oncológica,
+#   Cirugía Vascular, Neurocirugía, Oftalmología, Urología,
+#   Cirugía Maxilofacial, Cirugía Oral y Maxilofacial, Cirugía Torácica,
+#   Trasplantes  ->  Cirugía
+#   Traumatología y Ortopedia  ->  Traumatología
+#   Cirugía Pediátrica         ->  Pediatría
+#   Ginecología y Obstetricia  ->  Ginecología
+#   Gastroenterología          ->  Medicina Interna
+referencia_especialidad,procedimiento
+Cirugía,(VAC) Cambio de terapia de presión negativa
+Cirugía,(VAC) Colocación de terapia de presión negativa
+Cirugía,(VAC) Retiro de terapia de presión negativa
+Cirugía,Abdominoplastia
+Cirugía,Adenoamigdalectomía
+Cirugía,Adenoidectomía
+Cirugía,Adhesiolisis
+Cirugía,Amigdalectomía
+Cirugía,Amputación
+Traumatología,Toracentesis
+Cirugía,Amputación de urgencia
+Cirugía,Anastomosis intestinal
+Cirugía,Angioplastia coronaria
+Cirugía,Angioplastía de acceso vascular para hemodiálisis
+Cirugía,Apendicectomía
+Pediatría,Apendicectomía pediátrica
+Traumatología,Tenotomía
+Traumatología,Paracentesis
+Ginecología,Aspiración manual endouterina
+Pediatría,Atresias intestinales
+Cirugía,Banding
+Ginecología,Biopsia cervical
+Cirugía,Biopsia excisional
+Cirugía,Biopsia incisional
+Cirugía,Biopsia quirúrgica
+Cirugía,Biopsia renal abierta
+Cirugía,Biopsia renal percutánea
+Cirugía,Blefaroplastia
+Cirugía,Broncoscopia
+Cirugía,Bypass coronario
+Cirugía,Bypass femoropoplíteo
+Cirugía,Bypass gástrico
+Cirugía,Cateterismo cardíaco
+Cirugía,Cauterización
+Ginecología,Cerclaje cervical
+Ginecología,Cesárea
+Cirugía,Cesárea de emergencia
+Cirugía,Cierre de herida
+Cirugía,Cierre de ostomías
+Pediatría,Circuncisión
+Cirugía,Circuncisión
+Cirugía,Cirugía de aneurisma cerebral
+Cirugía,Cirugía de aorta torácica
+Cirugía,Cirugía de catarata
+Traumatología,Hemiartroplastia
+Cirugía,Cirugía de columna vertebral
+Cirugía,Cirugía de diverticulitis
+Cirugía,Cirugía de hidrocele
+Traumatología,Catéter umbilical (arterial/venoso)
+Traumatología,Artrodesis
+Cirugía,Cirugía de quistes hepáticos
+Cirugía,Cirugía de quistes sebáceos
+Cirugía,Cirugía de sarcomas
+Cirugía,Cirugía de tiroides
+Cirugía,Cirugía de tumores cerebrales
+Cirugía,Cirugía de varicocele
+Cirugía,Cirugía endoscópica nasal
+Cirugía,Cirugía hepatobiliar
+Cirugía,Cirugía ortognática
+Cirugía,Cirugía paliativa oncológica
+Cirugía,Cirugía pancreática
+Ginecología,Cirugía por prolapso genital
+Cirugía,Cirugía vascular periférica
+Cirugía,Cistolitotomía
+Cirugía,Cistoscopia
+Cirugía,Colecistectomía
+Cirugía,Colectomía
+Cirugía,Colectomía oncológica
+Cirugía,Colgajo cutáneo
+Cirugía,Colocación de arco de Erich
+Cirugía,Colocación de catéter doble J
+Cirugía,Colocación de catéter para diálisis peritoneal
+Cirugía,Colocación de catéter para hemodiálisis (temporal)
+Cirugía,Colocación de catéter tunelizado para hemodiálisis
+Cirugía,Colocación de injerto arteriovenoso para diálisis
+Cirugía,Colonoscopia
+Cirugía,Colostomía
+Ginecología,Colporrafia anterior
+Ginecología,Colporrafia posterior
+Ginecología,Conización cervical
+Cirugía,Control de daños
+Cirugía,Control de hemorragias
+Pediatría,Corrección de atresia intestinal
+Traumatología,Artrocentesis
+Traumatología,Antrodesis
+Pediatría,Corrección de labio y paladar hendido
+Cirugía,CPRE
+Cirugía,Craneotomía
+Cirugía,Craniectomía
+Cirugía,Craniectomía descompresiva
+Cirugía,Creación de fístula arteriovenosa (braquiocefálica)
+Cirugía,Creación de fístula arteriovenosa (radiocefálica)
+Cirugía,Cuadrantectomía
+Cirugía,Debridamiento quirúrgico
+Cirugía,Debulking tumoral
+Cirugía,Decorticación pleural
+Cirugía,Decorticación pulmonar
+Cirugía,Decortificación de riñón
+Cirugía,Dedo en gatillo
+Cirugía,Derivación ventriculoperitoneal
+Cirugía,Desbridamiento de tejidos infectados
+Cirugía,Discectomía
+Cirugía,Disección axilar
+Cirugía,Disección cervical
+Cirugía,Drenaje biliar
+Cirugía,Drenaje de absceso
+Cirugía,Drenaje de absceso renal
+Cirugía,Drenaje de abscesos profundos
+Cirugía,Drenaje de hematoma
+Cirugía,Drenaje epidural
+Cirugía,Drenaje torácico
+Ginecología,Embarazo ectópico
+Cirugía,Embolectomía
+Cirugía,Endarterectomía carotídea
+Cirugía,Endoscopía + dilatación
+Cirugía,Endoscopia digestiva alta
+Cirugía,Endoscopía y toma de biopsia
+Cirugía,Enterectomía
+Cirugía,Esplenectomía
+Pediatría,Estenosis pilórica
+Cirugía,Estimulación cerebral profunda
+Cirugía,Evacuación de hematomas
+Cirugía,Eventrorrafia
+Cirugía,Extracción de cuerpos extraños
+Cirugía,Extracción de terceros molares
+Cirugía,Fasciotomía urgente
+Cirugía,Fenestración laparoscópica de quiste renal
+Traumatología,Acceso intraóseo
+Traumatología,Tratamiento quirúrgico de fractura expuesta
+Traumatología,Tenorrafia
+Cirugía,Fístula arteriovenosa
+Cirugía,Fistulectomía
+Cirugía,Fisurotomía
+Cirugía,Funduplicatura
+Cirugía,Fusión vertebral
+Cirugía,Gastrectomía oncológica
+Cirugía,Gastrectomía subtotal
+Cirugía,Gastrectomía total
+Medicina Interna,Gastroscopía
+Cirugía,Gastrostomía
+Pediatría,Gastrostomía pediátrica
+Cirugía,Hemicolectomía derecha
+Cirugía,Hemicolectomía izquierda
+Cirugía,Hemorroidectomía
+Cirugía,Hepatectomía
+Cirugía,Hernioplastía incisional
+Cirugía,Hernioplastía inguinal
+Cirugía,Hernioplastía umbilical
+Cirugía,Herniorrafia
+Pediatría,Herniorrafia inguinal pediátrica
+Cirugía,Hidrocelectomía
+Ginecología,Histerectomía abdominal
+Ginecología,Histerectomía laparoscópica
+Ginecología,Histerectomía quirúrgica
+Ginecología,Histerectomía vaginal
+Cirugía,Ileostomía
+Cirugía,Implantación de marcapasos
+Cirugía,Infección del tracto urinario (UTI)
+Traumatología,Síndrome compartimental (fasciotomía)
+Cirugía,Injerto de piel
+Pediatría,Invaginación intestinal
+Cirugía,Laminectomía
+Cirugía,Laparoscopía diagnóstica
+Ginecología,Laparoscopía ginecológica
+Cirugía,Laparotomía de urgencia
+Cirugía,Laparotomía exploradora
+Cirugía,Laringectomía
+Cirugía,LASIK
+Cirugía,Lavado y desbridamiento
+Cirugía,Lavado y desbridamiento por quemadura
+Ginecología,Legrado uterino
+Cirugía,Levantamiento óseo frontal
+Traumatología,Reparación de tendones
+Ginecología,Ligadura de trompas
+Ginecología,Ligadura tubárica
+Cirugía,Linfadenectomía
+Cirugía,Litotricia
+Cirugía,Lobectomía pulmonar
+Pediatría,Malformaciones anorrectales
+Pediatría,Malformaciones congénitas
+Cirugía,Mamoplastia reductora
+Traumatología,Reparación de ligamentos
+Cirugía,Manejo de quemaduras
+Cirugía,Manejo quirúrgico de trauma abdominal
+Cirugía,Manga gástrica
+Ginecología,Marsupialización de quiste de Bartolino
+Cirugía,Marsupialización de quiste renal
+Cirugía,Mastectomía
+Cirugía,Mastoidectomía
+Cirugía,Mediastinoscopia
+Traumatología,Reemplazo de rodilla
+Cirugía,Microlaringoscopía
+Ginecología,Miomectomía
+Cirugía,Nefrectomía
+Cirugía,Nefrectomía parcial
+Cirugía,Nefrectomía radical
+Cirugía,Nefrectomía simple
+Cirugía,Nefrolitotomía percutánea
+Cirugía,Nefrostomía
+Cirugía,Nefrostomía percutánea
+Cirugía,Nefroureterectomía
+Cirugía,Neumonectomía
+Ginecología,Ooforectomía
+Pediatría,Orquidopexia
+Cirugía,Orquiectomía
+Traumatología,Reemplazo de cadera
+Traumatología,Reducción cerrada de fractura
+Cirugía,Osteotomía mandibular
+Cirugía,Otoplastia
+Cirugía,Pancreatectomía
+Cirugía,Pancreatectomía oncológica
+Cirugía,Paratiroidectomía
+Cirugía,Pericardiocentesis quirúrgica
+Cirugía,Pieloplastía
+Pediatría,Piloromiotomía
+Cirugía,Piloroplastía
+Cirugía,Pleurodesis
+Cirugía,Polipectomía endoscópica
+Cirugía,Polipectomía nasal
+Cirugía,Prostatectomía
+Cirugía,Queratoplastia
+Ginecología,Quistectomía ovárica
+Cirugía,Reconstrucción facial
+Cirugía,Reconstrucción mamaria
+Cirugía,Reconstrucción maxilar
+Traumatología,Reducción abierta y fijación interna (RAFI)
+Traumatología,Osteostomía
+Cirugía,Reducción de fractura facial
+Traumatología,Osteosíntesis
+Traumatología,Meniscectomía
+Cirugía,Reemplazo valvular
+Cirugía,Reexploración abdominal y cierre por planos
+Cirugía,Reimplante de uréter
+Cirugía,Remodelación de Colostomía
+Cirugía,Reparación de aneurismas
+Ginecología,Reparación de desgarros obstétricos
+Cirugía,Reparación de desprendimiento de retina
+Cirugía,Reparación de fístula arteriovenosa
+Cirugía,Reparación de fractura facial
+Cirugía,Reparación de fracturas craneales
+Cirugía,Reparación de hernias
+Cirugía,Reparación de lesiones complejas
+Traumatología,Manejo conservador
+Cirugía,Reparación de perforaciones gastrointestinales
+Ginecología,Reparación de prolapso uterino
+Traumatología,Liberación del túnel carpiano
+Cirugía,Reparación valvular
+Cirugía,Reparación vascular
+Cirugía,Resección de lipomas
+Cirugía,Resección de tejido
+Cirugía,Resección de tumor cerebral
+Cirugía,Resección de tumores
+Cirugía,Resección de tumores de piel y tejidos blandos
+Cirugía,Resección de tumores maxilares
+Cirugía,Resección de tumores mediastinales
+Cirugía,Resección hepática
+Cirugía,Resección intestinal
+Cirugía,Resección transuretral de próstata
+Cirugía,Retiro de catéter para diálisis peritoneal
+Cirugía,Retiro de catéter para hermodiálisis
+Cirugía,Revisión o recambio de catéter peritoneal
+Cirugía,Revisión quirúrgica de acceso vascular
+Cirugía,Rinoplastia
+Ginecología,Salpingectomía
+Ginecología,Salpingooforectomía
+Cirugía,Septoplastia
+Cirugía,Sigmoidectomía
+Traumatología,Infección en sitio quirúrgico
+Cirugía,Sutura de heridas
+Traumatología,Fijador externo
+Cirugía,Timpanoplastia
+Cirugía,Tiroidectomía oncológica
+Cirugía,Tiroidectomía parcial
+Cirugía,Tiroidectomía total
+Cirugía,Toracotomía
+Cirugía,Toracotomía de emergencia
+Cirugía,Trabeculectomía
+Cirugía,Transposición de vena basílica
+Cirugía,Traqueostomía
+Cirugía,Trasplante cardíaco
+Cirugía,Trasplante de médula ósea
+Cirugía,Trasplante hepático
+Cirugía,Trasplante pancreático
+Cirugía,Trasplante pulmonar
+Cirugía,Trasplante renal
+Ginecología,Tratamiento quirúrgico de endometriosis
+Traumatología,Fijación percutánea
+Cirugía,Tratamiento quirúrgico del sangrado digestivo
+Cirugía,Trombectomía
+Cirugía,Trombectomía de fístula arteriovenosa
+Cirugía,Tumorectomía
+Cirugía,Ureterolitotomía
+Cirugía,Ureteroscopia
+Cirugía,Vagotomía
+Cirugía,Varicectomía
+Cirugía,Varicocelectomía
+Cirugía,Vasectomía
+Cirugía,Vitrectomía
+Cirugía,Yeyunostomía
+Traumatología,Fijación externa
+Traumatología,Corrección de escoliosis
+Traumatología,Corrección de deformidades
+Traumatología,Cirugía de pie
+Cirugía,Biopsia Tru-Cut
+Traumatología,Cirugía de mano
+Ginecología,Cistectomía
+Ginecología,Colposcopía
+Cirugía,Drenaje ecoguiado
+Ginecología,Episiotomía
+Ginecología,Extracción manual de placenta
+Ginecología,Fimbriectomía
+Traumatología,Cirugía de columna
+Cirugía,Infiltración ecoguiada
+Traumatología,Artroscopía
+Cirugía,Punción lumbar
+Ginecología,Reparación de desgarro cervical/vaginal
+Traumatología,Artroplastia
+Traumatología,Amputación

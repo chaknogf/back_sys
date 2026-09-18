@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Boolean
 from core.database import Base
 
 
@@ -9,3 +9,5 @@ class EspecialidadModel(Base):
     nombre = Column(String(100), nullable=False, unique=True, index=True)
     abreviatura = Column(String(10), unique=True, nullable=True)
     codigo = Column(String(10), unique=True, nullable=True)
+    estado = Column(Boolean, nullable=False, default=True, server_default="true", index=True)
+    sop = Column(Boolean, nullable=False, default=True, server_default="true", index=True)

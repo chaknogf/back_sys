@@ -29,8 +29,11 @@ APP_BASE_URL = os.getenv("APP_BASE_URL", FRONTEND_URL.rstrip("/"))
 # Número de workers para producción (uvicorn/gunicorn)
 WORKERS_PER_NODE = int(os.getenv("WORKERS", "4"))
 # Pool de conexiones por worker (pool_size * workers <= max_connections de PostgreSQL)
-DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "20"))
-DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "40"))
+# Optimizado 2026-09: pool_size 20→5, max_overflow 40→10.
+#  - Antes: 4 workers × (20+40) = hasta 240 conexiones > max_connections(100) → ejército de backends postgres ociosos
+#  - Ahora: 4 workers × (5+10)  = hasta 60 conexiones < 100 → dentro de límite sin churn
+DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "5"))
+DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "10"))
 DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "3600"))
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")

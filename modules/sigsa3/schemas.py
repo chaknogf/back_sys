@@ -21,7 +21,7 @@ class Sigsa3Base(BaseModel):
     dx: Optional[str] = None
     especialidad_id: Optional[int] = None
     paciente_id: Optional[int] = None
-    medico_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     consulta_id: Optional[int] = None
 
 
@@ -47,7 +47,7 @@ class Sigsa3Update(BaseModel):
     codigo_cie_10_id: Optional[int] = None
     dx: Optional[str] = None
     especialidad_id: Optional[int] = None
-    medico_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     consulta_id: Optional[int] = None
 
 
@@ -61,7 +61,7 @@ class Sigsa3Out(Sigsa3Base):
 class Sigsa3RegistroOut(BaseModel):
     id: int
     paciente_id: int
-    medico_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     personal_salud_id: Optional[int] = None
     consulta_id: Optional[int] = None
     fecha_consulta: date

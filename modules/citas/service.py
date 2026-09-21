@@ -5,9 +5,13 @@ from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime, date, time, timedelta
 
-from modules.citas.models import CitaModel
+from modules.citas.models import CitaModel, CitaDiaInhabilModel
 from modules.pacientes.models import PacienteModel
-from modules.citas.schemas import CitaCreate, CitaListResponse, CitaUpdate, CitaResponse, CitaBase, CitasPorFechaRazon
+from modules.medicos.models import MedicoModel
+from modules.citas.schemas import (
+    CitaCreate, CitaListResponse, CitaUpdate, CitaResponse, CitaBase, CitasPorFechaRazon,
+    DiaInhabilCreate, DiaInhabilUpdate,
+)
 
 
 DIAS_ES = {
@@ -21,7 +25,43 @@ DIAS_ES = {
 }
 
 
+def _validar_fecha_cita(db: Session, fecha: date, es_creacion: bool = True) -> None:
+    """Reglas para agendar: solo días hábiles (lun–vie) y fechas no
+    deshabilitadas por el administrador (feriados / asuetos)."""
+    if fecha is None:
+        return
+    if fecha.weekday() >= 5:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Las citas solo se pueden agendar en días hábiles "
+                "(lunes a viernes)."
+            ),
+        )
+    inhabilitado = (
+        db.query(CitaDiaInhabilModel)
+        .filter(
+            CitaDiaInhabilModel.fecha == fecha,
+            CitaDiaInhabilModel.activo.is_(True),
+        )
+        .first()
+    )
+    if inhabilitado:
+        motivo = f" ({inhabilitado.motivo})" if inhabilitado.motivo else ""
+        raise HTTPException(
+            status_code=400,
+            detail=f"La fecha {fecha.isoformat()} está deshabilitada para citas{motivo}.",
+        )
+
+
 def crear_cita(cita: CitaCreate, current_user, db: Session):
+    _validar_fecha_cita(db, cita.fecha_cita)
+    if cita.personal_atencion_id is not None:
+        if db.get(MedicoModel, cita.personal_atencion_id) is None:
+            raise HTTPException(
+                status_code=404,
+                detail="El personal de atención asignado no existe",
+            )
     nueva_cita = CitaModel(
         created_by=current_user.username[:8] if current_user and current_user.username else None,
         fecha_registro=cita.fecha_registro,
@@ -29,6 +69,7 @@ def crear_cita(cita: CitaCreate, current_user, db: Session):
         paciente_id=cita.paciente_id,
         especialidad=cita.especialidad,
         especialidad_id=cita.especialidad_id,
+        personal_atencion_id=cita.personal_atencion_id,
         fecha_cita=cita.fecha_cita,
         datos_extra=cita.datos_extra
     )
@@ -46,6 +87,7 @@ def listar_citas(
     paciente_id: Optional[int] = None,
     especialidad: Optional[str] = None,
     especialidad_id: Optional[int] = None,
+    personal_atencion_id: Optional[int] = None,
     fecha_cita: Optional[date] = None,
     limit: int = 200,
     skip: int = 0,
@@ -65,6 +107,8 @@ def listar_citas(
         query = query.filter(CitaModel.especialidad == especialidad)
     if especialidad_id is not None:
         query = query.filter(CitaModel.especialidad_id == especialidad_id)
+    if personal_atencion_id is not None:
+        query = query.filter(CitaModel.personal_atencion_id == personal_atencion_id)
     if fecha_cita is not None:
         query = query.filter(CitaModel.fecha_cita == fecha_cita)
     total = query.count()
@@ -156,12 +200,24 @@ def actualizar_cita(cita_id: int, datos: CitaUpdate, db: Session):
     try:
         datos_dict = datos.model_dump(exclude_unset=True)
 
+        if "fecha_cita" in datos_dict:
+            _validar_fecha_cita(db, datos_dict["fecha_cita"])
+        if "personal_atencion_id" in datos_dict and datos_dict.get("personal_atencion_id") is not None:
+            if db.get(MedicoModel, datos_dict["personal_atencion_id"]) is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="El personal de atención asignado no existe",
+                )
+
         for campo, valor in datos_dict.items():
             setattr(cita, campo, valor)
 
         db.commit()
         db.refresh(cita)
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(
@@ -182,3 +238,67 @@ def eliminar_cita(cita_id: int, db: Session):
     db.commit()
 
     return {"message": "Cita eliminada correctamente"}
+
+
+# ════════════════════════════════════════════════════════════════
+# DÍAS INHÁBILES — control de fechas sin agendar (feriados/asuetos)
+# ════════════════════════════════════════════════════════════════
+def listar_dias_inhabiles(
+    db: Session,
+    activo: Optional[bool] = None,
+    desde: Optional[date] = None,
+    hasta: Optional[date] = None,
+):
+    query = db.query(CitaDiaInhabilModel)
+    if activo is not None:
+        query = query.filter(CitaDiaInhabilModel.activo.is_(activo))
+    if desde is not None:
+        query = query.filter(CitaDiaInhabilModel.fecha >= desde)
+    if hasta is not None:
+        query = query.filter(CitaDiaInhabilModel.fecha <= hasta)
+    return query.order_by(CitaDiaInhabilModel.fecha.asc()).all()
+
+
+def crear_dia_inhabil(data: DiaInhabilCreate, username: str, db: Session):
+    existe = (
+        db.query(CitaDiaInhabilModel)
+        .filter(CitaDiaInhabilModel.fecha == data.fecha)
+        .first()
+    )
+    if existe:
+        raise HTTPException(
+            status_code=409,
+            detail="Ya existe un registro para esa fecha",
+        )
+    registro = CitaDiaInhabilModel(
+        fecha=data.fecha,
+        motivo=(data.motivo or "").strip() or None,
+        activo=True,
+        created_by=(username or "")[:20],
+    )
+    db.add(registro)
+    db.commit()
+    db.refresh(registro)
+    return registro
+
+
+def actualizar_dia_inhabil(registro_id: int, data: DiaInhabilUpdate, db: Session):
+    registro = db.get(CitaDiaInhabilModel, registro_id)
+    if not registro:
+        raise HTTPException(status_code=404, detail="Fecha no encontrada")
+
+    datos = data.model_dump(exclude_unset=True)
+    for campo, valor in datos.items():
+        setattr(registro, campo, valor)
+    db.commit()
+    db.refresh(registro)
+    return registro
+
+
+def eliminar_dia_inhabil(registro_id: int, db: Session):
+    registro = db.get(CitaDiaInhabilModel, registro_id)
+    if not registro:
+        raise HTTPException(status_code=404, detail="Fecha no encontrada")
+    db.delete(registro)
+    db.commit()
+    return {"message": "Fecha eliminada correctamente"}

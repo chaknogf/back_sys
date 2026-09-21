@@ -4,7 +4,7 @@ from datetime import datetime
 
 
 class DefuncionCreate(BaseModel):
-    medico_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     fecha_defuncion: Optional[datetime] = None
     paciente_id: Optional[int] = None
     muerte_gestacion: Optional[str] = None
@@ -36,7 +36,7 @@ class DefuncionCreate(BaseModel):
 
 
 class DefuncionUpdate(BaseModel):
-    medico_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     fecha_defuncion: Optional[datetime] = None
     paciente_id: Optional[int] = None
     muerte_gestacion: Optional[str] = None
@@ -97,7 +97,7 @@ class MedicoResumen(BaseModel):
 
 class DefuncionOut(BaseModel):
     id: int
-    medico_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     fecha_defuncion: Optional[datetime] = None
     paciente_id: Optional[int] = None
     fallecido_edad_horas: Optional[int] = None
@@ -154,7 +154,7 @@ class DefuncionListResponse(BaseModel):
 class DefuncionResumen(BaseModel):
     id: Optional[int] = None
     fecha_defuncion: Optional[datetime] = None
-    medico_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     causa_a: Optional[str] = None
     causa_b: Optional[str] = None
     causa_c: Optional[str] = None
@@ -189,7 +189,7 @@ class PacientesFallecidosResponse(BaseModel):
 
 
 class RegistrarDefuncionRequest(BaseModel):
-    medico_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     fecha_defuncion: Optional[datetime] = None
     muerte_gestacion: Optional[str] = None
     causa_a: Optional[str] = None

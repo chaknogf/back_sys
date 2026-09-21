@@ -8,7 +8,7 @@ class DefuncionModel(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    medico_id = Column(Integer, ForeignKey("medicos.id", ondelete="SET NULL"), nullable=True)
+    personal_atencion_id = Column(Integer, ForeignKey("personal_atencion.id", ondelete="SET NULL"), nullable=True)
     fecha_defuncion = Column(TIMESTAMP(timezone=True))
 
     paciente_id = Column(Integer, ForeignKey("pacientes.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -57,5 +57,5 @@ class DefuncionModel(Base):
 
     paciente = relationship("PacienteModel", foreign_keys=[paciente_id])
     madre = relationship("PacienteModel", foreign_keys=[madre_id])
-    medico = relationship("MedicoModel", foreign_keys=[medico_id])
+    medico = relationship("MedicoModel", foreign_keys=[personal_atencion_id])
     registrador = relationship("UserModel")

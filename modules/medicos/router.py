@@ -1,4 +1,4 @@
-# modules/medicos/router.py
+# modules/personal_atencion/router.py
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -16,8 +16,8 @@ from .service import (
 )
 
 router = APIRouter(
-    prefix="/medicos",
-    tags=["Medicos"]
+    prefix="/personal-atencion",
+    tags=["Personal de Atencion"]
 )
 
 
@@ -35,7 +35,7 @@ def listar_medicos(
     pasaporte: Optional[str] = None,
     especialidad_id: Optional[int] = None,
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db)
 ):
     return service_listar_medicos(
@@ -51,20 +51,20 @@ def listar_medicos(
     )
 
 
-@router.get("/{medico_id}", response_model=MedicoOut)
-def obtener_medico(medico_id: int, db: Session = Depends(get_db)):
-    return service_obtener_medico(medico_id, db)
+@router.get("/{personal_atencion_id}", response_model=MedicoOut)
+def obtener_medico(personal_atencion_id: int, db: Session = Depends(get_db)):
+    return service_obtener_medico(personal_atencion_id, db)
 
 
-@router.put("/{medico_id}", response_model=MedicoOut)
+@router.put("/{personal_atencion_id}", response_model=MedicoOut)
 def actualizar_medico(
-    medico_id: int,
+    personal_atencion_id: int,
     data: MedicoUpdate,
     db: Session = Depends(get_db)
 ):
-    return service_actualizar_medico(medico_id, data, db)
+    return service_actualizar_medico(personal_atencion_id, data, db)
 
 
-@router.delete("/{medico_id}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_medico(medico_id: int, db: Session = Depends(get_db)):
-    return service_eliminar_medico(medico_id, db)
+@router.delete("/{personal_atencion_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_medico(personal_atencion_id: int, db: Session = Depends(get_db)):
+    return service_eliminar_medico(personal_atencion_id, db)

@@ -8,7 +8,7 @@ from modules.medicos.schemas import MedicoOut
 class ConstanciaNacimientoBase(BaseModel):
     paciente_id: int
     madre_id: Optional[int] = None
-    medico_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     registrador_id: Optional[int] = None
 
     documento: Optional[str] = Field(None, max_length=20)
@@ -30,7 +30,7 @@ class ConstanciaNacimientoCreate(ConstanciaNacimientoBase):
 
 
 class ConstanciaNacimientoUpdate(BaseModel):
-    medico_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     documento: Optional[str] = Field(None, max_length=20)
     fecha_registro: Optional[date] = None
 

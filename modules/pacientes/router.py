@@ -236,8 +236,8 @@ def gestionar_paciente(
                 constancia = db.query(ConstanciaNacimientoModel).filter(
                     ConstanciaNacimientoModel.paciente_id == paciente.id
                 ).first()
-                if constancia and constancia.medico_id != nuevo_id_medico:
-                    constancia.medico_id = nuevo_id_medico
+                if constancia and constancia.personal_atencion_id != nuevo_id_medico:
+                    constancia.personal_atencion_id = nuevo_id_medico
                     db.commit()
 
         if cambio_a_fallecido:

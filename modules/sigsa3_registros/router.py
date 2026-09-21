@@ -28,7 +28,7 @@ router = APIRouter(
 @router.get("/", response_model=Sigsa3RegistroListResponse)
 def listar(
     paciente_id: Optional[int] = Query(None, description="Filtrar por ID de paciente"),
-    medico_id: Optional[int] = Query(None, description="Filtrar por ID de médico"),
+    personal_atencion_id: Optional[int] = Query(None, description="Filtrar por ID de médico"),
     personal_salud_id: Optional[int] = Query(None, description="Filtrar por ID de personal de salud"),
     consulta_id: Optional[int] = Query(None, description="Filtrar por ID de consulta"),
     tipo_consulta_id: Optional[int] = Query(None, description="Filtrar por tipo de consulta"),
@@ -47,7 +47,7 @@ def listar(
     registros, total = service_listar(
         db=db,
         paciente_id=paciente_id,
-        medico_id=medico_id,
+        personal_atencion_id=personal_atencion_id,
         personal_salud_id=personal_salud_id,
         consulta_id=consulta_id,
         tipo_consulta_id=tipo_consulta_id,

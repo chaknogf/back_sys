@@ -15,14 +15,14 @@ SQL_BLOCKED_KEYWORDS = re.compile(
 
 TABLAS_CONOCIDAS = {
     "pacientes": "Pacientes del hospital. Datos demográficos, estado, CUI, expediente. JSONB: nombre (nombre1,nombre2,nombre3), apellido1...5, datos_extra (socioeconomicos, neonatales, etc.)",
-    "consultas": "Registro de consultas médicas. tipo_consulta (1=COEX, 2=Hosp, 3=Emerg), especialidad, paciente_id, fecha_consulta, medico_id, activo",
-    "medicos": "Catálogo de médicos. nombre, colegiado, especialidad, activo",
+    "consultas": "Registro de consultas médicas. tipo_consulta (1=COEX, 2=Hosp, 3=Emerg), especialidad, paciente_id, fecha_consulta, activo",
+    "personal_atencion": "Catálogo de médicos. nombre, colegiado, especialidad, activo",
     "users": "Usuarios del sistema. username, email, rol, activo",
     "citas": "Citas programadas. paciente_id, fecha_cita, especialidad, razon, estado",
     "ciclos_consulta": "Ciclos clínicos por consulta. consulta_id, descripcion, activo",
     "eventos_consulta": "Eventos clínicos (ingreso/evolución/egreso). consulta_id, tipo_evento, descripcion, creado_en",
     "procedimientos": "Catálogo de procedimientos. nombre, abreviatura, costo",
-    "proce_medicos": "Procedimientos realizados. consulta_id, procedimiento_id, medico_id, fecha",
+    "proce_medicos": "Procedimientos realizados. consulta_id, procedimiento_id, fecha",
     "constancia_nacimiento": "Constancias de nacimiento. paciente_id, madre_id, peso, sexo, estado_informe",
     "nacimientos": "Registro de nacimientos (sin datos redundantes). paciente_id, madre_id, peso_gramos, clasificacion_nacimiento, trabajo_parto",
     "nacimientos_legacy": "Datos históricos de nacimientos migrados de sistema anterior",

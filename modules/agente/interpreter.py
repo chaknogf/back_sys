@@ -292,7 +292,7 @@ def generar_consulta(texto: str, reglas_extra: dict | None = None,
     if entidad is None:
         raise PlanInvalido(
             "No reconozco sobre qué datos preguntas. Prueba con: pacientes, "
-            "consultas, citas, medicos, nacimientos, defunciones, censo de "
+            "consultas, citas, personal_atencion, nacimientos, defunciones, censo de "
             "camas, prestamos, procedimientos o constancias."
         )
     meta = ENTIDADES[entidad]
@@ -455,7 +455,7 @@ def generar_consulta(texto: str, reglas_extra: dict | None = None,
 def _titulo_entidad(entidad: str) -> str:
     nombres = {
         "pacientes": "pacientes", "consultas": "consultas", "citas": "citas",
-        "medicos": "médicos", "nacimientos": "nacimientos",
+        "personal_atencion": "médicos", "nacimientos": "nacimientos",
         "defunciones": "defunciones", "censo_camas": "censo de camas",
         "prestamos": "préstamos", "proce_medicos": "procedimientos",
         "sigsa3": "registros SIGSA-3",

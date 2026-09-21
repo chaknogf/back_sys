@@ -12,6 +12,7 @@ class CitaBase(BaseModel):
     paciente_id: Optional[int] = None
     especialidad: Optional[str] = None
     especialidad_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     fecha_cita: Optional[date] = None
     razon_consulta: Optional[str] = None
     notas: Optional[str] = None
@@ -27,6 +28,7 @@ class CitaUpdate(BaseModel):
     expediente: Optional[str] = None
     especialidad: Optional[str] = None
     especialidad_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     fecha_cita: Optional[date] = None
     razon_consulta: Optional[str] = None
     notas: Optional[str] = None
@@ -42,6 +44,7 @@ class CitasPorFechaRazon(BaseModel):
 class CitaResponse(CitaBase):
     id: int
     created_by: str
+    personal_atencion_nombre: Optional[str] = None
     paciente: Optional[PacientesNombre] = None
 
     @field_validator("created_by", mode="before")
@@ -56,4 +59,26 @@ class CitaResponse(CitaBase):
 class CitaListResponse(BaseModel):
     total: int
     citas: list[CitaResponse]
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Días inhábiles (feriados / asuetos) ────────────────────────────
+class DiaInhabilCreate(BaseModel):
+    fecha: date
+    motivo: Optional[str] = None
+
+
+class DiaInhabilUpdate(BaseModel):
+    fecha: Optional[date] = None
+    motivo: Optional[str] = None
+    activo: Optional[bool] = None
+
+
+class DiaInhabilOut(BaseModel):
+    id: int
+    fecha: date
+    motivo: Optional[str] = None
+    activo: bool
+    created_by: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)

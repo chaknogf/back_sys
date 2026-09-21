@@ -39,7 +39,7 @@ def listar_medicos(
         total = 1 if medico else 0
         return MedicoListResponse(
             total=total,
-            medicos=[medico] if medico else []
+            personal_atencion=[medico] if medico else []
         )
 
     if activo is not None:
@@ -59,7 +59,7 @@ def listar_medicos(
 
     total = query.count()
 
-    medicos = (
+    personal_atencion = (
         query
         .order_by(MedicoModel.nombre)
         .offset(skip)
@@ -67,11 +67,11 @@ def listar_medicos(
         .all()
     )
 
-    return MedicoListResponse(total=total, medicos=medicos)
+    return MedicoListResponse(total=total, personal_atencion=personal_atencion)
 
 
-def obtener_medico(medico_id: int, db: Session):
-    medico = db.query(MedicoModel).filter(MedicoModel.id == medico_id).first()
+def obtener_medico(personal_atencion_id: int, db: Session):
+    medico = db.query(MedicoModel).filter(MedicoModel.id == personal_atencion_id).first()
 
     if not medico:
         raise HTTPException(status_code=404, detail="Médico no encontrado")
@@ -79,8 +79,8 @@ def obtener_medico(medico_id: int, db: Session):
     return medico
 
 
-def actualizar_medico(medico_id: int, data: MedicoUpdate, db: Session):
-    medico = db.query(MedicoModel).filter(MedicoModel.id == medico_id).first()
+def actualizar_medico(personal_atencion_id: int, data: MedicoUpdate, db: Session):
+    medico = db.query(MedicoModel).filter(MedicoModel.id == personal_atencion_id).first()
 
     if not medico:
         raise HTTPException(status_code=404, detail="Médico no encontrado")
@@ -96,8 +96,8 @@ def actualizar_medico(medico_id: int, data: MedicoUpdate, db: Session):
     return medico
 
 
-def eliminar_medico(medico_id: int, db: Session):
-    medico = db.query(MedicoModel).filter(MedicoModel.id == medico_id).first()
+def eliminar_medico(personal_atencion_id: int, db: Session):
+    medico = db.query(MedicoModel).filter(MedicoModel.id == personal_atencion_id).first()
 
     if not medico:
         raise HTTPException(status_code=404, detail="Médico no encontrado")

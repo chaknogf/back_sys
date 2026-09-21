@@ -150,11 +150,11 @@ def _batch_insert_sigsa3_registros(
     
     stmt = text("""
         INSERT INTO sigsa3_registros (
-            paciente_id, medico_id, personal_salud_id, consulta_id,
+            paciente_id, personal_atencion_id, personal_salud_id, consulta_id,
             fecha_consulta, tipo_consulta_id, control, semana_gestacional,
             codigo_cie_10_id, especialidad_id, sigsa3_id
         ) VALUES (
-            :paciente_id, :medico_id, :personal_salud_id, :consulta_id,
+            :paciente_id, :personal_atencion_id, :personal_salud_id, :consulta_id,
             :fecha_consulta, :tipo_consulta_id, :control, :semana_gestacional,
             :codigo_cie_10_id, :especialidad_id, :sigsa3_id
         )

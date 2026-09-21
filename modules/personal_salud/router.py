@@ -23,7 +23,7 @@ router = APIRouter(
 def listar(
     nombre: Optional[str] = Query(None, max_length=200, description="Filtro por nombre (búsqueda parcial)"),
     especialidad_id: Optional[int] = Query(None, description="Filtro por especialidad"),
-    medico_id: Optional[int] = Query(None, description="Filtro por médico"),
+    personal_atencion_id: Optional[int] = Query(None, description="Filtro por médico"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
@@ -31,7 +31,7 @@ def listar(
         db,
         nombre=nombre,
         especialidad_id=especialidad_id,
-        medico_id=medico_id,
+        personal_atencion_id=personal_atencion_id,
     )
 
 
@@ -50,7 +50,7 @@ def crear(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return service_crear(data.nombre, data.especialidad_id, data.medico_id, db)
+    return service_crear(data.nombre, data.especialidad_id, data.personal_atencion_id, db)
 
 
 @router.put("/{ps_id}", response_model=PersonalSaludOut)
@@ -60,7 +60,7 @@ def actualizar(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return service_actualizar(ps_id, data.nombre, data.especialidad_id, data.medico_id, db)
+    return service_actualizar(ps_id, data.nombre, data.especialidad_id, data.personal_atencion_id, db)
 
 
 @router.delete("/{ps_id}")

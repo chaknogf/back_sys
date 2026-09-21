@@ -37,6 +37,6 @@ class MedicoOut(MedicoBase):
 
 class MedicoListResponse(BaseModel):
     total: int
-    medicos: list[MedicoOut]
+    personal_atencion: list[MedicoOut]
 
     model_config = ConfigDict(from_attributes=True)

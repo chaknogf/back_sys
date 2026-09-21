@@ -70,9 +70,9 @@ ENTIDADES = {
             "anio": ("EXTRACT(YEAR FROM ci.fecha_cita)::int", "anio"),
         },
     },
-    "medicos": {
-        "tabla": "medicos m",
-        "sinonimos": ["medico", "medicos", "doctor", "doctores", "galeno"],
+    "personal_atencion": {
+        "tabla": "personal_atencion m",
+        "sinonimos": ["medico", "personal_atencion", "doctor", "doctores", "galeno"],
         "fecha_col": None,
         "join_especialidad": "LEFT JOIN especialidades e ON e.id = m.especialidad_id",
         "agrupaciones": {

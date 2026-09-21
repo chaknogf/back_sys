@@ -31,7 +31,7 @@ def _base_query(db: Session):
             EspecialidadModel.nombre,
         )
         .outerjoin(PacienteModel, Sigsa3RegistroModel.paciente_id == PacienteModel.id)
-        .outerjoin(MedicoModel, Sigsa3RegistroModel.medico_id == MedicoModel.id)
+        .outerjoin(MedicoModel, Sigsa3RegistroModel.personal_atencion_id == MedicoModel.id)
         .outerjoin(PersonalSaludModel, Sigsa3RegistroModel.personal_salud_id == PersonalSaludModel.id)
         .outerjoin(TipoConsultaSigsa3Model, Sigsa3RegistroModel.tipo_consulta_id == TipoConsultaSigsa3Model.id)
         .outerjoin(Cie10Model, Sigsa3RegistroModel.codigo_cie_10_id == Cie10Model.id)
@@ -41,7 +41,7 @@ def _base_query(db: Session):
 
 def _filtros(
     paciente_id: Optional[int] = None,
-    medico_id: Optional[int] = None,
+    personal_atencion_id: Optional[int] = None,
     personal_salud_id: Optional[int] = None,
     consulta_id: Optional[int] = None,
     tipo_consulta_id: Optional[int] = None,
@@ -56,8 +56,8 @@ def _filtros(
     conds = []
     if paciente_id is not None:
         conds.append(Sigsa3RegistroModel.paciente_id == paciente_id)
-    if medico_id is not None:
-        conds.append(Sigsa3RegistroModel.medico_id == medico_id)
+    if personal_atencion_id is not None:
+        conds.append(Sigsa3RegistroModel.personal_atencion_id == personal_atencion_id)
     if personal_salud_id is not None:
         conds.append(Sigsa3RegistroModel.personal_salud_id == personal_salud_id)
     if consulta_id is not None:
@@ -98,7 +98,7 @@ def _serializar(row) -> dict:
     return {
         "id": reg.id,
         "paciente_id": reg.paciente_id,
-        "medico_id": reg.medico_id,
+        "personal_atencion_id": reg.personal_atencion_id,
         "personal_salud_id": reg.personal_salud_id,
         "consulta_id": reg.consulta_id,
         "fecha_consulta": reg.fecha_consulta,
@@ -111,7 +111,7 @@ def _serializar(row) -> dict:
         "paciente_nombre": pac_nombre,
         "paciente_expediente": pac_expediente,
         "sexo": pac_sexo,
-        "medico_nombre": med_nombre,
+        "personal_atencion_nombre": med_nombre,
         "personal_salud_nombre": ps_nombre,
         "tipo_consulta_nombre": tc_nombre,
         "codigo_cie_10": cie10,
@@ -136,8 +136,8 @@ def _validar_fks(db: Session, data) -> None:
     """Valida existencia de todas las FKs de un registro normalizado
     contra sus tablas de catálogo (coincidencias garantizadas)."""
     _validar_fk_existe(db, PacienteModel, data.paciente_id, "paciente_id", "pacientes")
-    if data.medico_id is not None:
-        _validar_fk_existe(db, MedicoModel, data.medico_id, "medico_id", "medicos")
+    if data.personal_atencion_id is not None:
+        _validar_fk_existe(db, MedicoModel, data.personal_atencion_id, "personal_atencion_id", "personal_atencion")
     _validar_fk_existe(db, PersonalSaludModel, data.personal_salud_id, "personal_salud_id", "personal_salud")
     _validar_fk_existe(db, ConsultaModel, data.consulta_id, "consulta_id", "consultas")
     _validar_fk_existe(db, TipoConsultaSigsa3Model, data.tipo_consulta_id, "tipo_consulta_id", "tipos_consulta_sigsa3")
@@ -166,13 +166,13 @@ def _validar_coherencia_consulta(db: Session, paciente_id, consulta_id) -> None:
         )
 
 
-def _resolver_especialidad_desde_medico(db: Session, medico_id, especialidad_id) -> int | None:
-    """La especialidad gana el médico: si hay medico_id, usa medicos.especialidad_id
+def _resolver_especialidad_desde_medico(db: Session, personal_atencion_id, especialidad_id) -> int | None:
+    """La especialidad gana el médico: si hay personal_atencion_id, usa personal_atencion.especialidad_id
     salvo que el usuario envíe una explícita y el médico no tenga una."""
     if especialidad_id is not None:
         return especialidad_id
-    if medico_id is not None:
-        medico = db.get(MedicoModel, medico_id)
+    if personal_atencion_id is not None:
+        medico = db.get(MedicoModel, personal_atencion_id)
         if medico and medico.especialidad_id is not None:
             return medico.especialidad_id
     return None
@@ -181,7 +181,7 @@ def _resolver_especialidad_desde_medico(db: Session, medico_id, especialidad_id)
 def listar_registros(
     db: Session,
     paciente_id: Optional[int] = None,
-    medico_id: Optional[int] = None,
+    personal_atencion_id: Optional[int] = None,
     personal_salud_id: Optional[int] = None,
     consulta_id: Optional[int] = None,
     tipo_consulta_id: Optional[int] = None,
@@ -197,7 +197,7 @@ def listar_registros(
 ):
     conds = _filtros(
         paciente_id=paciente_id,
-        medico_id=medico_id,
+        personal_atencion_id=personal_atencion_id,
         personal_salud_id=personal_salud_id,
         consulta_id=consulta_id,
         tipo_consulta_id=tipo_consulta_id,
@@ -243,7 +243,7 @@ def crear_registro(data: Sigsa3RegistroCreate, db: Session) -> dict:
         )
     datos = data.model_dump()
     datos["especialidad_id"] = _resolver_especialidad_desde_medico(
-        db, datos.get("medico_id"), datos.get("especialidad_id")
+        db, datos.get("personal_atencion_id"), datos.get("especialidad_id")
     )
     registro = Sigsa3RegistroModel(**datos)
     db.add(registro)
@@ -261,12 +261,12 @@ def actualizar_registro(registro_id: int, data: Sigsa3RegistroUpdate, db: Sessio
         )
     update_data = data.model_dump(exclude_unset=True)
     # Validar FKs contra catálogos con los valores finales
-    campos = ("paciente_id", "medico_id", "personal_salud_id", "consulta_id",
+    campos = ("paciente_id", "personal_atencion_id", "personal_salud_id", "consulta_id",
               "tipo_consulta_id", "codigo_cie_10_id", "especialidad_id")
     finales = {k: update_data.get(k, getattr(registro, k)) for k in campos}
     _validar_fk_existe(db, PacienteModel, finales["paciente_id"], "paciente_id", "pacientes")
-    if finales["medico_id"] is not None:
-        _validar_fk_existe(db, MedicoModel, finales["medico_id"], "medico_id", "medicos")
+    if finales["personal_atencion_id"] is not None:
+        _validar_fk_existe(db, MedicoModel, finales["personal_atencion_id"], "personal_atencion_id", "personal_atencion")
     _validar_fk_existe(db, PersonalSaludModel, finales["personal_salud_id"], "personal_salud_id", "personal_salud")
     _validar_fk_existe(db, ConsultaModel, finales["consulta_id"], "consulta_id", "consultas")
     _validar_fk_existe(db, TipoConsultaSigsa3Model, finales["tipo_consulta_id"], "tipo_consulta_id", "tipos_consulta_sigsa3")
@@ -280,9 +280,9 @@ def actualizar_registro(registro_id: int, data: Sigsa3RegistroUpdate, db: Sessio
     for key, value in update_data.items():
         setattr(registro, key, value)
     # Especialidad: gana el médico si no viene explícita
-    if "especialidad_id" not in update_data and "medico_id" in update_data:
+    if "especialidad_id" not in update_data and "personal_atencion_id" in update_data:
         derivada = _resolver_especialidad_desde_medico(
-            db, update_data["medico_id"], None
+            db, update_data["personal_atencion_id"], None
         )
         if derivada is not None:
             registro.especialidad_id = derivada

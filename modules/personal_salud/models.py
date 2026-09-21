@@ -9,7 +9,7 @@ class PersonalSaludModel(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     nombre = Column(String(200), nullable=False, unique=True, index=True)
     especialidad_id = Column(Integer, ForeignKey("especialidades.id", ondelete="SET NULL"), nullable=True, index=True)
-    medico_id = Column(Integer, ForeignKey("medicos.id", ondelete="SET NULL"), nullable=True, index=True)
+    personal_atencion_id = Column(Integer, ForeignKey("personal_atencion.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(TIMESTAMP(timezone=False), server_default=text("CURRENT_TIMESTAMP"))
     especialidad_ref = relationship("EspecialidadModel", lazy="joined")
 

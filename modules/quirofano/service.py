@@ -537,7 +537,7 @@ def _resolve_intervencion(row) -> dict:
     """Convierte una fila con joins en dict serializable."""
     interv, paciente, medico, estado, formato, procedencia, rango, quirofano = row
     paciente_nombre = getattr(paciente, "nombre_completo", None) if paciente else None
-    medico_nombre = getattr(medico, "nombre", None) if medico else None
+    personal_atencion_nombre = getattr(medico, "nombre", None) if medico else None
     estado_nombre = getattr(estado, "nombre", None) if estado else None
     formato_nombre = getattr(formato, "nombre", None) if formato else None
     procedencia_nombre = getattr(procedencia, "nombre", None) if procedencia else None
@@ -549,8 +549,8 @@ def _resolve_intervencion(row) -> dict:
         "paciente_id": interv.paciente_id,
         "paciente_nombre": paciente_nombre,
         "expediente": interv.expediente,
-        "medico_id": interv.medico_id,
-        "medico_nombre": medico_nombre,
+        "personal_atencion_id": interv.personal_atencion_id,
+        "personal_atencion_nombre": personal_atencion_nombre,
         "procedimiento_principal": interv.procedimiento_principal,
         "procedimiento_2": interv.procedimiento_2,
         "procedimiento_3": interv.procedimiento_3,
@@ -595,7 +595,7 @@ def _base_query_intervenciones(db: Session):
     ).select_from(IntervencionQuirurgicaModel).outerjoin(
         PacienteModel, PacienteModel.id == IntervencionQuirurgicaModel.paciente_id
     ).outerjoin(
-        MedicoModel, MedicoModel.id == IntervencionQuirurgicaModel.medico_id
+        MedicoModel, MedicoModel.id == IntervencionQuirurgicaModel.personal_atencion_id
     ).outerjoin(
         EstadoCirugiaModel, EstadoCirugiaModel.estado_cirugia_id == IntervencionQuirurgicaModel.estado_cirugia_id
     ).outerjoin(
@@ -682,9 +682,9 @@ def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_
         QuirofanoNumeroModel.quirofano_numero_id == data.quirofano_numero_id
     ).first():
         raise HTTPException(status_code=404, detail="Número de quirófano no encontrado")
-    if data.medico_id:
+    if data.personal_atencion_id:
         from modules.medicos.models import MedicoModel
-        if not db.query(MedicoModel).filter(MedicoModel.id == data.medico_id).first():
+        if not db.query(MedicoModel).filter(MedicoModel.id == data.personal_atencion_id).first():
             raise HTTPException(status_code=404, detail="Médico no encontrado")
 
     reg = IntervencionQuirurgicaModel(
@@ -701,7 +701,7 @@ def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_
         procedencia_procedimiento_id=data.procedencia_procedimiento_id,
         rango_especialista_id=data.rango_especialista_id,
         quirofano_numero_id=data.quirofano_numero_id,
-        medico_id=data.medico_id,
+        personal_atencion_id=data.personal_atencion_id,
         fecha=data.fecha,
         hora_inicio_anestesia=data.hora_inicio_anestesia,
         hora_inicio_intervencion=data.hora_inicio_intervencion,

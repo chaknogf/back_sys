@@ -159,7 +159,7 @@ class QuirofanoNumeroOut(BaseModel):
 class IntervencionQuirurgicaCreate(BaseModel):
     paciente_id: int = Field(..., description="ID del paciente")
     expediente: str | None = Field(None, max_length=20)
-    medico_id: int | None = Field(None, description="Cirujano (médico)")
+    personal_atencion_id: int | None = Field(None, description="Cirujano (médico)")
     estado_cirugia_id: int | None = None
     formato_procedimiento_id: int | None = None
     procedencia_procedimiento_id: int | None = None
@@ -180,7 +180,7 @@ class IntervencionQuirurgicaCreate(BaseModel):
 
 
 class IntervencionQuirurgicaUpdate(BaseModel):
-    medico_id: int | None = None
+    personal_atencion_id: int | None = None
     estado_cirugia_id: int | None = None
     formato_procedimiento_id: int | None = None
     procedencia_procedimiento_id: int | None = None
@@ -206,7 +206,7 @@ class IntervencionQuirurgicaOut(BaseModel):
     paciente_id: int
     paciente_nombre: str | None = None
     expediente: str | None = None
-    medico_id: int | None = None
+    personal_atencion_id: int | None = None
     medico_nombre: str | None = None
     procedimiento_principal: str | None = None
     procedimiento_2: str | None = None

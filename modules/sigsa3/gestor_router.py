@@ -161,8 +161,8 @@ def sincronizar_medico_especialidad(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Paso 1: asocia medico_id en SIGSA-3 por nombre (personal_salud → personal_salud.medico_id).
-    Paso 2: actualiza especialidad en SIGSA-3 desde medicos.especialidad según medico_id."""
+    """Paso 1: asocia personal_atencion_id en SIGSA-3 por nombre (personal_salud → personal_salud.personal_atencion_id).
+    Paso 2: actualiza especialidad en SIGSA-3 desde personal_atencion.especialidad según personal_atencion_id."""
     return sincronizar_sigsa3(db)
 
 
@@ -248,7 +248,7 @@ def sincronizar_todo(
 ):
     """Orquesta el flujo completo de sincronización:
 
-    1. sincronizar-medico-especialidad: asocia medico_id por personal_salud.nombre
+    1. sincronizar-medico-especialidad: asocia personal_atencion_id por personal_salud.nombre
        y copia especialidad_id desde personal_salud (tabla puente depurada).
     2. asociar-pacientes-masivo: pipeline que llena paciente_id y consulta_id.
     3. normalizar: migra a sigsa3_registros (con sigsa3_id) y purga staging.

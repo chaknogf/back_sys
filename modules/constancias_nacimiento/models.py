@@ -12,7 +12,7 @@ class ConstanciaNacimientoModel(Base):
     documento = Column(String(20), nullable=True)
     paciente_id = Column(Integer, ForeignKey("pacientes.id", name="fk_constancia_paciente", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
     madre_id = Column(Integer, ForeignKey("pacientes.id", name="fk_constancia_madre", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
-    medico_id = Column(Integer, ForeignKey("medicos.id", name="fk_constancia_medico", onupdate="CASCADE", ondelete="RESTRICT"), nullable=True)
+    personal_atencion_id = Column(Integer, ForeignKey("personal_atencion.id", name="fk_constancia_personal_atencion", onupdate="CASCADE", ondelete="RESTRICT"), nullable=True)
     registrador_id = Column(Integer, ForeignKey("users.id", name="fk_constancia_registrador", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
     nombre_madre = Column(String(200), nullable=True)
     vecindad_madre = Column(String(200))

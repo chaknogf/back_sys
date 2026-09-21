@@ -76,3 +76,4 @@ estado vigente es el resultado de `022 → 024 → 025 → 027 → 028`:
   `TRUNCATE ... RESTART IDENTITY`; si un test restaura con `setval` debe hacer
   `flush` antes (los `SessionLocal` del proyecto usan `autoflush=False`).
 - No hay otros `ALTER`/`CREATE`/`DROP` aplicados a mano fuera de estos archivos.
+| 029 | `029_personal_atencion_citas.sql` | Renombra `medicos` → `personal_atencion` + columnas FK `medico_id` → `personal_atencion_id` (personal_salud, defunciones, intervenciones_quirurgicas, sigsa3, sigsa3_registros, constancia_nacimiento); crea `citas_dias_inhabiles`; agrega `citas.personal_atencion_id`. |

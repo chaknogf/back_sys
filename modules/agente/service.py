@@ -163,7 +163,7 @@ def _redactar(texto: str, plan: dict, filas: list, columnas: list) -> str:
 def _titulo_entidad(entidad: str) -> str:
     nombres = {
         "pacientes": "pacientes", "consultas": "consultas", "citas": "citas",
-        "medicos": "médicos", "nacimientos": "nacimientos",
+        "personal_atencion": "médicos", "nacimientos": "nacimientos",
         "defunciones": "defunciones", "censo_camas": "reportes de camas",
         "prestamos": "préstamos", "proce_medicos": "procedimientos",
         "sigsa3": "registros SIGSA-3",

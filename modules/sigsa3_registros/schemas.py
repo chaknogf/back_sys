@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 class Sigsa3RegistroBase(BaseModel):
     paciente_id: int = Field(..., description="ID del paciente (obligatorio)")
-    medico_id: Optional[int] = Field(None, description="ID del médico (opcional)")
+    personal_atencion_id: Optional[int] = Field(None, description="ID del médico (opcional)")
     personal_salud_id: Optional[int] = None
     consulta_id: Optional[int] = None
     fecha_consulta: date = Field(..., description="Fecha de la consulta (obligatorio)")
@@ -22,7 +22,7 @@ class Sigsa3RegistroCreate(Sigsa3RegistroBase):
 
 class Sigsa3RegistroUpdate(BaseModel):
     paciente_id: Optional[int] = None
-    medico_id: Optional[int] = None
+    personal_atencion_id: Optional[int] = None
     personal_salud_id: Optional[int] = None
     consulta_id: Optional[int] = None
     fecha_consulta: Optional[date] = None
@@ -39,7 +39,7 @@ class Sigsa3RegistroOut(Sigsa3RegistroBase):
     paciente_nombre: Optional[str] = None
     paciente_expediente: Optional[str] = None
     sexo: Optional[str] = None
-    medico_nombre: Optional[str] = None
+    personal_atencion_nombre: Optional[str] = None
     personal_salud_nombre: Optional[str] = None
     tipo_consulta_nombre: Optional[str] = None
     codigo_cie_10: Optional[str] = None

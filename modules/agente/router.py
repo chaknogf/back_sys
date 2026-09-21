@@ -64,7 +64,7 @@ def registrar_feedback(
     # intentamos derivar un sinónimo de entidad.
     if not body.correcto and body.correccion:
         n = (body.correccion or "").strip().lower()
-        for entidad in ("pacientes", "consultas", "citas", "medicos",
+        for entidad in ("pacientes", "consultas", "citas", "personal_atencion",
                         "nacimientos", "defunciones", "censo_camas",
                         "prestamos", "proce_medicos", "constancia_nacimiento"):
             if entidad in n and not _existe_regla(db, "sinonimo_entidad", n, entidad):

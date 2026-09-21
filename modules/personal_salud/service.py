@@ -15,30 +15,30 @@ def listar_personal_salud(
     db: Session,
     nombre: str | None = None,
     especialidad_id: int | None = None,
-    medico_id: int | None = None,
+    personal_atencion_id: int | None = None,
 ) -> list:
     query = db.query(PersonalSaludModel)
     if nombre:
         query = query.filter(PersonalSaludModel.nombre.ilike(f"%{nombre}%"))
     if especialidad_id is not None:
         query = query.filter(PersonalSaludModel.especialidad_id == especialidad_id)
-    if medico_id is not None:
-        query = query.filter(PersonalSaludModel.medico_id == medico_id)
+    if personal_atencion_id is not None:
+        query = query.filter(PersonalSaludModel.personal_atencion_id == personal_atencion_id)
     return query.order_by(PersonalSaludModel.nombre).all()
 
 
-def crear_personal_salud(nombre: str, especialidad_id: int | None, medico_id: int | None, db: Session) -> PersonalSaludModel:
+def crear_personal_salud(nombre: str, especialidad_id: int | None, personal_atencion_id: int | None, db: Session) -> PersonalSaludModel:
     existente = db.query(PersonalSaludModel).filter(PersonalSaludModel.nombre == nombre).first()
     if existente:
         raise HTTPException(status_code=409, detail=f"'{nombre}' ya existe en personal_salud")
-    registro = PersonalSaludModel(nombre=nombre, especialidad_id=especialidad_id, medico_id=medico_id)
+    registro = PersonalSaludModel(nombre=nombre, especialidad_id=especialidad_id, personal_atencion_id=personal_atencion_id)
     db.add(registro)
     db.commit()
     db.refresh(registro)
     return registro
 
 
-def actualizar_personal_salud(ps_id: int, nombre: str | None, especialidad_id: int | None, medico_id: int | None, db: Session) -> PersonalSaludModel:
+def actualizar_personal_salud(ps_id: int, nombre: str | None, especialidad_id: int | None, personal_atencion_id: int | None, db: Session) -> PersonalSaludModel:
     registro = db.query(PersonalSaludModel).filter(PersonalSaludModel.id == ps_id).first()
     if not registro:
         raise HTTPException(status_code=404, detail="Registro de personal_salud no encontrado")
@@ -46,8 +46,8 @@ def actualizar_personal_salud(ps_id: int, nombre: str | None, especialidad_id: i
         registro.nombre = nombre
     if especialidad_id is not None:
         registro.especialidad_id = especialidad_id
-    if medico_id is not None:
-        registro.medico_id = medico_id
+    if personal_atencion_id is not None:
+        registro.personal_atencion_id = personal_atencion_id
     db.commit()
     db.refresh(registro)
     return registro

@@ -210,7 +210,7 @@ def crear_paciente_desde_madre(
             paciente_id=nuevo.id,
             madre_id=madre.id,
             registrador_id=current_user.id,
-            medico_id=hijo.datos_extra.id_medico,
+            personal_atencion_id=hijo.datos_extra.id_medico,
             documento=generar_constancia_nacimiento(db),
             nombre_madre=nombre_madre_str,
             vecindad_madre=str(vecindad_madre) if vecindad_madre else None,

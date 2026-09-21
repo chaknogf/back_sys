@@ -4,7 +4,7 @@ from core.database import Base
 
 
 class MedicoModel(Base):
-    __tablename__ = "medicos"
+    __tablename__ = "personal_atencion"
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(200), nullable=False, index=True)
@@ -20,11 +20,11 @@ class MedicoModel(Base):
     )
 
     __table_args__ = (
-        Index("idx_medicos_activo", "activo"),
-        Index("idx_medicos_colegiado", "colegiado"),
-        Index("idx_medicos_pasaporte", "pasaporte"),
-        Index("idx_medicos_dpi", "dpi"),
-        Index("idx_medicos_nombre", "nombre"),
+        Index("idx_personal_atencion_activo", "activo"),
+        Index("idx_personal_atencion_colegiado", "colegiado"),
+        Index("idx_personal_atencion_pasaporte", "pasaporte"),
+        Index("idx_personal_atencion_dpi", "dpi"),
+        Index("idx_personal_atencion_nombre", "nombre"),
     )
 
     constancias = relationship(

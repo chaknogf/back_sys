@@ -18,7 +18,7 @@ def _fetchall(db: Session, sql: str, params: dict | None = None) -> list[dict]:
 
 
 _DEF_COLS = """
-    d.id, d.medico_id, d.fecha_defuncion,
+    d.id, d.personal_atencion_id, d.fecha_defuncion,
     d.paciente_id, d.fallecido_edad_horas, d.fallecido_edad_dias,
     d.fallecido_edad_meses, d.fallecido_edad_anios, d.mujer_edad_fertil,
     d.muerte_gestacion,
@@ -129,7 +129,7 @@ def _build_medico(row: dict) -> dict | None:
 
 def _build_out(row: dict) -> dict:
     out = {k: row.get(k) for k in [
-        "id", "medico_id", "fecha_defuncion", "paciente_id",
+        "id", "personal_atencion_id", "fecha_defuncion", "paciente_id",
         "fallecido_edad_horas", "fallecido_edad_dias", "fallecido_edad_meses",
         "fallecido_edad_anios", "mujer_edad_fertil", "muerte_gestacion",
         "causa_a", "causa_b", "causa_c", "causa_d", "causa_intervalo", "causa_otros",
@@ -366,7 +366,7 @@ def listar_defunciones(
     joins = """
         LEFT JOIN pacientes p ON p.id = d.paciente_id
         LEFT JOIN pacientes m ON m.id = d.madre_id
-        LEFT JOIN medicos doc ON doc.id = d.medico_id
+        LEFT JOIN personal_atencion doc ON doc.id = d.personal_atencion_id
     """
 
     count_sql = f"SELECT COUNT(*) FROM defunciones d {joins} WHERE {where_sql}"
@@ -409,7 +409,7 @@ def obtener_defuncion(defuncion_id: int, db: Session) -> dict:
         FROM defunciones d
         LEFT JOIN pacientes p ON p.id = d.paciente_id
         LEFT JOIN pacientes m ON m.id = d.madre_id
-        LEFT JOIN medicos doc ON doc.id = d.medico_id
+        LEFT JOIN personal_atencion doc ON doc.id = d.personal_atencion_id
         WHERE d.id = :id
     """, {"id": defuncion_id})
     return _build_out(row)
@@ -461,7 +461,7 @@ def buscar_pacientes_fallecidos(
     data_sql = f"""
         SELECT p.id, p.expediente, p.cui, p.nombre_completo, p.nombre,
                p.sexo, p.fecha_nacimiento, p.estado, p.datos_extra,
-               d.id AS defuncion_id, d.fecha_defuncion, d.medico_id,
+               d.id AS defuncion_id, d.fecha_defuncion, d.personal_atencion_id,
                d.causa_a, d.causa_b, d.causa_c, d.causa_d,
                d.fallecido_edad_anios, d.muerte_gestacion,
                d.es_fetal, d.mujer_edad_fertil,
@@ -507,7 +507,7 @@ def buscar_pacientes_fallecidos(
             "defuncion": {
                 "id": r.get("defuncion_id"),
                 "fecha_defuncion": r.get("fecha_defuncion"),
-                "medico_id": r.get("medico_id"),
+                "personal_atencion_id": r.get("personal_atencion_id"),
                 "causa_a": r.get("causa_a"),
                 "causa_b": r.get("causa_b"),
                 "causa_c": r.get("causa_c"),

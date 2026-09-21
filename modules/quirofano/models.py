@@ -23,7 +23,7 @@ class IntervencionQuirurgicaModel(Base):
     procedencia_procedimiento_id = Column(Integer, ForeignKey("procedencia_procedimiento.procedencia_procedimiento_id", ondelete="SET NULL"))
     rango_especialista_id = Column(Integer, ForeignKey("rango_especialista.rango_especialista_id", ondelete="SET NULL"))
     quirofano_numero_id = Column(Integer, ForeignKey("quirofano_numero.quirofano_numero_id", ondelete="SET NULL"), index=True)
-    medico_id = Column(Integer, ForeignKey("medicos.id", ondelete="SET NULL"), index=True)
+    personal_atencion_id = Column(Integer, ForeignKey("personal_atencion.id", ondelete="SET NULL"), index=True)
     fecha = Column(Date, nullable=False, index=True)
     hora_inicio_anestesia = Column(Time, nullable=True)
     hora_inicio_intervencion = Column(Time, nullable=True)

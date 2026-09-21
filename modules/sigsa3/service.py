@@ -219,11 +219,11 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
             consulta_id = _parse_int_safe(mapped.get("consulta_id"))
 
             ps_id = None
-            medico_id = None
+            personal_atencion_id = None
             if personal_salud:
                 match_ps = _resolver_personal_salud(mapa_ps, personal_salud)
                 if match_ps:
-                    ps_id, medico_id, esp_from_ps = match_ps
+                    ps_id, personal_atencion_id, esp_from_ps = match_ps
                     if especialidad_id is None and esp_from_ps is not None:
                         especialidad_id = esp_from_ps
 
@@ -250,7 +250,7 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
                 dx=dx,
                 especialidad_id=especialidad_id,
                 paciente_id=paciente_id,
-                medico_id=medico_id,
+                personal_atencion_id=personal_atencion_id,
                 consulta_id=consulta_id,
             )
             registros.append(registro)
@@ -374,23 +374,23 @@ def _validar_fk_staging(db: Session, model, fk_id: int | None, campo: str, tabla
 
 def _resolver_fks_staging(db: Session, datos: dict, mapa_ps: dict | None = None) -> dict:
     """Resuelve FKs del staging por string usando la tabla puente personal_salud:
-    - personal_salud (string) → personal_salud_id + medico_id + especialidad_id
+    - personal_salud (string) → personal_salud_id + personal_atencion_id + especialidad_id
     - codigo_cie_10 (string) → codigo_cie_10_id
     - validación de FKs numéricas contra catálogos
     """
     if mapa_ps is None:
         mapa_ps = _build_personal_salud_map(db)
 
-    # personal_salud string → personal_salud_id / medico_id / especialidad_id
+    # personal_salud string → personal_salud_id / personal_atencion_id / especialidad_id
     nombre_ps = (datos.get("personal_salud") or "").strip()
     if nombre_ps:
         match = _resolver_personal_salud(mapa_ps, nombre_ps)
         if match:
-            ps_id, medico_id, esp_id = match
+            ps_id, personal_atencion_id, esp_id = match
             if datos.get("personal_salud_id") is None:
                 datos["personal_salud_id"] = ps_id
-            if datos.get("medico_id") is None and medico_id is not None:
-                datos["medico_id"] = medico_id
+            if datos.get("personal_atencion_id") is None and personal_atencion_id is not None:
+                datos["personal_atencion_id"] = personal_atencion_id
             if datos.get("especialidad_id") is None and esp_id is not None:
                 datos["especialidad_id"] = esp_id
 
@@ -405,7 +405,7 @@ def _resolver_fks_staging(db: Session, datos: dict, mapa_ps: dict | None = None)
 
     # Validación de FKs numéricas contra catálogos
     _validar_fk_staging(db, PacienteModel, datos.get("paciente_id"), "paciente_id", "pacientes")
-    _validar_fk_staging(db, MedicoModel, datos.get("medico_id"), "medico_id", "medicos")
+    _validar_fk_staging(db, MedicoModel, datos.get("personal_atencion_id"), "personal_atencion_id", "personal_atencion")
     _validar_fk_staging(db, PersonalSaludModel, datos.get("personal_salud_id"), "personal_salud_id", "personal_salud")
     _validar_fk_staging(db, ConsultaModel, datos.get("consulta_id"), "consulta_id", "consultas")
     _validar_fk_staging(db, EspecialidadModel, datos.get("especialidad_id"), "especialidad_id", "especialidades")
@@ -532,9 +532,9 @@ def eliminar_por_periodo(desde: date, hasta: date, db: Session) -> dict:
 
 
 def _build_personal_salud_map(db: Session) -> dict:
-    """Construye el mapa nombre(personal_salud) → (id, medico_id, especialidad_id).
+    """Construye el mapa nombre(personal_salud) → (id, personal_atencion_id, especialidad_id).
     personal_salud es la tabla puente depurada: su nombre es la clave de match y
-    su medico_id es el mismo id que usa la tabla medicos."""
+    su personal_atencion_id es el mismo id que usa la tabla personal_atencion."""
     from modules.personal_salud.models import PersonalSaludModel
 
     personal = db.query(PersonalSaludModel).all()
@@ -542,13 +542,13 @@ def _build_personal_salud_map(db: Session) -> dict:
     for p in personal:
         clave = p.nombre.strip().lower()
         if clave:
-            mapa[clave] = (p.id, p.medico_id, p.especialidad_id)
+            mapa[clave] = (p.id, p.personal_atencion_id, p.especialidad_id)
     return mapa
 
 
 def _resolver_medico_desde_medicos(db: Session, nombre: str) -> tuple | None:
-    """Busca médico directamente en la tabla medicos por nombre (match exacto normalizado).
-    Devuelve (medico_id, especialidad_id) o None."""
+    """Busca médico directamente en la tabla personal_atencion por nombre (match exacto normalizado).
+    Devuelve (personal_atencion_id, especialidad_id) o None."""
     if not nombre:
         return None
     from modules.medicos.models import MedicoModel
@@ -562,7 +562,7 @@ def _resolver_medico_desde_medicos(db: Session, nombre: str) -> tuple | None:
 
 def _resolver_personal_salud(mapa: dict, nombre: str) -> tuple | None:
     """Resuelve un nombre de personal_salud contra el mapa puente.
-    Devuelve (personal_salud_id, medico_id, especialidad_id) o None.
+    Devuelve (personal_salud_id, personal_atencion_id, especialidad_id) o None.
     Match exacto primero; si no, match por subcadena bidireccional."""
     if not nombre:
         return None
@@ -592,14 +592,14 @@ def _resolver_personal_salud_vectorizado(
       nombre (no solo el primero), y se devuelve la confianza EXPLÍCITA.
     - 'asociar' es True solo cuando la confianza supera el umbral: nunca se
       convierte una similitud baja en una certeza (el reporte lo deja visible).
-    Devuelve dict con id/medico_id/especialidad_id/confianza/nivel/asociar
+    Devuelve dict con id/personal_atencion_id/especialidad_id/confianza/nivel/asociar
     o None si el nombre no tiene candidatos."""
     if not nombre:
         return None
     directo = mapa.get(nombre.strip().lower())
     if directo:
         return {
-            "id": directo[0], "medico_id": directo[1], "especialidad_id": directo[2],
+            "id": directo[0], "personal_atencion_id": directo[1], "especialidad_id": directo[2],
             "candidato": nombre, "confianza": 1.0, "nivel": "exacto", "asociar": True,
         }
     resultado = mejor_candidato(nombre, list(mapa.keys()), idf=idf, umbral=umbral_auto)
@@ -610,7 +610,7 @@ def _resolver_personal_salud_vectorizado(
         return None
     confianza = resultado["confianza"]
     return {
-        "id": valores[0], "medico_id": valores[1], "especialidad_id": valores[2],
+        "id": valores[0], "personal_atencion_id": valores[1], "especialidad_id": valores[2],
         "candidato": resultado["candidato"], "score": resultado["score"],
         "confianza": confianza, "nivel": resultado["nivel"],
         "asociar": confianza >= umbral_auto,
@@ -921,12 +921,12 @@ def _asociar_pacientes_por_nombre_vectorial(df_sigsa, df_pacientes,
 
 
 def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
-    """Paso 1: asocia personal_salud_id y medico_id en SIGSA-3 por nombre
-    (personal_salud → personal_salud.medico_id, tabla puente depurada).
-    Paso 2: actualiza especialidad_id desde personal_salud (y medicos).
+    """Paso 1: asocia personal_salud_id y personal_atencion_id en SIGSA-3 por nombre
+    (personal_salud → personal_salud.personal_atencion_id, tabla puente depurada).
+    Paso 2: actualiza especialidad_id desde personal_salud (y personal_atencion).
 
     Emparejamiento con LÓGICA VECTORIAL: match exacto masivo en SQL para los
-    500K+ filas; para los pocos sin medico_id se usa similitud de vectores de
+    500K+ filas; para los pocos sin personal_atencion_id se usa similitud de vectores de
     características (nombres completos tokenizados, pesos por IDF). Solo se
     asocia automáticamente cuando la confianza supera el umbral; los nombres
     con candidato pero sin certeza se reportan en personal_salud_baja_confianza
@@ -956,7 +956,7 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
         ).scalar()
         sin_medico = db.query(Sigsa3Model).filter(
             Sigsa3Model.personal_salud.isnot(None),
-            Sigsa3Model.medico_id.is_(None),
+            Sigsa3Model.personal_atencion_id.is_(None),
         ).count()
         mapa = _build_personal_salud_map(db)
         idf = _idf_personal_salud(mapa)
@@ -964,7 +964,7 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
         sin_match = 0
         registros_sin_medico = db.query(Sigsa3Model).filter(
             Sigsa3Model.personal_salud.isnot(None),
-            Sigsa3Model.medico_id.is_(None),
+            Sigsa3Model.personal_atencion_id.is_(None),
         ).all()
         for reg in registros_sin_medico:
             match = _resolver_personal_salud_vectorizado(mapa, idf, reg.personal_salud)
@@ -989,23 +989,23 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
         return _stats_vacios()
 
     # ── Paso masivo en SQL (match exacto) para los ~500K con nombre ──
-    # personal_salud.nombre es la clave depurada; su medico_id es el id de medicos.
-    # Si personal_salud.medico_id es NULL, intenta resolver desde medicos por nombre.
+    # personal_salud.nombre es la clave depurada; su personal_atencion_id es el id de personal_atencion.
+    # Si personal_salud.personal_atencion_id es NULL, intenta resolver desde personal_atencion por nombre.
     res = db.execute(
         text("""
             UPDATE sigsa3 s
             SET personal_salud_id = ps.id,
-                medico_id = COALESCE(
-                    s.medico_id,
-                    ps.medico_id,
-                    (SELECT m.id FROM medicos m
+                personal_atencion_id = COALESCE(
+                    s.personal_atencion_id,
+                    ps.personal_atencion_id,
+                    (SELECT m.id FROM personal_atencion m
                      WHERE LOWER(TRIM(m.nombre)) = LOWER(TRIM(ps.nombre))
                      LIMIT 1)
                 ),
                 especialidad_id = COALESCE(
                     s.especialidad_id,
                     ps.especialidad_id,
-                    (SELECT m.especialidad_id FROM medicos m
+                    (SELECT m.especialidad_id FROM personal_atencion m
                      WHERE LOWER(TRIM(m.nombre)) = LOWER(TRIM(ps.nombre))
                      AND m.especialidad_id IS NOT NULL
                      LIMIT 1)
@@ -1014,14 +1014,14 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
             WHERE LOWER(TRIM(s.personal_salud)) = LOWER(TRIM(ps.nombre))
               AND s.personal_salud IS NOT NULL
               AND (s.personal_salud_id IS DISTINCT FROM ps.id
-                   OR s.medico_id IS DISTINCT FROM COALESCE(
-                       s.medico_id, ps.medico_id,
-                       (SELECT m.id FROM medicos m
+                   OR s.personal_atencion_id IS DISTINCT FROM COALESCE(
+                       s.personal_atencion_id, ps.personal_atencion_id,
+                       (SELECT m.id FROM personal_atencion m
                         WHERE LOWER(TRIM(m.nombre)) = LOWER(TRIM(ps.nombre))
                         LIMIT 1))
                    OR s.especialidad_id IS DISTINCT FROM COALESCE(
                        s.especialidad_id, ps.especialidad_id,
-                       (SELECT m.especialidad_id FROM medicos m
+                       (SELECT m.especialidad_id FROM personal_atencion m
                         WHERE LOWER(TRIM(m.nombre)) = LOWER(TRIM(ps.nombre))
                         AND m.especialidad_id IS NOT NULL
                         LIMIT 1)))
@@ -1030,7 +1030,7 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
     db.commit()
     personal_salud_asociados = int(res or 0)
 
-    # ── Barrido vectorial solo para los sin medico_id (pocos, ~2K) ──
+    # ── Barrido vectorial solo para los sin personal_atencion_id (pocos, ~2K) ──
     mapa = _build_personal_salud_map(db)
     idf = _idf_personal_salud(mapa)
     asociados = 0
@@ -1038,7 +1038,7 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
     sin_match = 0
     registros_sin_medico = db.query(Sigsa3Model).filter(
         Sigsa3Model.personal_salud.isnot(None),
-        Sigsa3Model.medico_id.is_(None),
+        Sigsa3Model.personal_atencion_id.is_(None),
     ).all()
     for reg in registros_sin_medico:
         match = _resolver_personal_salud_vectorizado(mapa, idf, reg.personal_salud)
@@ -1048,19 +1048,19 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
         if not match.get("asociar"):
             continue  # candidato sin certeza: se reporta, no se asocia
         ps_id = match["id"]
-        medico_id = match["medico_id"]
+        personal_atencion_id = match["personal_atencion_id"]
         personal_esp_id = match["especialidad_id"]
-        # Fallback: si el bridge no tiene medico_id, buscar directo en medicos
-        if medico_id is None and reg.personal_salud:
+        # Fallback: si el bridge no tiene personal_atencion_id, buscar directo en personal_atencion
+        if personal_atencion_id is None and reg.personal_salud:
             fallback = _resolver_medico_desde_medicos(db, reg.personal_salud)
             if fallback:
-                medico_id = fallback[0]
+                personal_atencion_id = fallback[0]
                 if personal_esp_id is None:
                     personal_esp_id = fallback[1]
         if ps_id is not None and reg.personal_salud_id != ps_id:
             reg.personal_salud_id = ps_id
-        if medico_id is not None and reg.medico_id != medico_id:
-            reg.medico_id = medico_id
+        if personal_atencion_id is not None and reg.personal_atencion_id != personal_atencion_id:
+            reg.personal_atencion_id = personal_atencion_id
             asociados += 1
         if personal_esp_id and reg.especialidad_id != personal_esp_id:
             reg.especialidad_id = personal_esp_id
@@ -1694,7 +1694,7 @@ def exportar_csv(db: Session) -> bytes:
     output = io.StringIO()
     writer = csv.writer(output)
     columns = [
-        "id", "paciente_id", "medico_id", "consulta_id", "personal_salud",
+        "id", "paciente_id", "personal_atencion_id", "consulta_id", "personal_salud",
         "fecha_consulta", "no_historia_clinica", "nombre_paciente", "sexo",
         "edad_dias", "edad_meses", "edad_anios", "tipo_consulta", "control",
         "semana_gestacional", "codigo_cie_10", "dx", "especialidad_nombre",
@@ -1702,7 +1702,7 @@ def exportar_csv(db: Session) -> bytes:
     writer.writerow(columns)
     for r in registros:
         writer.writerow([
-            r.id, r.paciente_id, r.medico_id, r.consulta_id, r.personal_salud,
+            r.id, r.paciente_id, r.personal_atencion_id, r.consulta_id, r.personal_salud,
             r.fecha_consulta, r.no_historia_clinica, r.nombre_paciente, r.sexo,
             r.edad_dias, r.edad_meses, r.edad_anios, r.tipo_consulta, r.control,
             r.semana_gestacional, r.codigo_cie_10, r.dx, r.especialidad_nombre,
@@ -2150,7 +2150,7 @@ def _stats_staging(db: Session) -> dict:
     omitidos_sin_medico = db.query(Sigsa3Model).filter(
         Sigsa3Model.paciente_id.isnot(None),
         Sigsa3Model.paciente_id != 0,
-        Sigsa3Model.medico_id.is_(None),
+        Sigsa3Model.personal_atencion_id.is_(None),
     ).count()
     return {
         "omitidos_sin_medico": omitidos_sin_medico,
@@ -2168,7 +2168,7 @@ def _personal_salud_sin_match(db: Session) -> list[dict]:
             WHERE personal_salud IS NOT NULL
               AND personal_salud <> ''
               AND personal_salud_id IS NULL
-              AND medico_id IS NULL
+              AND personal_atencion_id IS NULL
             GROUP BY personal_salud
             ORDER BY total DESC, nombre
             LIMIT 500
@@ -2182,7 +2182,7 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
     """Migra registros de sigsa3 (staging) a sigsa3_registros (normalizado).
 
     - Solo migra registros con paciente_id (obligatorio).
-      medico_id y consulta_id son opcionales.
+      personal_atencion_id y consulta_id son opcionales.
     - Copia sigsa3_id (id del staging) en sigsa3_registros para trazabilidad.
     - NO borra en línea: al final purga de sigsa3 los id migrados (los que
       tienen sigsa3_id en sigsa3_registros). En staging solo quedan huérfanos.
@@ -2281,7 +2281,7 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
 
                 nuevo = Sigsa3RegistroModel(
                     paciente_id=reg.paciente_id,
-                    medico_id=reg.medico_id,
+                    personal_atencion_id=reg.personal_atencion_id,
                     personal_salud_id=reg.personal_salud_id,
                     consulta_id=reg.consulta_id,
                     fecha_consulta=reg.fecha_consulta,

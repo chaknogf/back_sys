@@ -7,10 +7,13 @@ from typing import List, Optional
 from datetime import datetime, date, time, timedelta
 
 from core.database import get_db
-from core.security import get_current_user
+from core.security import get_current_user, get_current_admin_user
 from modules.users.models import UserModel
 from .models import CitaModel
-from .schemas import CitaCreate, CitaListResponse, CitaUpdate, CitaResponse, CitaBase, CitasPorFechaRazon
+from .schemas import (
+    CitaCreate, CitaListResponse, CitaUpdate, CitaResponse, CitaBase, CitasPorFechaRazon,
+    DiaInhabilCreate, DiaInhabilUpdate, DiaInhabilOut,
+)
 from .service import (
     crear_cita as service_crear_cita,
     listar_citas as service_listar_citas,
@@ -19,6 +22,10 @@ from .service import (
     obtener_cita as service_obtener_cita,
     actualizar_cita as service_actualizar_cita,
     eliminar_cita as service_eliminar_cita,
+    listar_dias_inhabiles as service_listar_dias,
+    crear_dia_inhabil as service_crear_dia,
+    actualizar_dia_inhabil as service_actualizar_dia,
+    eliminar_dia_inhabil as service_eliminar_dia,
 )
 
 router = APIRouter(
@@ -43,6 +50,7 @@ def listar_citas(
     paciente_id: Optional[int] = None,
     especialidad: Optional[str] = None,
     especialidad_id: Optional[int] = None,
+    personal_atencion_id: Optional[int] = None,
     fecha_cita: Optional[date] = None,
     limit: int = 200,
     skip: int = 0,
@@ -56,6 +64,7 @@ def listar_citas(
         paciente_id=paciente_id,
         especialidad=especialidad,
         especialidad_id=especialidad_id,
+        personal_atencion_id=personal_atencion_id,
         fecha_cita=fecha_cita,
         limit=limit,
         skip=skip,
@@ -91,6 +100,46 @@ def citas_por_especialidad(
     db: Session = Depends(get_db)
 ):
     return service_citas_por_especialidad(especialidad, db)
+
+
+# ── Días inhábiles (feriados / asuetos) — lectura: auth; escritura: admin
+@router.get("/dias-inhabiles", response_model=List[DiaInhabilOut])
+def listar_dias_inhabiles(
+    activo: Optional[bool] = None,
+    desde: Optional[date] = None,
+    hasta: Optional[date] = None,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return service_listar_dias(db=db, activo=activo, desde=desde, hasta=hasta)
+
+
+@router.post("/dias-inhabiles", response_model=DiaInhabilOut, status_code=201)
+def crear_dia_inhabil(
+    data: DiaInhabilCreate,
+    current_user: UserModel = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    return service_crear_dia(data, current_user.username, db)
+
+
+@router.patch("/dias-inhabiles/{registro_id}", response_model=DiaInhabilOut)
+def actualizar_dia_inhabil(
+    registro_id: int,
+    data: DiaInhabilUpdate,
+    current_user: UserModel = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    return service_actualizar_dia(registro_id, data, db)
+
+
+@router.delete("/dias-inhabiles/{registro_id}")
+def eliminar_dia_inhabil(
+    registro_id: int,
+    current_user: UserModel = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    return service_eliminar_dia(registro_id, db)
 
 
 @router.get("/{cita_id}", response_model=CitaResponse)

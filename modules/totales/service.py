@@ -30,9 +30,10 @@ def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
             WHERE activo = true
         )
         SELECT entidad, total FROM (
-            SELECT 'pacientes_activos' AS entidad, COUNT(*) AS total, 1 AS orden
-            FROM pacientes
-            WHERE estado = 'A'
+            SELECT 'consultas_activas' AS entidad, COUNT(*) AS total, 1 AS orden
+            FROM consultas
+            WHERE COALESCE(ultimo_estado, '') NOT IN ('egreso', 'archivo', 'referido')
+              AND COALESCE(condicion_egreso, '') != 'fallecido'
 
             UNION ALL
 
@@ -71,7 +72,7 @@ def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
     sufijo = "Hoy" if es_hoy else fecha_consulta.strftime("%d/%m/%Y")
 
     iconos_map = {
-        'pacientes_activos': 'user-check',
+        'consultas_activas': 'user-check',
         'coex_hoy': 'stethoscope',
         'hospitalizaciones_hoy': 'bed',
         'emergencias_hoy': 'ambulance',
@@ -79,7 +80,7 @@ def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
     }
 
     colores_map = {
-        'pacientes_activos': 'purple',
+        'consultas_activas': 'purple',
         'coex_hoy': 'cyan',
         'hospitalizaciones_hoy': 'orange',
         'emergencias_hoy': 'red',
@@ -87,7 +88,7 @@ def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
     }
 
     nombres_map = {
-        'pacientes_activos': 'Pacientes Activos',
+        'consultas_activas': 'Consultas Activas',
         'coex_hoy': f'COEX {sufijo}',
         'hospitalizaciones_hoy': f'Hospitalizaciones {sufijo}',
         'emergencias_hoy': f'Emergencias {sufijo}',

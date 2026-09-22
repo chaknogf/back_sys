@@ -7,6 +7,7 @@ from datetime import datetime
 
 from modules.ciclos.models import CiclosConsulta
 from modules.consultas.models import ConsultaModel
+from modules.users.models import UserModel
 from modules.ciclos.schemas import CicloConsulta, CicloConsultaBase, CicloOut
 
 
@@ -37,6 +38,11 @@ def obtener_ciclo(ciclo_id: int, db: Session):
 
     if not ciclo:
         raise HTTPException(status_code=404, detail="Ciclo no encontrado")
+
+    # Nombre legible de quien registró la nota (el campo usuario guarda el username).
+    ciclo.usuario_nombre = db.query(UserModel.nombre).filter(
+        UserModel.username == ciclo.usuario
+    ).scalar()
 
     return ciclo
 

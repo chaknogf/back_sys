@@ -41,6 +41,7 @@ class CicloConsulta (CicloConsultaBase):
 class CicloOut(CicloConsultaBase):
     id: int
     consulta: ConsultaHistoriaResumidaOut
+    usuario_nombre: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 

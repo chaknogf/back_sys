@@ -3,6 +3,7 @@
 from sqlalchemy import Column, Integer, Date, String, ForeignKey, Text, Boolean, text, func
 from sqlalchemy.dialects.postgresql import TIMESTAMP, JSONB
 from sqlalchemy.orm import relationship, validates
+from typing import Optional
 from datetime import date
 from core.database import Base
 

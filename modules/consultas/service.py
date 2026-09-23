@@ -228,7 +228,6 @@ def registrar_consulta(datos: RegistroConsultaCreate, db: Session, current_user)
             ConsultaModel.tipo_consulta == datos.tipo_consulta,
             ConsultaModel.especialidad == datos.especialidad
         )
-        .with_for_update()
         .scalar()
     ) or 0
 

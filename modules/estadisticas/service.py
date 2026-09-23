@@ -1,7 +1,13 @@
-from datetime import date, datetime
-from sqlalchemy import text
-from sqlalchemy.orm import Session
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
+from sqlalchemy import func, text
+from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
+from core.config import APP_TIMEZONE
+
+from modules.consultas.models import ConsultaModel
+from modules.pacientes.models import PacienteModel
+from modules.consultas.schemas import ConsultaListResponse
 
 
 TIPO_CONSULTA_MAP = {1: "COEX", 2: "Hospitalización", 3: "Emergencia"}
@@ -55,7 +61,7 @@ def pacientes_atendidos(db: Session, desde: str, hasta: str) -> dict:
         "hasta": f_hasta,
         "datos": datos,
         "total_general": total_general,
-        "generado_en": datetime.now().isoformat(),
+        "generado_en": datetime.now(APP_TIMEZONE).isoformat(),
     }
 
 
@@ -97,7 +103,7 @@ def hospitalizacion_infantil(db: Session, desde: str, hasta: str) -> dict:
         "hasta": f_hasta,
         "datos": datos,
         "total_general": total_general,
-        "generado_en": datetime.now().isoformat(),
+        "generado_en": datetime.now(APP_TIMEZONE).isoformat(),
     }
 
 
@@ -164,16 +170,23 @@ def promedio_diario(db: Session, desde: str, hasta: str) -> dict:
         "hasta": f_hasta,
         "datos": datos,
         "total_general": total_general,
-        "generado_en": datetime.now().isoformat(),
+        "generado_en": datetime.now(APP_TIMEZONE).isoformat(),
     }
 
 
-def personal_hospital(db: Session, desde: str, hasta: str, skip: int = 0, limit: int = 100) -> dict:
+def _sigsa3_por_grupo(
+    db: Session, desde: str, hasta: str,
+    campo_filtro: str, valor_filtro: str,
+    titulo: str,
+    skip: int = 0, limit: int = 100,
+) -> dict:
+    """Genérico para consultas SIGSA-3 filtradas por campo de pacientes."""
     f_desde, f_hasta = _parse_fechas(desde, hasta)
-
     limit = min(limit, 500)
 
-    rows = db.execute(text("""
+    where_extra = f"AND p.{campo_filtro} = :valor_filtro"
+
+    rows = db.execute(text(f"""
         SELECT
             p.nombre,
             p.nombre_completo,
@@ -194,80 +207,10 @@ def personal_hospital(db: Session, desde: str, hasta: str, skip: int = 0, limit:
         LEFT JOIN cie10_catalogo cie ON cie.id = r.codigo_cie_10_id
         LEFT JOIN consultas c ON c.id = r.consulta_id
         WHERE r.fecha_consulta BETWEEN :desde AND :hasta
-          AND p.es_personal_hospital = 'S'
+          {where_extra}
         ORDER BY r.fecha_consulta, r.id
         LIMIT :limit OFFSET :skip
-    """), {"desde": f_desde, "hasta": f_hasta, "limit": limit, "skip": skip}).fetchall()
-
-    datos = []
-    for r in rows:
-        m = r._mapping
-        tc = int(m["tipo_consulta"])
-        edad = None
-        if m["fecha_nacimiento"] and m["fecha_consulta"]:
-            edad = (m["fecha_consulta"] - m["fecha_nacimiento"]).days // 365
-        datos.append({
-            "nombre": m["nombre"] if m["nombre"] else None,
-            "nombre_completo": m["nombre_completo"], 
-            "expediente": str(m["expediente"]) if m["expediente"] else None,
-            "tipo_consulta": tc,
-            "tipo_consulta_nombre": TIPO_CONSULTA_MAP.get(tc, f"Tipo {tc}"),
-            "sexo": str(m["sexo"]) if m["sexo"] else None,
-            "edad": edad,
-            "especialidad": str(m["especialidad"]),
-            "documento": str(m["documento"]) if m["documento"] else None,
-            "diagnostico": str(m["diagnostico"]) if m["diagnostico"] else None,
-            "paciente_id": str(m["paciente_id"]),
-            "fecha_consulta": str(m["fecha_consulta"])
-        })
-
-    total = db.execute(text("""
-        SELECT COUNT(*) AS total
-        FROM sigsa3_registros r
-        JOIN pacientes p ON p.id = r.paciente_id
-        WHERE r.fecha_consulta BETWEEN :desde AND :hasta
-          AND p.es_personal_hospital = 'S'
-    """), {"desde": f_desde, "hasta": f_hasta}).scalar()
-
-    return {
-        "titulo": "Consultas de Personal del Hospital",
-        "desde": f_desde,
-        "hasta": f_hasta,
-        "datos": datos,
-        "total_general": int(total) if total else 0,
-        "skip": skip,
-        "limit": limit,
-        "generado_en": datetime.now().isoformat(),
-    }
-
-
-def estudiante_publico(db: Session, desde: str, hasta: str) -> dict:
-    f_desde, f_hasta = _parse_fechas(desde, hasta)
-
-    rows = db.execute(text("""
-        SELECT
-            p.nombre,
-            p.nombre_completo,
-            p.expediente,
-            r.tipo_consulta_id AS tipo_consulta,
-            p.sexo,
-            p.fecha_nacimiento,
-            r.fecha_consulta,
-            COALESCE(e.nombre, '—') AS especialidad,
-            c.documento,
-            r.paciente_id,
-            CASE WHEN cie.codigo IS NOT NULL
-                 THEN cie.codigo || COALESCE(' - ' || cie.descripcion, '')
-            END AS diagnostico
-        FROM sigsa3_registros r
-        JOIN pacientes p ON p.id = r.paciente_id
-        LEFT JOIN especialidades e ON e.id = r.especialidad_id
-        LEFT JOIN cie10_catalogo cie ON cie.id = r.codigo_cie_10_id
-        LEFT JOIN consultas c ON c.id = r.consulta_id
-        WHERE r.fecha_consulta BETWEEN :desde AND :hasta
-          AND p.es_estudiante_publico = 'S'
-        ORDER BY r.fecha_consulta, r.id
-    """), {"desde": f_desde, "hasta": f_hasta}).fetchall()
+    """), {"desde": f_desde, "hasta": f_hasta, "valor_filtro": valor_filtro, "limit": limit, "skip": skip}).fetchall()
 
     datos = []
     for r in rows:
@@ -287,26 +230,36 @@ def estudiante_publico(db: Session, desde: str, hasta: str) -> dict:
             "especialidad": str(m["especialidad"]),
             "documento": str(m["documento"]) if m["documento"] else None,
             "diagnostico": str(m["diagnostico"]) if m["diagnostico"] else None,
+            "paciente_id": str(m["paciente_id"]),
             "fecha_consulta": str(m["fecha_consulta"]),
-            "paciente_id": str(m["paciente_id"])
         })
 
-    total = db.execute(text("""
+    total = db.execute(text(f"""
         SELECT COUNT(*)
         FROM sigsa3_registros r
         JOIN pacientes p ON p.id = r.paciente_id
         WHERE r.fecha_consulta BETWEEN :desde AND :hasta
-          AND p.es_estudiante_publico = 'S'
-    """), {"desde": f_desde, "hasta": f_hasta}).scalar()
+          {where_extra}
+    """), {"desde": f_desde, "hasta": f_hasta, "valor_filtro": valor_filtro}).scalar()
 
     return {
-        "titulo": "Consultas de Estudiantes Públicos",
+        "titulo": titulo,
         "desde": f_desde,
         "hasta": f_hasta,
         "datos": datos,
         "total_general": int(total) if total else 0,
-        "generado_en": datetime.now().isoformat(),
+        "skip": skip,
+        "limit": limit,
+        "generado_en": datetime.now(APP_TIMEZONE).isoformat(),
     }
+
+
+def personal_hospital(db: Session, desde: str, hasta: str, skip: int = 0, limit: int = 100) -> dict:
+    return _sigsa3_por_grupo(db, desde, hasta, "es_personal_hospital", "S", "Consultas de Personal del Hospital", skip, limit)
+
+
+def estudiante_publico(db: Session, desde: str, hasta: str) -> dict:
+    return _sigsa3_por_grupo(db, desde, hasta, "es_estudiante_publico", "S", "Consultas de Estudiantes Públicos")
 
 
 def reingresos(db: Session, desde: str, hasta: str) -> dict:
@@ -439,7 +392,7 @@ def reingresos(db: Session, desde: str, hasta: str) -> dict:
         "resumen": resumen,
         "por_especialidad": por_especialidad,
         "total_general": len(datos),
-        "generado_en": datetime.now().isoformat(),
+        "generado_en": datetime.now(APP_TIMEZONE).isoformat(),
     }
 
 
@@ -541,15 +494,6 @@ def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
             result.append(item)
         return result
 
-    def _build_estado(items, key) -> list[dict]:
-        result = []
-        for r in items:
-            m = r._mapping
-            item = {"estado": str(m["estado"]), "sexo": str(m["sexo"]), "total": int(m["total"])}
-            item[key] = str(m[key]) if m.get(key) is not None else None
-            result.append(item)
-        return result
-
     por_mortinato = []
     for r in rows_mortinato:
         m = r._mapping
@@ -571,11 +515,14 @@ def estadisticas_nacimientos(db: Session, desde: str, hasta: str) -> dict:
         "hasta": f_hasta,
         "total": int(total),
         "por_mortinato": por_mortinato,
-        "por_fallecidos_posteriores": _build_estado(rows_fallecidos_posteriores, "sexo"),
+        "por_fallecidos_posteriores": [
+            {"estado": str(r._mapping["estado"]), "sexo": str(r._mapping["sexo"]), "total": int(r._mapping["total"])}
+            for r in rows_fallecidos_posteriores
+        ],
         "por_clase_parto": _build_mortinato(rows_clase_parto, "clase_parto"),
         "por_clasificacion_parto": _build_mortinato(rows_clasificacion_parto, "clasificacion_parto"),
         "por_trabajo_parto": _build_mortinato(rows_trabajo_parto, "trabajo_parto"),
-        "generado_en": datetime.now().isoformat(),
+        "generado_en": datetime.now(APP_TIMEZONE).isoformat(),
     }
 
 
@@ -624,7 +571,7 @@ def sigsa3_por_especialidad(db: Session, desde: str, hasta: str) -> dict:
         "hasta": f_hasta,
         "datos": datos,
         "total_general": total_general,
-        "generado_en": datetime.now().isoformat(),
+        "generado_en": datetime.now(APP_TIMEZONE).isoformat(),
     }
 
 
@@ -781,5 +728,94 @@ def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str, top: int = 10, tip
         "datos": datos,
         "totales_por_grupo": totales_grupo,
         "total_general": total_general,
-        "generado_en": datetime.now().isoformat(),
+        "generado_en": datetime.now(APP_TIMEZONE).isoformat(),
     }
+
+
+# =====================================================================
+# REINGRESOS Y CONSULTAS ACTIVAS (movidos desde consultas/service.py)
+# =====================================================================
+
+def reingresos_consulta_tipo3(
+    db: Session,
+    skip: int = 0,
+    limit: int = 50,
+):
+    desde = date.today() - timedelta(days=20)
+    hasta = date.today()
+
+    filters = (
+        ConsultaModel.tipo_consulta == 3,
+        ConsultaModel.activo.is_(True),
+        ConsultaModel.fecha_consulta.between(desde, hasta),
+    )
+
+    multi_pacientes = (
+        db.query(ConsultaModel.paciente_id)
+        .filter(*filters)
+        .group_by(ConsultaModel.paciente_id)
+        .having(func.count(ConsultaModel.id) >= 2)
+        .subquery()
+    )
+
+    total_query = (
+        db.query(func.count(ConsultaModel.id))
+        .filter(
+            ConsultaModel.paciente_id.in_(db.query(multi_pacientes.c.paciente_id)),
+            *filters,
+        )
+    )
+    total = total_query.scalar()
+
+    resultados = (
+        db.query(ConsultaModel)
+        .options(joinedload(ConsultaModel.paciente))
+        .filter(
+            ConsultaModel.paciente_id.in_(db.query(multi_pacientes.c.paciente_id)),
+            *filters,
+        )
+        .order_by(ConsultaModel.paciente_id, ConsultaModel.fecha_consulta.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return ConsultaListResponse(
+        total=total or 0,
+        consultas=resultados
+    )
+
+
+def consultas_activas_admision_mayores_7_dias(
+    db: Session,
+    skip: int = 0,
+    limit: int = 50,
+):
+    corte = date.today() - timedelta(days=7)
+    query = (
+        db.query(ConsultaModel)
+        .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
+        .options(joinedload(ConsultaModel.paciente))
+        .filter(
+            ConsultaModel.activo.is_(True),
+            ConsultaModel.ultimo_estado == "admision",
+            ConsultaModel.fecha_consulta < corte
+        )
+    )
+
+    total = query.count()
+    resultados = (
+        query
+        .order_by(ConsultaModel.fecha_consulta.asc())
+        .limit(limit).offset(skip)
+        .all()
+    )
+
+    hoy = date.today()
+    for r in resultados:
+        r.dias_acumulados = (hoy - r.fecha_consulta).days
+
+    return ConsultaListResponse(
+        total=total,
+        consultas=resultados
+    )

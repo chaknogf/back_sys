@@ -1,8 +1,12 @@
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 import os
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
+
+# ── Zona horaria de la aplicación (Guatemala UTC-6) ──
+APP_TIMEZONE = ZoneInfo("America/Guatemala")
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:

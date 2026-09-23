@@ -2,6 +2,7 @@ from datetime import date, datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from fastapi import HTTPException, status
+from core.config import APP_TIMEZONE
 
 from modules.totales.schemas import TotalesResponse, TotalesItem
 
@@ -18,17 +19,10 @@ def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
     else:
         fecha_consulta = date.today()
 
+    # Fecha anterior para el censo de camas (refleja cómo amaneció)
+    fecha_censo = fecha_consulta - __import__('datetime').timedelta(days=1)
+
     query = text("""
-        WITH occupancy AS (
-            SELECT COALESCE(SUM(cc.camas_ocupadas), 0) AS ocupadas
-            FROM censo_camas cc
-            WHERE cc.fecha = :fecha
-        ),
-        capacity AS (
-            SELECT COALESCE(SUM(camas_censables), 0) AS total_camas
-            FROM encamamiento
-            WHERE activo = true
-        )
         SELECT entidad, total FROM (
             SELECT 'consultas_activas' AS entidad, COUNT(*) AS total, 1 AS orden
             FROM consultas
@@ -58,15 +52,34 @@ def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
 
             UNION ALL
 
-            SELECT 'porcentaje_ocupacional' AS entidad,
-                   ROUND(occupancy.ocupadas * 100.0 / NULLIF(capacity.total_camas, 0), 1)::float AS total,
+            SELECT 'ocupacion_actual' AS entidad,
+                   COUNT(*) AS total,
                    5 AS orden
-            FROM occupancy, capacity
+            FROM consultas
+            WHERE tipo_consulta = 2
+              AND COALESCE(ultimo_estado, '') NOT IN ('egreso', 'archivo', 'referido')
+              AND COALESCE(condicion_egreso, '') != 'fallecido'
+
+            UNION ALL
+
+            SELECT 'censo_camas_hoy' AS entidad,
+                   ROUND(
+                       COALESCE(SUM(cc.camas_ocupadas), 0) * 100.0 /
+                       NULLIF(
+                           (SELECT COALESCE(SUM(camas_censables), 0)
+                            FROM encamamiento WHERE activo = true),
+                           0
+                       ), 1
+                   )::float AS total,
+                   6 AS orden
+            FROM censo_camas cc
+            WHERE cc.fecha = :fecha_censo
+
         ) AS totales_ordenados
         ORDER BY orden;
     """)
 
-    resultado = db.execute(query, {"fecha": fecha_consulta}).fetchall()
+    resultado = db.execute(query, {"fecha": fecha_consulta, "fecha_censo": fecha_censo}).fetchall()
 
     es_hoy = fecha_consulta == date.today()
     sufijo = "Hoy" if es_hoy else fecha_consulta.strftime("%d/%m/%Y")
@@ -76,7 +89,8 @@ def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
         'coex_hoy': 'stethoscope',
         'hospitalizaciones_hoy': 'bed',
         'emergencias_hoy': 'ambulance',
-        'porcentaje_ocupacional': 'bed',
+        'ocupacion_actual': 'activity',
+        'censo_camas_hoy': 'bed',
     }
 
     colores_map = {
@@ -84,7 +98,8 @@ def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
         'coex_hoy': 'cyan',
         'hospitalizaciones_hoy': 'orange',
         'emergencias_hoy': 'red',
-        'porcentaje_ocupacional': 'green',
+        'ocupacion_actual': 'blue',
+        'censo_camas_hoy': 'green',
     }
 
     nombres_map = {
@@ -92,13 +107,14 @@ def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
         'coex_hoy': f'COEX {sufijo}',
         'hospitalizaciones_hoy': f'Hospitalizaciones {sufijo}',
         'emergencias_hoy': f'Emergencias {sufijo}',
-        'porcentaje_ocupacional': f'Ocupación Camas {sufijo}',
+        'ocupacion_actual': 'Ocupación Actual',
+        'censo_camas_hoy': f'Censo Camas {sufijo}',
     }
 
     totales = [
         TotalesItem(
             entidad=nombres_map.get(row.entidad, row.entidad.capitalize()),
-            total=float(row.total) if row.entidad == 'porcentaje_ocupacional' else int(row.total),
+            total=int(row.total),
             icono=iconos_map.get(row.entidad, "bar-chart"),
             color=colores_map.get(row.entidad, "gray"),
         )
@@ -107,5 +123,5 @@ def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
 
     return TotalesResponse(
         totales=totales,
-        generado_en=datetime.now().isoformat(),
+        generado_en=datetime.now(APP_TIMEZONE).isoformat(),
     )

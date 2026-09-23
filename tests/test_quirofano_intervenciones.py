@@ -62,7 +62,7 @@ class TestIntervencionesQuirurgicas:
     def _crear_medico(self, client):
         s = _sufijo()
         r = client.post(
-            "/medicos/",
+            "/personal-atencion/",
             json={
                 "nombre": f"Dr. Cirujano {s}",
                 "colegiado": str(s),
@@ -150,7 +150,7 @@ class TestIntervencionesQuirurgicas:
             headers=auth_headers,
             json={
                 "paciente_id": paciente["id"],
-                "medico_id": medico["id"],
+                "personal_atencion_id": medico["id"],
                 "quirofano_numero_id": quirofano["quirofano_numero_id"],
                 "procedimiento_principal": "Apendicectomía",
                 "procedimiento_2": "Lavado de cavidad",
@@ -165,7 +165,7 @@ class TestIntervencionesQuirurgicas:
         assert r.status_code == 201
         data = r.json()
         assert data["paciente_id"] == paciente["id"]
-        assert data["medico_id"] == medico["id"]
+        assert data["personal_atencion_id"] == medico["id"]
         assert data["quirofano_numero_id"] == quirofano["quirofano_numero_id"]
         assert data["quirofano_numero_nombre"] == quirofano["nombre"]
         assert data["procedimiento_principal"] == "Apendicectomía"

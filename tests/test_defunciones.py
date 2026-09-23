@@ -41,7 +41,7 @@ class TestDefunciones:
     def _crear_medico(self, client):
         s = _sufijo()
         r = client.post(
-            "/medicos/",
+            "/personal-atencion/",
             json={
                 "nombre": f"Dr. Forense {s}",
                 "colegiado": str(s),
@@ -82,7 +82,7 @@ class TestDefunciones:
             "/defunciones/",
             headers=auth_headers,
             json={
-                "medico_id": medico["id"],
+                "personal_atencion_id": medico["id"],
                 "paciente_id": paciente["id"],
                 "fecha_defuncion": now,
                 "causa_a": "Infarto agudo de miocardio",
@@ -93,7 +93,7 @@ class TestDefunciones:
         assert r.status_code == 201
         data = r.json()
         assert data["paciente_id"] == paciente["id"]
-        assert data["medico_id"] == medico["id"]
+        assert data["personal_atencion_id"] == medico["id"]
         assert data["causa_a"] == "Infarto agudo de miocardio"
         assert data["fallecido_edad_anios"] is not None
         created_ids["defunciones"].append(data["id"])
@@ -106,7 +106,7 @@ class TestDefunciones:
             "/defunciones/",
             headers=auth_headers,
             json={
-                "medico_id": medico["id"],
+                "personal_atencion_id": medico["id"],
                 "paciente_id": madre["id"],
                 "fecha_defuncion": datetime.now().isoformat(),
                 "es_fetal": True,
@@ -140,7 +140,7 @@ class TestDefunciones:
             "/defunciones/",
             headers=auth_headers,
             json={
-                "medico_id": medico["id"],
+                "personal_atencion_id": medico["id"],
                 "paciente_id": paciente["id"],
                 "fecha_defuncion": datetime.now().isoformat(),
                 "causa_a": "Paro cardíaco",
@@ -168,7 +168,7 @@ class TestDefunciones:
             "/defunciones/",
             headers=auth_headers,
             json={
-                "medico_id": medico["id"],
+                "personal_atencion_id": medico["id"],
                 "paciente_id": paciente["id"],
                 "fecha_defuncion": datetime.now().isoformat(),
                 "causa_a": "Causa original",
@@ -198,7 +198,7 @@ class TestDefunciones:
             "/defunciones/",
             headers=auth_headers,
             json={
-                "medico_id": medico["id"],
+                "personal_atencion_id": medico["id"],
                 "paciente_id": paciente["id"],
                 "fecha_defuncion": datetime.now().isoformat(),
             },
@@ -221,7 +221,7 @@ class TestDefunciones:
             f"/defunciones/registrar/{paciente['id']}",
             headers=auth_headers,
             json={
-                "medico_id": medico["id"],
+                "personal_atencion_id": medico["id"],
                 "fecha_defuncion": datetime.now().isoformat(),
                 "causa_a": "Hemorragia interna",
             },
@@ -242,7 +242,7 @@ class TestDefunciones:
         r = client.post(
             f"/defunciones/registrar/{paciente['id']}",
             headers=auth_headers,
-            json={"medico_id": medico["id"]},
+            json={"personal_atencion_id": medico["id"]},
         )
         def_id = r.json()["id"]
         created_ids["defunciones"].append(def_id)
@@ -250,7 +250,7 @@ class TestDefunciones:
         r2 = client.post(
             f"/defunciones/registrar/{paciente['id']}",
             headers=auth_headers,
-            json={"medico_id": medico["id"]},
+            json={"personal_atencion_id": medico["id"]},
         )
         assert r2.status_code == 400
 

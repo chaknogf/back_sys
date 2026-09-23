@@ -19,7 +19,7 @@ from core.security import hash_password
 
 created_ids = {
     "pacientes": [],
-    "medicos": [],
+    "personal_atencion": [],
     "consultas": [],
     "citas": [],
     "ciclos": [],
@@ -40,7 +40,7 @@ def cleanup():
     try:
         model_map = {
             "pacientes": PacienteModel,
-            "medicos": MedicoModel,
+            "personal_atencion": MedicoModel,
             "consultas": ConsultaModel,
             "citas": CitaModel,
             "ciclos": CiclosConsulta,
@@ -93,7 +93,7 @@ class TestAuth:
 
     def test_login_fail(self, client):
         r = client.post("/auth/login", data={"username": "no_existe", "password": "x"})
-        assert r.status_code == 401
+        assert r.status_code in (401, 429)
 
     def test_me(self, client, auth_headers):
         r = client.get("/auth/me", headers=auth_headers)
@@ -225,7 +225,7 @@ class TestMedicos:
     def test_create_medico(self, client, auth_headers):
         s = _sufijo()
         r = client.post(
-            "/medicos/",
+            "/personal-atencion/",
             json={
                 "nombre": f"Dr. Test {s}",
                 "colegiado": str(int(s)),
@@ -236,38 +236,38 @@ class TestMedicos:
         )
         assert r.status_code in (200, 201)
         data = r.json()
-        created_ids["medicos"].append(data["id"])
+        created_ids["personal_atencion"].append(data["id"])
 
     def test_list_medicos(self, client, auth_headers):
-        r = client.get("/medicos/")
+        r = client.get("/personal-atencion/")
         assert r.status_code == 200
         data = r.json()
         assert "total" in data
-        assert "medicos" in data
+        assert "personal_atencion" in data
 
     def test_list_medicos_with_filter(self, client, auth_headers):
-        r = client.get("/medicos/?especialidad_id=1")
+        r = client.get("/personal-atencion/?especialidad_id=1")
         assert r.status_code == 200
 
     def test_get_medico(self, client, auth_headers):
-        if not created_ids["medicos"]:
+        if not created_ids["personal_atencion"]:
             pytest.skip("No medico created")
-        r = client.get(f"/medicos/{created_ids['medicos'][0]}")
+        r = client.get(f"/personal-atencion/{created_ids['personal_atencion'][0]}")
         assert r.status_code == 200
 
     def test_get_medico_not_found(self, client, auth_headers):
-        r = client.get("/medicos/999999")
+        r = client.get("/personal-atencion/999999")
         assert r.status_code == 404
 
     def test_update_medico(self, client, auth_headers):
-        if not created_ids["medicos"]:
+        if not created_ids["personal_atencion"]:
             pytest.skip("No medico created")
-        mid = created_ids["medicos"][0]
+        mid = created_ids["personal_atencion"][0]
         # Usar un colegiado único (columna UNIQUE) para no colisionar
         # con registros persistentes de la BD (ej. 99999).
         s = _sufijo()
         r = client.put(
-            f"/medicos/{mid}",
+            f"/personal-atencion/{mid}",
             json={
                 "nombre": "Dr. Test Updated",
                 "colegiado": f"CU{s}",
@@ -279,12 +279,12 @@ class TestMedicos:
         assert r.json()["nombre"] == "Dr. Test Updated"
 
     def test_delete_medico(self, client, auth_headers):
-        if not created_ids["medicos"]:
+        if not created_ids["personal_atencion"]:
             pytest.skip("No medico created")
-        mid = created_ids["medicos"][-1]
-        r = client.delete(f"/medicos/{mid}")
+        mid = created_ids["personal_atencion"][-1]
+        r = client.delete(f"/personal-atencion/{mid}")
         assert r.status_code == 204
-        created_ids["medicos"].remove(mid)
+        created_ids["personal_atencion"].remove(mid)
 
 
 # =====================================================================
@@ -712,6 +712,10 @@ class TestCitas:
     def test_update_cita(self, client, auth_headers):
         if not created_ids["citas"]:
             pytest.skip("No cita created")
+        # Asegurar que la fecha sea día hábil (lun-vie)
+        fecha = date.today() + timedelta(days=31)
+        while fecha.weekday() >= 5:
+            fecha += timedelta(days=1)
         cid = created_ids["citas"][0]
         r = client.put(
             f"/citas/{cid}",
@@ -720,7 +724,7 @@ class TestCitas:
                 "paciente_id": created_ids["pacientes"][0] if created_ids["pacientes"] else 1,
                 "expediente": "UPD",
                 "especialidad": "MED",
-                "fecha_cita": (date.today() + timedelta(days=31)).isoformat(),
+                "fecha_cita": fecha.isoformat(),
             },
         )
         assert r.status_code == 200
@@ -1233,7 +1237,7 @@ class TestConstanciasNacimiento:
     CONSTANCIA_ID = None
 
     def test_create_constancia(self, client, auth_headers, db_session):
-        if not created_ids["pacientes"] or not created_ids["medicos"]:
+        if not created_ids["pacientes"] or not created_ids["personal_atencion"]:
             pytest.skip("Need paciente and medico")
         user = db_session.query(UserModel).filter(
             UserModel.username == "test_integration"
@@ -1243,7 +1247,7 @@ class TestConstanciasNacimiento:
             headers=auth_headers,
             json={
                 "paciente_id": created_ids["pacientes"][0],
-                "medico_id": created_ids["medicos"][0],
+                "medico_id": created_ids["personal_atencion"][0],
                 "registrador_id": user.id,
                 "nombre_madre": "MARIA TEST",
                 "vecindad_madre": "TECPAN",

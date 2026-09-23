@@ -1,6 +1,7 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from datetime import datetime
+from core.config import APP_TIMEZONE
 
 
 class ReglaAgenteBase(BaseModel):
@@ -55,4 +56,4 @@ class RespuestaAgente(BaseModel):
     ejecucion_ms: int = 0
     modelo: str = "agente-rule"
     error: Optional[str] = None
-    generado_en: datetime = Field(default_factory=datetime.now)
+    generado_en: datetime = Field(default_factory=lambda: datetime.now(APP_TIMEZONE))

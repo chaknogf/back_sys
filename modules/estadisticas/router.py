@@ -4,10 +4,6 @@ from core.database import get_db
 from core.security import get_current_user
 from modules.users.models import UserModel
 from modules.consultas.schemas import ConsultaListResponse
-from modules.consultas.service import (
-    consultas_activas_admision_mayores_7_dias as svc_activas_admision_mayores_7_dias,
-    reingresos_consulta_tipo3 as svc_reingresos_tipo3,
-)
 
 from .schemas import (
     PacientesAtendidosResponse,
@@ -30,6 +26,8 @@ from .service import (
     estadisticas_nacimientos as svc_estadisticas_nacimientos,
     sigsa3_por_especialidad as svc_sigsa3_especialidad,
     sigsa3_dx_frecuentes as svc_sigsa3_dx,
+    consultas_activas_admision_mayores_7_dias as svc_activas_admision_mayores_7_dias,
+    reingresos_consulta_tipo3 as svc_reingresos_tipo3,
 )
 
 router = APIRouter(prefix="/estadisticas", tags=["Estadísticas y Reportes"])

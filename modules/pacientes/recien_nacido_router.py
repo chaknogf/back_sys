@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from datetime import date, datetime
 from core.database import get_db
 from core.security import get_current_user
+from core.config import APP_TIMEZONE
 from modules.users.models import UserModel
 from modules.expediente.service import generar_expediente, generar_constancia_nacimiento
 from modules.constancias_nacimiento.models import ConstanciaNacimientoModel
@@ -218,7 +219,7 @@ def crear_paciente_desde_madre(
                 "historial": [
                     {
                         "usuario": current_user.username,
-                        "fecha_hora": datetime.now().isoformat(),
+                        "fecha_hora": datetime.now(APP_TIMEZONE).isoformat(),
                         "estado_informe": "creado",
                     }
                 ],

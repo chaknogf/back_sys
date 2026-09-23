@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime
+from core.config import APP_TIMEZONE
 
 from modules.ciclos.models import CiclosConsulta
 from modules.consultas.models import ConsultaModel
@@ -64,7 +65,7 @@ def crear_ciclo(data: CicloConsultaBase, db: Session, current_user):
         consulta_id=data.consulta_id,
         numero=nuevo_numero,
         activo=True,
-        registro=datetime.utcnow(),
+        registro=datetime.now(APP_TIMEZONE),
         usuario=current_user.username,
         especialidad=data.especialidad,
         especialidad_id=data.especialidad_id,

@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from typing import Optional
 from modules.pacientes.models import PacienteModel
 from modules.expediente.service import generar_constancia_nacimiento as generar_cn
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload, attributes
 from decimal import Decimal
 from core.database import get_db
 from core.security import get_current_user
+from core.config import APP_TIMEZONE
 from modules.users.models import UserModel
 from modules.constancias_nacimiento.models import ConstanciaNacimientoModel
 from modules.constancias_nacimiento.models import ConstanciaNacimientoHistorialModel
@@ -66,7 +68,7 @@ def crear_constancia(
         "historial": [
             {
                 "usuario": current_user.username,
-                "fecha_hora": datetime.now().isoformat(),
+                "fecha_hora": datetime.now(APP_TIMEZONE).isoformat(),
                 "estado_informe": "creado",
             }
         ],
@@ -245,11 +247,11 @@ def actualizar_estado_informe(
         constancia.metadatos["historial"] = []
     constancia.metadatos["historial"].append({
         "usuario": current_user.username,
-        "fecha_hora": datetime.now().isoformat(),
+        "fecha_hora": datetime.now(APP_TIMEZONE).isoformat(),
         "estado_informe": data.estado_informe
     })
     attributes.flag_modified(constancia, "metadatos")
-    constancia.updated_at = datetime.now()
+    constancia.updated_at = datetime.now(APP_TIMEZONE)
 
     db.commit()
     db.refresh(constancia)

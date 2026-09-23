@@ -5,6 +5,7 @@ from sqlalchemy import String, cast, desc, func, text, or_, and_, case
 from sqlalchemy.orm.attributes import flag_modified
 from typing import Optional, List
 from datetime import datetime, date, time, timedelta
+from core.config import APP_TIMEZONE
 
 from modules.pacientes.models import PacienteModel
 from modules.pacientes.service import quitar_tildes
@@ -20,14 +21,14 @@ from modules.expediente.service import generar_expediente, generar_emergencia
 
 
 def _agregar_ciclo(db, consulta, nuevo_ciclo, current_user):
-    nuevo_ciclo["registro"] = datetime.now().isoformat()
+    nuevo_ciclo["registro"] = datetime.now(APP_TIMEZONE).isoformat()
     nuevo_ciclo["usuario"] = current_user.username
     nuevo_ciclo.setdefault("estado", "actualizado")
 
     historial_entry = ConsultaHistorialModel(
         consulta_id=consulta.id,
         estado=nuevo_ciclo.get("estado", "actualizado"),
-        registro=nuevo_ciclo.get("registro", datetime.now().isoformat()),
+        registro=nuevo_ciclo.get("registro", datetime.now(APP_TIMEZONE).isoformat()),
         usuario=current_user.username,
         especialidad=nuevo_ciclo.get("especialidad"),
         servicio=nuevo_ciclo.get("servicio"),
@@ -140,91 +141,6 @@ def buscar_consultas_activas(
     )
 
 
-def reingresos_consulta_tipo3(
-    db: Session,
-    skip: int = 0,
-    limit: int = 50,
-):
-    desde = date.today() - timedelta(days=20)
-    hasta = date.today()
-
-    filters = (
-        ConsultaModel.tipo_consulta == 3,
-        ConsultaModel.activo.is_(True),
-        ConsultaModel.fecha_consulta.between(desde, hasta),
-    )
-
-    multi_pacientes = (
-        db.query(ConsultaModel.paciente_id)
-        .filter(*filters)
-        .group_by(ConsultaModel.paciente_id)
-        .having(func.count(ConsultaModel.id) >= 2)
-        .subquery()
-    )
-
-    total_query = (
-        db.query(func.count(ConsultaModel.id))
-        .filter(
-            ConsultaModel.paciente_id.in_(db.query(multi_pacientes.c.paciente_id)),
-            *filters,
-        )
-    )
-    total = total_query.scalar()
-
-    resultados = (
-        db.query(ConsultaModel)
-        .options(joinedload(ConsultaModel.paciente))
-        .filter(
-            ConsultaModel.paciente_id.in_(db.query(multi_pacientes.c.paciente_id)),
-            *filters,
-        )
-        .order_by(ConsultaModel.paciente_id, ConsultaModel.fecha_consulta.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
-    return ConsultaListResponse(
-        total=total or 0,
-        consultas=resultados
-    )
-
-
-def consultas_activas_admision_mayores_7_dias(
-    db: Session,
-    skip: int = 0,
-    limit: int = 50,
-):
-    corte = date.today() - timedelta(days=7)
-    query = (
-        db.query(ConsultaModel)
-        .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
-        .options(joinedload(ConsultaModel.paciente))
-        .filter(
-            ConsultaModel.activo.is_(True),
-            ConsultaModel.ultimo_estado == "admision",
-            ConsultaModel.fecha_consulta < corte
-        )
-    )
-
-    total = query.count()
-    resultados = (
-        query
-        .order_by(ConsultaModel.fecha_consulta.asc())
-        .limit(limit).offset(skip)
-        .all()
-    )
-
-    hoy = date.today()
-    for r in resultados:
-        r.dias_acumulados = (hoy - r.fecha_consulta).days
-
-    return ConsultaListResponse(
-        total=total,
-        consultas=resultados
-    )
-
-
 def obtener_consulta(consulta_id: int, db: Session):
     consulta = db.get(ConsultaModel, consulta_id)
     if not consulta:
@@ -237,7 +153,7 @@ def registrar_consulta(datos: RegistroConsultaCreate, db: Session, current_user)
     if not paciente:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
 
-    ahora = datetime.now()
+    ahora = datetime.now(APP_TIMEZONE)
     hace_3_horas = ahora - timedelta(hours=3)
     duplicado = db.query(ConsultaModel).filter(
         ConsultaModel.paciente_id == datos.paciente_id,
@@ -312,6 +228,7 @@ def registrar_consulta(datos: RegistroConsultaCreate, db: Session, current_user)
             ConsultaModel.tipo_consulta == datos.tipo_consulta,
             ConsultaModel.especialidad == datos.especialidad
         )
+        .with_for_update()
         .scalar()
     ) or 0
 
@@ -323,7 +240,7 @@ def registrar_consulta(datos: RegistroConsultaCreate, db: Session, current_user)
         especialidad=datos.especialidad,
         servicio=datos.servicio,
         fecha_consulta=hoy,
-        hora_consulta=datetime.now().time(),
+        hora_consulta=datetime.now(APP_TIMEZONE).time(),
         indicadores=indicadores_completos,
         orden=ultimo_orden + 1,
         ultimo_estado="admision",
@@ -335,7 +252,7 @@ def registrar_consulta(datos: RegistroConsultaCreate, db: Session, current_user)
     historial_entry = ConsultaHistorialModel(
         consulta_id=nueva_consulta.id,
         estado="admision",
-        registro=datetime.now().isoformat(),
+        registro=datetime.now(APP_TIMEZONE).isoformat(),
         usuario=current_user.username,
         especialidad=datos.especialidad,
         servicio=datos.servicio,
@@ -425,7 +342,7 @@ def actualizar_consulta(consulta_id: int, update_data: ConsultaUpdate, db: Sessi
         egreso_nuevo = datos["egreso"] or {}
 
         if "registro" not in egreso_nuevo:
-            egreso_nuevo["registro"] = datetime.now().isoformat()
+            egreso_nuevo["registro"] = datetime.now(APP_TIMEZONE).isoformat()
 
         datos["egreso"] = {**egreso_actual, **egreso_nuevo}
 
@@ -508,10 +425,33 @@ def desactivar_consulta(consulta_id: int, db: Session, current_user):
     return consulta
 
 
+def _reordenar_grupo(db: Session, fecha_consulta, tipo_consulta, especialidad):
+    """Reordena secuencialmente las consultas de un grupo (fecha, tipo, especialidad)
+    para cerrar huecos dejados por eliminaciones."""
+    consultas = (
+        db.query(ConsultaModel)
+        .filter(
+            ConsultaModel.fecha_consulta == fecha_consulta,
+            ConsultaModel.tipo_consulta == tipo_consulta,
+            ConsultaModel.especialidad == especialidad,
+        )
+        .order_by(ConsultaModel.orden.asc())
+        .all()
+    )
+    for i, c in enumerate(consultas, start=1):
+        if c.orden != i:
+            c.orden = i
+
+
 def eliminar_consulta(consulta_id: int, db: Session, current_user=None):
     consulta = db.get(ConsultaModel, consulta_id)
     if not consulta:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")
+
+    # Guardar datos del grupo antes de eliminar para reordenar
+    fecha_grupo = consulta.fecha_consulta
+    tipo_grupo = consulta.tipo_consulta
+    especialidad_grupo = consulta.especialidad
 
     try:
         db.query(CiclosConsulta).filter(
@@ -528,6 +468,11 @@ def eliminar_consulta(consulta_id: int, db: Session, current_user=None):
         ).delete(synchronize_session=False)
 
         db.delete(consulta)
+        db.flush()
+
+        # Reordenar el grupo (fecha, tipo, especialidad) para cerrar huecos
+        _reordenar_grupo(db, fecha_grupo, tipo_grupo, especialidad_grupo)
+
         db.commit()
     except Exception as e:
         db.rollback()

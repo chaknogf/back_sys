@@ -89,13 +89,15 @@ def listar_citas(
     especialidad_id: Optional[int] = None,
     personal_atencion_id: Optional[int] = None,
     fecha_cita: Optional[date] = None,
+    fecha_desde: Optional[date] = None,
+    fecha_hasta: Optional[date] = None,
     limit: int = 200,
     skip: int = 0,
 ):
     query = db.query(CitaModel).outerjoin(
         PacienteModel, CitaModel.paciente_id == PacienteModel.id
     )
-    if fecha_cita is None and id is None and paciente_id is None:
+    if fecha_cita is None and id is None and paciente_id is None and fecha_desde is None:
         fecha_cita = date.today()
     if id is not None:
         query = query.filter(CitaModel.id == id)
@@ -111,6 +113,10 @@ def listar_citas(
         query = query.filter(CitaModel.personal_atencion_id == personal_atencion_id)
     if fecha_cita is not None:
         query = query.filter(CitaModel.fecha_cita == fecha_cita)
+    if fecha_desde is not None:
+        query = query.filter(CitaModel.fecha_cita >= fecha_desde)
+    if fecha_hasta is not None:
+        query = query.filter(CitaModel.fecha_cita <= fecha_hasta)
     total = query.count()
     citas = query.order_by(PacienteModel.expediente.asc().nullslast()).offset(skip).limit(limit).all()
     return CitaListResponse(total=total, citas=citas)
@@ -125,21 +131,18 @@ def obtener_citas_por_paciente(
     limit: int = 200,
     skip: int = 0,
 ):
-    query = db.query(CitaModel).filter(CitaModel.paciente_id == paciente_id)
-
-    if fecha_desde is not None:
-        query = query.filter(CitaModel.fecha_cita == fecha_desde)
-    if fecha_hasta is not None:
-        query = query.filter(CitaModel.fecha_cita == fecha_hasta)
-    if especialidad is not None:
-        query = query.filter(CitaModel.especialidad == especialidad)
-
-    citas = query.order_by(CitaModel.fecha_cita.asc()).offset(skip).limit(limit).all()
-
-    if not citas:
+    resultado = listar_citas(
+        db=db,
+        paciente_id=paciente_id,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        especialidad=especialidad,
+        limit=limit,
+        skip=skip,
+    )
+    if not resultado.citas:
         raise HTTPException(status_code=404, detail="No se encontraron citas para este paciente")
-
-    return citas
+    return resultado.citas
 
 
 def citas_por_especialidad(especialidad: str, db: Session):

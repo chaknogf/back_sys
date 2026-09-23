@@ -716,11 +716,11 @@ class TestSigsa3Extra:
     def test_personal_salud_create(self, client, auth_headers):
         s = _sufijo()
         r = client.post(
-            "/sigsa3/personal-salud",
+            "/sigsa3/personal-salud/",
             headers=auth_headers,
             json={
                 "nombre": f"Dr. Personal {s}",
-                "especialidad": "MEDICINA GENERAL",
+                "especialidad_id": None,
             },
         )
         assert r.status_code == 201

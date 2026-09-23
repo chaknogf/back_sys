@@ -1,8 +1,10 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from core.database import get_db
 from core.security import get_current_user
+from core.config import APP_TIMEZONE
 from .service import (
     generar_expediente as generar_exp,
     generar_emergencia as generar_emerg,
@@ -32,7 +34,7 @@ def generar_nuevo_expediente(
             "expediente": expediente,
             "tipo": "general",
             "generado_por": current_user.nombre,
-            "fecha": datetime.now().isoformat()
+            "fecha": datetime.now(APP_TIMEZONE).isoformat()
         }
     except Exception as e:
         raise HTTPException(
@@ -58,7 +60,7 @@ def generar_hoja_emergencia(
             "hoja_emergencia": hoja,
             "tipo": "emergencia",
             "generado_por": current_user.nombre,
-            "fecha": datetime.now().isoformat()
+            "fecha": datetime.now(APP_TIMEZONE).isoformat()
         }
     except Exception as e:
         raise HTTPException(
@@ -84,7 +86,7 @@ def generar_constancia_nacimiento(
             "constancia_nacimiento": correlativo,
             "tipo": "constancia_nacimiento",
             "generado_por": current_user.nombre,
-            "fecha": datetime.now().isoformat()
+            "fecha": datetime.now(APP_TIMEZONE).isoformat()
         }
     except Exception as e:
         raise HTTPException(
@@ -110,7 +112,7 @@ def generar_constancia_defuncion(
             "constancia_defuncion": correlativo,
             "tipo": "constancia_defuncion",
             "generado_por": current_user.nombre,
-            "fecha": datetime.now().isoformat()
+            "fecha": datetime.now(APP_TIMEZONE).isoformat()
         }
     except Exception as e:
         raise HTTPException(
@@ -136,7 +138,7 @@ def generar_constancia_medica(
             "constancia_medica": correlativo,
             "tipo": "constancia_medica",
             "generado_por": current_user.nombre,
-            "fecha": datetime.now().isoformat()
+            "fecha": datetime.now(APP_TIMEZONE).isoformat()
         }
     except Exception as e:
         raise HTTPException(

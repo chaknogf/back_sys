@@ -446,19 +446,6 @@ class MadreHijoResponse(BaseModel):
     pacientes: list[PacienteOut]
     total: int
 
-class PacientesConConsultas(BaseModel):
-    cui: Optional[int] = None
-    expediente: Optional[str] = None
-    pasaporte: Optional[str] = None
-    nombre: Nombre
-    sexo: Optional[str] = None
-    fecha_nacimiento: Optional[date] = None
-    datos_extra: Optional[Dict[str, Any]] = None
-    consultas: List[ConsultaBaseOut]
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class PacienteConsultaBase(BaseModel):
     id: int
     cui: Optional[int] = None

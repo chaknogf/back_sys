@@ -58,7 +58,7 @@ class TestSigsa3Registros:
         TestSigsa3Registros.PACIENTE_ID = r.json()["id"]
 
         r = client.post(
-            "/medicos/",
+            "/personal-atencion/",
             headers=auth_headers,
             json={
                 "nombre": f"Medico Test {s}",

@@ -6,15 +6,42 @@ from sqlalchemy import text
 
 from modules.defunciones.models import DefuncionModel
 from modules.defunciones.schemas import DefuncionCreate, DefuncionUpdate
+from core.db_helpers import fetchone as _fetchone, fetchall as _fetchall
+
+import json
 
 
-def _fetchone(db: Session, sql: str, params: dict | None = None) -> dict | None:
-    r = db.execute(text(sql), params or {}).mappings().first()
-    return dict(r) if r else None
-
-
-def _fetchall(db: Session, sql: str, params: dict | None = None) -> list[dict]:
-    return [dict(r) for r in db.execute(text(sql), params or {}).mappings().all()]
+def _extraer_defuncion_de_datos_extra(datos_extra) -> dict:
+    """Extrae datos de defunción de pacientes.datos_extra.defuncion.
+    Maneja tanto string (datetime-local) como dict con campos de defunción."""
+    if not datos_extra:
+        return {}, None
+    de = datos_extra
+    if isinstance(de, str):
+        try:
+            de = json.loads(de)
+        except Exception:
+            return {}, None
+    if not isinstance(de, dict):
+        return {}, None
+    raw = de.get("defuncion")
+    fecha_def = None
+    extra = {}
+    if isinstance(raw, str):
+        try:
+            fecha_def = datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
+        except Exception:
+            pass
+    elif isinstance(raw, dict):
+        extra = raw
+        if extra.get("fecha_defuncion"):
+            try:
+                fecha_def = datetime.fromisoformat(extra["fecha_defuncion"])
+                if fecha_def.tzinfo is None:
+                    fecha_def = fecha_def.replace(tzinfo=timezone.utc)
+            except Exception:
+                pass
+    return extra, fecha_def
 
 
 _DEF_COLS = """
@@ -83,7 +110,6 @@ def _build_paciente(row: dict, prefix: str = "p") -> dict | None:
     nombre = row.get(f"{prefix}_nombre")
     if nombre and isinstance(nombre, str):
         try:
-            import json
             nombre = json.loads(nombre)
         except Exception:
             pass
@@ -93,7 +119,6 @@ def _build_paciente(row: dict, prefix: str = "p") -> dict | None:
     de = row.get(f"{prefix}_datos_extra")
     if de and isinstance(de, str):
         try:
-            import json
             de = json.loads(de)
         except Exception:
             de = None
@@ -199,7 +224,6 @@ def _recalcular_edad(db: Session, defuncion_id: int):
     if row.get("madre_datos_extra"):
         de = row["madre_datos_extra"]
         if isinstance(de, str):
-            import json
             try:
                 de = json.loads(de)
             except Exception:
@@ -237,31 +261,10 @@ def actualizar_estado_por_paciente(paciente_id: int, nuevo_estado: str, db: Sess
                 text("SELECT fecha_nacimiento, datos_extra FROM pacientes WHERE id = :id"),
                 {"id": paciente_id}
             ).mappings().first()
-            fecha_def = None
             extra = {}
+            fecha_def = None
             if paciente:
-                de = paciente["datos_extra"]
-                if de and isinstance(de, str):
-                    import json
-                    try: de = json.loads(de)
-                    except: de = None
-                if de and isinstance(de, dict):
-                    raw = de.get("defuncion")
-                    if isinstance(raw, str):
-                        # datos_extra.defuncion es un string datetime-local "YYYY-MM-DDTHH:mm"
-                        try:
-                            fecha_def = datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
-                        except Exception:
-                            pass
-                    elif isinstance(raw, dict):
-                        extra = raw
-                        if extra.get("fecha_defuncion"):
-                            try:
-                                fecha_def = datetime.fromisoformat(extra["fecha_defuncion"])
-                                if fecha_def.tzinfo is None:
-                                    fecha_def = fecha_def.replace(tzinfo=timezone.utc)
-                            except Exception:
-                                pass
+                extra, fecha_def = _extraer_defuncion_de_datos_extra(paciente["datos_extra"])
             data = DefuncionCreate(
                 paciente_id=paciente_id,
                 fecha_defuncion=fecha_def or ahora,
@@ -287,18 +290,7 @@ def actualizar_estado_por_paciente(paciente_id: int, nuevo_estado: str, db: Sess
                     ).mappings().first()
                     fecha_def = None
                     if paciente:
-                        de = paciente["datos_extra"]
-                        if de and isinstance(de, str):
-                            import json
-                            try: de = json.loads(de)
-                            except: de = None
-                        if de and isinstance(de, dict):
-                            raw = de.get("defuncion")
-                            if isinstance(raw, str):
-                                try:
-                                    fecha_def = datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
-                                except Exception:
-                                    pass
+                        _, fecha_def = _extraer_defuncion_de_datos_extra(paciente["datos_extra"])
                     defuncion.fecha_defuncion = fecha_def or datetime.now(timezone.utc)
                 db.commit()
                 _recalcular_edad(db, defuncion.id)
@@ -397,8 +389,6 @@ def obtener_defuncion(defuncion_id: int, db: Session) -> dict:
     if not defuncion:
         raise HTTPException(status_code=404, detail="Registro de defunción no encontrado")
 
-    _recalcular_edad(db, defuncion_id)
-
     row = _fetchone(db, f"""
         SELECT {_DEF_COLS}, {_PACIENTE_SELECT}, {_MEDICO_SELECT},
                m.id AS madre_id, m.nombre_completo AS madre_nombre_completo,
@@ -482,7 +472,6 @@ def buscar_pacientes_fallecidos(
         nombre = r.get("nombre")
         if nombre and isinstance(nombre, str):
             try:
-                import json
                 nombre = json.loads(nombre)
             except Exception:
                 pass
@@ -490,7 +479,6 @@ def buscar_pacientes_fallecidos(
         de = r.get("datos_extra")
         if de and isinstance(de, str):
             try:
-                import json
                 de = json.loads(de)
             except Exception:
                 de = None
@@ -611,30 +599,7 @@ def sincronizar_defunciones(db: Session) -> dict:
 def _crear_defuncion_desde_paciente(p: dict, ahora: datetime, db: Session):
     """Crea una DefuncionModel desde los datos del paciente (evita N+1)."""
     pid = p["id"]
-    de = p["datos_extra"]
-    if de and isinstance(de, str):
-        import json
-        try: de = json.loads(de)
-        except: de = None
-
-    fecha_def = None
-    extra = {}
-    if de and isinstance(de, dict):
-        raw = de.get("defuncion")
-        if isinstance(raw, str):
-            try:
-                fecha_def = datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
-            except Exception:
-                pass
-        elif isinstance(raw, dict):
-            extra = raw
-            if extra.get("fecha_defuncion"):
-                try:
-                    fecha_def = datetime.fromisoformat(extra["fecha_defuncion"])
-                    if fecha_def.tzinfo is None:
-                        fecha_def = fecha_def.replace(tzinfo=timezone.utc)
-                except Exception:
-                    pass
+    extra, fecha_def = _extraer_defuncion_de_datos_extra(p["datos_extra"])
 
     data = DefuncionCreate(
         paciente_id=pid,

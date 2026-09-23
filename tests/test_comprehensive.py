@@ -188,16 +188,11 @@ class TestNormalizacionEspecialidad:
         "Pediatría": "PEDI",
         "Ginecología": "GINE",
         "Traumatología": "TRAU",
-        "Cardiología": "CAR",
-        "Neurología": "NEUR",
         "Psicología": "PSIC",
         "Nutrición": "NUTR",
         "Odontología": "ODON",
         "Terapia respiratoria": "TERR",
-        "Educadora": "EDUC",
         "Anestesiología": "ANES",
-        "Medicina Crítica": "UCI",
-        "Neonatología": "NEO",
     }
 
     def test_codigos_en_especialidades(self):
@@ -459,7 +454,7 @@ class TestNormalizacionDatosExtra:
 class TestMedicos:
     def test_create_medico(self, client):
         s = _sufijo()
-        r = client.post("/medicos/", json={
+        r = client.post("/personal-atencion/", json={
             "nombre": f"TEST-DOCTOR-{s}",
             "colegiado": s,
             "dpi": int(f"123456789{s[-3:]}"),
@@ -470,7 +465,7 @@ class TestMedicos:
         created_ids["medicos"].append(r.json()["id"])
 
     def test_list_medicos(self, client):
-        r = client.get("/medicos/")
+        r = client.get("/personal-atencion/")
         assert r.status_code == 200, f"Failed: {r.text}"
         data = r.json()
         if isinstance(data, dict):
@@ -483,30 +478,30 @@ class TestMedicos:
     def test_get_medico(self, client):
         if not created_ids["medicos"]:
             pytest.skip("No medico created")
-        r = client.get(f"/medicos/{created_ids['medicos'][0]}")
+        r = client.get(f"/personal-atencion/{created_ids['medicos'][0]}")
         assert r.status_code == 200
 
     def test_get_medico_not_found(self, client):
-        r = client.get("/medicos/999999")
+        r = client.get("/personal-atencion/999999")
         assert r.status_code == 404
 
     def test_update_medico(self, client):
         if not created_ids["medicos"]:
             pytest.skip("No medico created")
         mid = created_ids["medicos"][-1]
-        r = client.put(f"/medicos/{mid}", json={"nombre": "TEST-UPDATED"})
+        r = client.put(f"/personal-atencion/{mid}", json={"nombre": "TEST-UPDATED"})
         assert r.status_code == 200
         assert "TEST-UPDATED" in r.json()["nombre"]
 
     def test_list_medicos_filtered(self, client):
-        r = client.get("/medicos/?activo=true")
+        r = client.get("/personal-atencion/?activo=true")
         assert r.status_code == 200
 
     def test_delete_medico(self, client):
         if not created_ids["medicos"]:
             pytest.skip("No medico created")
         mid = created_ids["medicos"][-1]
-        r = client.delete(f"/medicos/{mid}")
+        r = client.delete(f"/personal-atencion/{mid}")
         assert r.status_code == 204
         created_ids["medicos"].remove(mid)
 

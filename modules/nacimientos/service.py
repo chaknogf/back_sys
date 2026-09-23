@@ -18,13 +18,7 @@ from modules.common.vector_similarity import (
 )
 
 
-def _fetchone(db: Session, sql: str, params: dict | None = None) -> dict | None:
-    r = db.execute(text(sql), params or {}).mappings().first()
-    return dict(r) if r else None
-
-
-def _fetchall(db: Session, sql: str, params: dict | None = None) -> list[dict]:
-    return [dict(r) for r in db.execute(text(sql), params or {}).mappings().all()]
+from core.db_helpers import fetchone as _fetchone, fetchall as _fetchall
 
 
 _NACIMIENTO_COLS = """

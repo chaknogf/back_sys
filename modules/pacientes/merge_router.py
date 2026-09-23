@@ -12,32 +12,10 @@ from core.database import get_db
 from core.security import get_current_user
 from modules.users.models import UserModel
 from .models import PacienteModel
+from .service import agregar_evento
 
 
 router = APIRouter(prefix="/pacientes", tags=["merge_paciente"])
-
-
-def agregar_evento(
-    paciente,
-    usuario,
-    accion,
-    expediente_duplicado: bool | None = None,
-    detalle: str = ""
-):
-    evento = {
-        "usuario": usuario or "sistema",
-        "registro": datetime.now(timezone.utc).isoformat(),
-        "accion": accion,
-        "expediente_duplicado": expediente_duplicado,
-        "detalle": detalle,
-    }
-
-    if paciente.metadatos is None:
-        paciente.metadatos = []
-
-    paciente.metadatos.append(evento)
-
-    flag_modified(paciente, "metadatos")
 
 
 def merge_telefonos(principal, duplicado):

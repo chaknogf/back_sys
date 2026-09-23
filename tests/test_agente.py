@@ -19,7 +19,7 @@ HOY = datetime(2026, 8, 9).date()
     ("listado de citas de hoy", "citas", "list"),
     ("promedio de edad de pacientes", "pacientes", "avg_edad"),
     ("top 5 diagnósticos sigsa", "sigsa3", "top"),
-    ("¿cuántos médicos por especialidad?", "medicos", "count"),
+    ("¿cuántos médicos por especialidad?", "personal_atencion", "count"),
     ("suma de cantidad de camas", "censo_camas", "sum_cantidad"),
 ])
 def test_genera_plan_valido(pregunta, entidad, medida):
@@ -82,9 +82,9 @@ def test_fechas_relativas():
 
 
 def test_sinonimo_aprendido():
-    plan = generar_consulta("cuántos 'units' hay", reglas_extra={"units": "medicos"},
+    plan = generar_consulta("cuántos 'units' hay", reglas_extra={"units": "personal_atencion"},
                             hoy=HOY)
-    assert plan["entidad"] == "medicos"
+    assert plan["entidad"] == "personal_atencion"
 
 
 def test_fecha_con_dia_y_mes():

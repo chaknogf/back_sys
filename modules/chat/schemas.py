@@ -1,6 +1,7 @@
 from typing import List, Optional, Any
 from pydantic import BaseModel, Field
 from datetime import datetime
+from core.config import APP_TIMEZONE
 
 
 class MensajeChat(BaseModel):
@@ -63,4 +64,4 @@ class ChatResponse(BaseModel):
     ejecucion_ms: int = Field(0, description="Tiempo de ejecución en ms")
     modelo: str = Field("", description="Modelo LLM usado")
     error: Optional[str] = Field(None, description="Error si ocurrió")
-    generado_en: datetime = Field(default_factory=lambda: datetime.now())
+    generado_en: datetime = Field(default_factory=lambda: datetime.now(APP_TIMEZONE))

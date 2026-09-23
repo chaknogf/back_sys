@@ -1,10 +1,12 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 from modules.expediente.models import CorrelativoControl
+from core.config import APP_TIMEZONE
 
 
 def _generar_correlativo(db: Session, tipo: str, formato: str) -> str:
-    anio_actual = int(datetime.now().strftime("%y"))
+    anio_actual = int(datetime.now(APP_TIMEZONE).strftime("%y"))
     control = (
         db.query(CorrelativoControl)
         .filter(

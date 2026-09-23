@@ -6,6 +6,7 @@ from sqlalchemy import text, or_, func
 from sqlalchemy.orm import Session
 from typing import List, Optional as Opt
 from datetime import date, datetime
+from core.config import APP_TIMEZONE
 
 from modules.sigsa3.models import Sigsa3Model, Sigsa3RegistroModel
 from modules.sigsa3.schemas import Sigsa3Create, Sigsa3Update, Sigsa3RegistroOut
@@ -1661,7 +1662,7 @@ def dx_por_codigo_cie(db: Session, desde: str, hasta: str, codigos: list[str]) -
         "datos": datos,
         "total_general": total_general,
         "total_pacientes": int(total_pacientes) if total_pacientes else 0,
-        "generado_en": datetime.now().isoformat(),
+        "generado_en": datetime.now(APP_TIMEZONE).isoformat(),
     }
 
 

@@ -56,13 +56,40 @@ def filtro_nombre_campo(campo: str, valor: str):
     return columna.ilike(f"%{quitar_tildes(valor)}%")
 
 
+def apply_paciente_filters(
+    query,
+    *,
+    paciente_id: int | None = None,
+    cui: int | None = None,
+    expediente: str | None = None,
+    primer_nombre: str | None = None,
+    segundo_nombre: str | None = None,
+    primer_apellido: str | None = None,
+    segundo_apellido: str | None = None,
+):
+    """Aplica filtros estándar de búsqueda de pacientes a un SQLAlchemy query.
+    Usa unaccent para matching insensible a tildes."""
+    if paciente_id is not None:
+        query = query.filter(PacienteModel.id == paciente_id)
+    if cui is not None:
+        if str(cui).isdigit():
+            query = query.filter(PacienteModel.cui == int(cui))
+        else:
+            query = query.filter(cast(PacienteModel.cui, String).ilike(f"%{cui}%"))
+    if expediente:
+        query = query.filter(PacienteModel.expediente == expediente)
+    for campo, valor in [
+        ("primer_nombre", primer_nombre),
+        ("segundo_nombre", segundo_nombre),
+        ("primer_apellido", primer_apellido),
+        ("segundo_apellido", segundo_apellido),
+    ]:
+        if valor:
+            query = query.filter(filtro_nombre_campo(campo, valor))
+    return query
+
+
 def buscar_neonatales(db: Session, filters: dict, skip: int = 0, limit: int = 50):
-    _LIST_COLS = [
-        PacienteModel.id, PacienteModel.cui, PacienteModel.expediente,
-        PacienteModel.pasaporte, PacienteModel.nombre, PacienteModel.nombre_completo,
-        PacienteModel.sexo, PacienteModel.fecha_nacimiento, PacienteModel.estado,
-        PacienteModel.datos_extra, PacienteModel.es_personal_hospital,
-    ]
     query = db.query(PacienteModel).options(load_only(*_LIST_COLS)).order_by(desc(PacienteModel.id))
     query = query.filter(PacienteModel.estado != "I")
     query = query.filter(
@@ -110,12 +137,6 @@ def buscar_neonatales(db: Session, filters: dict, skip: int = 0, limit: int = 50
 
 
 def buscar_personal_hospital(db: Session, filters: dict | None = None, skip: int = 0, limit: int = 50):
-    _LIST_COLS = [
-        PacienteModel.id, PacienteModel.cui, PacienteModel.expediente,
-        PacienteModel.pasaporte, PacienteModel.nombre, PacienteModel.nombre_completo,
-        PacienteModel.sexo, PacienteModel.fecha_nacimiento, PacienteModel.estado,
-        PacienteModel.datos_extra,
-    ]
     query = db.query(PacienteModel).options(load_only(*_LIST_COLS)).order_by(desc(PacienteModel.id))
     query = query.filter(PacienteModel.estado != "I")
     query = query.filter(PacienteModel.es_personal_hospital == 'S')
@@ -144,13 +165,6 @@ def buscar_personal_hospital(db: Session, filters: dict | None = None, skip: int
 
 def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50):
     from modules.prestamos.models import Prestamo
-
-    _LIST_COLS = [
-        PacienteModel.id, PacienteModel.cui, PacienteModel.expediente,
-        PacienteModel.pasaporte, PacienteModel.nombre, PacienteModel.nombre_completo,
-        PacienteModel.sexo, PacienteModel.fecha_nacimiento, PacienteModel.estado,
-        PacienteModel.datos_extra,
-    ]
 
     # JOIN con prestamos activos por paciente_id — último préstamo activo por paciente
     # prestamos.id_paciente = pacientes.id AND prestamos.activo = true
@@ -184,6 +198,7 @@ def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50)
                 or_(
                     cast(PacienteModel.cui, String).ilike(f"%{termino}%"),
                     PacienteModel.expediente.ilike(f"%{termino}%"),
+                    PacienteModel.pasaporte.ilike(f"%{termino}%"),
                     and_(*filtros_nombre),
                 )
             )
@@ -342,7 +357,7 @@ _LIST_COLS = [
     PacienteModel.id, PacienteModel.cui, PacienteModel.expediente,
     PacienteModel.pasaporte, PacienteModel.nombre, PacienteModel.nombre_completo,
     PacienteModel.sexo, PacienteModel.fecha_nacimiento, PacienteModel.estado,
-    PacienteModel.datos_extra,
+    PacienteModel.datos_extra, PacienteModel.es_personal_hospital,
 ]
 
 

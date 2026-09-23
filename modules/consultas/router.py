@@ -92,40 +92,21 @@ def buscar_pacientes(
     current_user: UserModel = Depends(get_current_user)
 ):
     from modules.pacientes.models import PacienteModel
+    from modules.pacientes.service import apply_paciente_filters
+
     query = db.query(PacienteModel)
-
-    if paciente_id is not None:
-        query = query.filter(PacienteModel.id == paciente_id)
-
-    if cui is not None:
-        query = query.filter(PacienteModel.cui == cui)
-
-    if expediente:
-        query = query.filter(PacienteModel.expediente == expediente)
-
-    if primer_nombre:
-        query = query.filter(
-            cast(PacienteModel.nombre["primer_nombre"], String)
-            .ilike(f"%{primer_nombre}%")
-        )
-    if segundo_nombre:
-        query = query.filter(
-            cast(PacienteModel.nombre["segundo_nombre"], String)
-            .ilike(f"%{segundo_nombre}%")
-        )
-    if primer_apellido:
-        query = query.filter(
-            cast(PacienteModel.nombre["primer_apellido"], String)
-            .ilike(f"%{primer_apellido}%")
-        )
-    if segundo_apellido:
-        query = query.filter(
-            cast(PacienteModel.nombre["segundo_apellido"], String)
-            .ilike(f"%{segundo_apellido}%")
-        )
+    query = apply_paciente_filters(
+        query,
+        paciente_id=paciente_id,
+        cui=cui,
+        expediente=expediente,
+        primer_nombre=primer_nombre,
+        segundo_nombre=segundo_nombre,
+        primer_apellido=primer_apellido,
+        segundo_apellido=segundo_apellido,
+    )
 
     if documento is not None:
-        from modules.consultas.models import ConsultaModel
         query = (
             query
             .join(ConsultaModel, ConsultaModel.paciente_id == PacienteModel.id)
@@ -267,3 +248,42 @@ def eliminar_consulta(
     current_user: UserModel = Depends(get_current_user)
 ):
     return service_eliminar_consulta(consulta_id, db)
+
+
+@router.post("/recalcular-orden", response_model=dict)
+def recalcular_orden(
+    fecha: str = Query(..., description="Fecha (YYYY-MM-DD)"),
+    tipo_consulta: int = Query(..., description="Tipo de consulta (1=COEX, 2=Hosp, 3=Emerg)"),
+    especialidad: str = Query(..., description="Especialidad"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Recalcula los números de orden secuenciales para un grupo de consultas.
+    Elimina huecos causados por eliminaciones o reasignaciones."""
+    from datetime import date as date_type
+    from .service import _reordenar_grupo
+    try:
+        fecha_consulta = date_type.fromisoformat(fecha)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
+
+    consultas = (
+        db.query(ConsultaModel)
+        .filter(
+            ConsultaModel.fecha_consulta == fecha_consulta,
+            ConsultaModel.tipo_consulta == tipo_consulta,
+            ConsultaModel.especialidad == especialidad,
+        )
+        .all()
+    )
+
+    _reordenar_grupo(db, fecha_consulta, tipo_consulta, especialidad)
+    db.commit()
+
+    return {
+        "detail": f"Orden recalculado para {len(consultas)} consultas",
+        "fecha": fecha,
+        "tipo_consulta": tipo_consulta,
+        "especialidad": especialidad,
+        "total": len(consultas)
+    }

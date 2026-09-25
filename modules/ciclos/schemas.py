@@ -50,3 +50,40 @@ class CicloOutList(CicloConsultaBase):
     total: int
     consulta: ConsultaHistoriaResumidaOut   
     model_config = ConfigDict(from_attributes=True)
+
+
+# ===================================================================
+# Historia clínica agrupada por consulta
+# ===================================================================
+class CicloResumen(BaseModel):
+    """Resumen ligero de un ciclo para la vista de historia clínica."""
+    id: int
+    numero: int
+    registro: Optional[datetime] = None
+    usuario: str = ""
+    usuario_nombre: Optional[str] = None
+    especialidad: Optional[str] = None
+    servicio: Optional[str] = None
+    resumen: Optional[str] = None
+    signos_vitales: Optional[Dict[str, Any]] = None
+    impresion_clinica: Optional[str] = None
+    egreso: Optional[Dict[str, Any]] = None
+    odontologia: Optional[Dict[str, Any]] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConsultaHistoria(BaseModel):
+    """Una consulta con todos sus ciclos agrupados."""
+    consulta: ConsultaHistoriaResumidaOut
+    ciclos: List[CicloResumen]
+    total_ciclos: int
+
+
+class HistoriaClinicaResponse(BaseModel):
+    """Historia clínica completa de un paciente, agrupada por consulta."""
+    paciente_id: int
+    paciente_nombre: Optional[str] = None
+    paciente_expediente: Optional[str] = None
+    consultas: List[ConsultaHistoria]
+    total_consultas: int
+    total_ciclos: int

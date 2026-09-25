@@ -10,14 +10,26 @@ from core.database import get_db
 from core.security import get_current_user
 from modules.users.models import UserModel
 from .models import CiclosConsulta
-from .schemas import CicloConsulta, CicloConsultaBase, CicloOut
+from .schemas import CicloConsulta, CicloConsultaBase, CicloOut, HistoriaClinicaResponse
 from .service import (
     obtener_ciclos_por_consulta as service_obtener_ciclos_por_consulta,
     obtener_ciclo as service_obtener_ciclo,
     crear_ciclo as service_crear_ciclo,
+    obtener_historia_clinica as service_obtener_historia_clinica,
 )
 
 router = APIRouter(prefix="/ciclos", tags=["Ciclos Clínicos"])
+
+
+@router.get("/paciente/{paciente_id}", response_model=HistoriaClinicaResponse)
+def obtener_historia_clinica(
+    paciente_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Historia clínica completa de un paciente, agrupada por consulta.
+    Optimizado: una sola query por patient en vez de N+1."""
+    return service_obtener_historia_clinica(paciente_id, db)
 
 
 @router.get("/consulta/{consulta_id}", response_model=List[CicloConsulta])

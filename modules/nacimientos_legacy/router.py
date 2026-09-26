@@ -1,3 +1,5 @@
+"""Acceso de compatibilidad al catálogo histórico de nacimientos importados."""
+
 from datetime import date
 from typing import List
 
@@ -20,6 +22,7 @@ def listar_nacimientos(
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
+    """Filtra registros originales y limita la lectura a 500 filas por solicitud."""
     query = db.query(NacimientoLegacy)
 
     if id is not None:
@@ -47,6 +50,7 @@ def listar_nacimientos(
 
 @router.put("/{id}", response_model=NacimientoLegacyResponse)
 def update_nacimiento(id: int, data: NacimientoLegacyBase, db: Session = Depends(get_db)):
+    """Actualiza campos explícitos sin convertir el registro al modelo vigente."""
     nacimiento = db.query(NacimientoLegacy).filter(NacimientoLegacy.id == id).first()
     if not nacimiento:
         raise HTTPException(status_code=404, detail="Registro no encontrado")

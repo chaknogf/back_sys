@@ -1,3 +1,5 @@
+"""Importación, asociación y normalización de registros SIGSA-3."""
+
 import csv
 import io
 import re
@@ -264,6 +266,7 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
             detail="No se encontraron registros válidos en el archivo",
         )
 
+    # IDs opcionales inexistentes se descartan antes del INSERT para no abortar el lote por sus FK.
     existing_pacientes = set()
     existing_consultas = set()
 
@@ -282,6 +285,7 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
         if r.consulta_id is not None and r.consulta_id not in existing_consultas:
             r.consulta_id = None
 
+    # El lote válido se confirma completo; ante un fallo, se revierte toda la inserción.
     try:
         objs = [Sigsa3Model(**r.model_dump()) for r in registros]
         db.add_all(objs)

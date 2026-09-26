@@ -1,3 +1,5 @@
+"""Modelo ORM de servicios de encamamiento y capacidad censable."""
+
 from sqlalchemy import Column, Integer, SmallInteger, String, Text, Boolean, TIMESTAMP, text
 from core.database import Base
 

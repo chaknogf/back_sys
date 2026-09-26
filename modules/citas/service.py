@@ -55,6 +55,7 @@ def _validar_fecha_cita(db: Session, fecha: date, es_creacion: bool = True) -> N
 
 
 def crear_cita(cita: CitaCreate, current_user, db: Session):
+    """Valida día hábil y personal asignado antes de persistir la cita."""
     _validar_fecha_cita(db, cita.fecha_cita)
     if cita.personal_atencion_id is not None:
         if db.get(MedicoModel, cita.personal_atencion_id) is None:

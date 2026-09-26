@@ -1,3 +1,5 @@
+"""Rutas del catálogo con lectura autenticada y cambios reservados a administradores."""
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -21,6 +23,7 @@ def listar(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """Lista especialidades filtradas por estado y disponibilidad quirúrgica."""
     return svc.listar(db, estado=estado, sop=sop)
 
 

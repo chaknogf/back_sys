@@ -1,3 +1,5 @@
+"""Reexporta dependencias comunes de base de datos y autenticación."""
+
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from core.database import get_db

@@ -1,4 +1,5 @@
 # modules/personal_atencion/router.py
+"""Rutas del catálogo de personal de atención médica."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -38,6 +39,7 @@ def listar_medicos(
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db)
 ):
+    """Busca y pagina personal de atención por identificadores y datos de catálogo."""
     return service_listar_medicos(
         db=db,
         id=id,

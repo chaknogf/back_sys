@@ -1,3 +1,5 @@
+"""Búsqueda autenticada de posibles pacientes duplicados sin fusionar registros."""
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -23,6 +25,7 @@ def pacientes_nombres_similares(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Compara nombres con el método seleccionado y devuelve coincidencias paginadas."""
 
     if metodo == "vectorial":
         # El motor vectorial se evalúa sobre pares ya bloqueados en SQL por

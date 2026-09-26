@@ -1,3 +1,5 @@
+"""Consulta del catálogo geográfico y mantenimiento administrativo de municipios."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_cache.decorator import cache
 from sqlalchemy.orm import Session
@@ -12,6 +14,7 @@ from modules.users.models import UserModel
 
 
 def _unaccent_ilike(column, pattern: str):
+    """Construye una búsqueda parcial SQL sin distinguir acentos ni mayúsculas."""
     return func.unaccent(column).ilike(f"%{pattern}%")
 
 
@@ -60,6 +63,7 @@ def crear_municipio(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Restringe altas a administradores y exige un código RENAP no registrado."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
 
@@ -80,6 +84,7 @@ def actualizar_municipio(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Permite actualizar el catálogo solo a administradores."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
 
@@ -101,6 +106,7 @@ def eliminar_municipio(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Restringe la eliminación del municipio a administradores."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores")
 
@@ -116,6 +122,7 @@ def eliminar_municipio(
 @router.get("/departamentos", response_model=List[DepartamentoOut])
 @cache(expire=3600)
 def listar_departamentos(db: Session = Depends(get_db)):
+    """Obtiene departamentos únicos usando los dos primeros dígitos del código."""
     rows = (
         db.query(
             func.substr(MunicipiosModel.codigo, 1, 2).label("codigo"),

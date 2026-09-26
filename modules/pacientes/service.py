@@ -1,3 +1,5 @@
+"""Búsqueda, alta y transformación de datos del registro de pacientes."""
+
 import re
 import unicodedata
 from datetime import date, datetime, timedelta, timezone
@@ -20,6 +22,7 @@ def quitar_tildes(texto: str) -> str:
 
 
 def agregar_evento(paciente, usuario, accion, expediente_duplicado: bool | None = None, detalle: str = ""):
+    """Añade una entrada UTC a los metadatos de auditoría del paciente."""
     evento = {
         "usuario": usuario or "sistema",
         "registro": datetime.now(timezone.utc).isoformat(),
@@ -33,6 +36,7 @@ def agregar_evento(paciente, usuario, accion, expediente_duplicado: bool | None 
 
 
 def normalizar_metadatos(paciente):
+    """Completa claves de auditoría faltantes y serializa fechas de versiones previas."""
     if not paciente.metadatos:
         return
     for m in paciente.metadatos:
@@ -90,6 +94,7 @@ def apply_paciente_filters(
 
 
 def buscar_neonatales(db: Session, filters: dict, skip: int = 0, limit: int = 50):
+    """Lista neonatos no inactivos y filtra los datos específicos almacenados en JSONB."""
     query = db.query(PacienteModel).options(load_only(*_LIST_COLS)).order_by(desc(PacienteModel.id))
     query = query.filter(PacienteModel.estado != "I")
     query = query.filter(
@@ -164,6 +169,7 @@ def buscar_personal_hospital(db: Session, filters: dict | None = None, skip: int
 
 
 def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50):
+    """Incluye el último préstamo activo y cuenta pacientes distintos pese a los JOIN."""
     from modules.prestamos.models import Prestamo
 
     # JOIN con prestamos activos por paciente_id — último préstamo activo por paciente
@@ -279,6 +285,7 @@ def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50)
 
 
 def obtener_paciente(db: Session, paciente_id: int):
+    """Obtiene el paciente y normaliza metadatos antiguos antes de serializarlo."""
     paciente = db.get(PacienteModel, paciente_id)
     if not paciente:
         raise HTTPException(status_code=404, detail=f"Paciente con ID {paciente_id} no encontrado")
@@ -299,6 +306,7 @@ def obtener_paciente(db: Session, paciente_id: int):
 
 
 def crear_paciente(db: Session, paciente_in: PacienteCreate, auto_expediente: bool, username: str):
+    """Normaliza identificadores vacíos, evita coincidencias básicas y registra el alta."""
     data = paciente_in.model_dump()
     for field in ("cui", "expediente", "pasaporte"):
         if not data.get(field) or str(data.get(field)).strip() == "":
@@ -422,6 +430,7 @@ def _exec_expedientes_query(
     expediente_desde: Optional[str] = None,
     expediente_hasta: Optional[str] = None,
 ):
+    """Cruza pacientes con su última consulta activa y separa los atendidos en el año móvil."""
     hace_un_anio = date(date.today().year - 1, date.today().month, date.today().day)
 
     count_query = (

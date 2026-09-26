@@ -1,3 +1,5 @@
+"""CRUD y reportes del registro de variables hospitalarias."""
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
@@ -203,6 +205,7 @@ def eliminar_variable(var_id: int, db: Session) -> None:
 # ── Measurements ──
 
 def _measurement_to_dict(m: VhMeasurementModel, db: Session) -> dict:
+    """Agrega etiquetas de catálogos a la medición para la respuesta de API."""
     hosp_name = db.query(VhHospitalModel.hospital_name).filter(VhHospitalModel.hospital_id == m.hospital_id).scalar()
     dept_name = db.query(VhDepartmentModel.department_name).filter(VhDepartmentModel.department_id == m.department_id).scalar()
     var_name = db.query(VhVariableModel.variable_name).filter(VhVariableModel.variable_id == m.variable_id).scalar()
@@ -272,6 +275,7 @@ def obtener_medicion(measurement_id: int, db: Session) -> dict:
 
 
 def crear_medicion(data: MeasurementCreate, db: Session) -> dict:
+    """Impide duplicar la combinación hospital/departamento/variable/mes/género/año."""
     existe = db.query(VhMeasurementModel).filter(
         VhMeasurementModel.hospital_id == data.hospital_id,
         VhMeasurementModel.department_id == data.department_id,
@@ -310,6 +314,7 @@ def eliminar_medicion(measurement_id: int, db: Session) -> None:
 
 
 def bulk_upsert(mediciones: list[MeasurementBulkItem], db: Session) -> dict:
+    """Inserta o actualiza por la clave compuesta de medición y reporta errores por elemento."""
     creados = 0
     actualizados = 0
     errores = []
@@ -398,6 +403,7 @@ def crear_departamento(data, db: Session) -> dict:
 # ── Views / Reports ──
 
 def resumen_mensual(db: Session, year: Optional[int] = None, category_id: Optional[int] = None) -> list[dict]:
+    """Lee la vista mensual de base de datos y aplica filtros con parámetros SQL."""
     query = text("""
         SELECT category_name, variable_name, variable_code, month_name, month_number, year,
                masculino, femenino, total
@@ -417,6 +423,7 @@ def resumen_mensual(db: Session, year: Optional[int] = None, category_id: Option
 
 
 def resumen_anual(db: Session, year: Optional[int] = None, category_id: Optional[int] = None) -> list[dict]:
+    """Lee la vista anual de base de datos y aplica filtros con parámetros SQL."""
     query = text("""
         SELECT category_name, variable_name, variable_code, year,
                masculino_total, femenino_total, total_anual
@@ -445,5 +452,6 @@ def inventario_categorias(db: Session) -> list[dict]:
 
 
 def validar_totales(db: Session, year: int) -> list[dict]:
+    """Delega la verificación de totales a la función SQL del esquema hospitalario."""
     rows = db.execute(text("SELECT * FROM fn_vh_validate_totals(:y)"), {"y": year}).mappings().all()
     return [dict(r) for r in rows]

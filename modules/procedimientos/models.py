@@ -1,3 +1,5 @@
+"""Modelos del catálogo de procedimientos y sus realizaciones clínicas."""
+
 from sqlalchemy import Column, Integer, String, Text, Date, CHAR, TIMESTAMP, CheckConstraint, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -5,6 +7,7 @@ from core.database import Base
 
 
 class Procedimiento(Base):
+    """Catálogo con nombres y abreviaturas únicos para procedimientos clínicos."""
     __tablename__ = "procedimientos"
     __table_args__ = {"schema": "public"}
     
@@ -18,6 +21,7 @@ class Procedimiento(Base):
 
 
 class ProceMedico(Base):
+    """Procedimiento realizado; la base exige cantidad positiva y sexo M/F."""
     __tablename__ = "proce_medicos"
     __table_args__ = (
         CheckConstraint("cantidad >= 1", name="proce_medicos_cantidad_check"),

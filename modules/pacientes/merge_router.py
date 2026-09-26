@@ -278,6 +278,7 @@ def merge_pacientes(
                     detail=f"El paciente ID {dup.id} ya está marcado como inactivo"
                 )
 
+            # El CUI puede colisionar con el principal; se conserva como referencia antes de liberar el UNIQUE.
             if dup.cui is not None:
                 if dup.datos_extra is None:
                     dup.datos_extra = {}
@@ -326,6 +327,7 @@ def merge_pacientes(
                 detalle=detalle_base,
             )
 
+        # Todos los duplicados se consolidan en una sola transacción para evitar fusiones parciales.
         db.commit()
         db.refresh(principal)
 

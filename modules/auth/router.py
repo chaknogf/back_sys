@@ -1,3 +1,5 @@
+"""Rutas públicas de inicio de sesión y consulta del usuario autenticado."""
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -20,6 +22,7 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
+    """Autentica con límite de intentos y registra el acceso exitoso."""
     result = authenticate_user(db, form_data.username, form_data.password)
     ua = request.headers.get("user-agent")
     registrar_acceso(
@@ -38,4 +41,5 @@ def login(
 
 @router.get("/me", summary="Obtener datos del usuario autenticado")
 def me(current_user: UserModel = Depends(get_current_user)):
+    """Devuelve los datos básicos del usuario identificado por el token."""
     return get_current_user_info(current_user)

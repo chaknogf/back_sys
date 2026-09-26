@@ -1,3 +1,5 @@
+"""Validación de credenciales y proyección de datos de sesión."""
+
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from core.security import verify_password, create_access_token
@@ -5,6 +7,7 @@ from modules.users.models import UserModel
 
 
 def authenticate_user(db: Session, username: str, password: str) -> dict:
+    """Emite un token solo para cuentas activas y distingue errores de acceso por estado."""
     user = db.query(UserModel).filter(UserModel.username == username).first()
     if not user or not verify_password(password, user.password):
         raise HTTPException(
@@ -36,6 +39,7 @@ def authenticate_user(db: Session, username: str, password: str) -> dict:
 
 
 def get_current_user_info(user) -> dict:
+    """Proyecta los campos públicos del usuario autenticado."""
     return {
         "id": user.id,
         "username": user.username,

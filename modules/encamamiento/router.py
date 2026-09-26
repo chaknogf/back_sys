@@ -1,3 +1,5 @@
+"""Endpoints CRUD de servicios y capacidad censable de encamamiento."""
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from typing import List

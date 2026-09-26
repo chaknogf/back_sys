@@ -1,3 +1,5 @@
+"""Gestión del catálogo de especialidades con unicidad y protección referencial."""
+
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -35,6 +37,7 @@ def _verificar_unicos(
     codigo: Optional[str] = None,
     exclude_id: Optional[int] = None,
 ):
+    """Rechaza nombre, abreviatura o código ya asignados a otra especialidad."""
     checks = [
         (EspecialidadModel.nombre, nombre, "nombre"),
         (EspecialidadModel.abreviatura, abreviatura, "abreviatura"),
@@ -98,6 +101,7 @@ def actualizar(esp_id: int, data: EspecialidadUpdate, db: Session) -> Especialid
 
 
 def eliminar(esp_id: int, db: Session) -> dict:
+    """Devuelve conflicto si hay registros que todavía referencian la especialidad."""
     reg = obtener(esp_id, db)
     try:
         db.delete(reg)

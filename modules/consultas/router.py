@@ -1,4 +1,6 @@
 # modules/consultas/router.py
+"""Endpoints autenticados para búsqueda, registro y mantenimiento de consultas."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import String, cast, desc, func, text, or_, String, and_, case
@@ -91,6 +93,7 @@ def buscar_pacientes(
     limit: int = Query(50, ge=1, le=200),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Busca pacientes con filtros compartidos y deduplica el JOIN por documento."""
     from modules.pacientes.models import PacienteModel
     from modules.pacientes.service import apply_paciente_filters
 
@@ -144,6 +147,7 @@ def sincronizar_indicadores(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """Valida fechas ISO y sincroniza indicadores del período solicitado."""
     try:
         f_desde = datetime.strptime(desde, "%Y-%m-%d").date()
         f_hasta = datetime.strptime(hasta, "%Y-%m-%d").date()
@@ -169,6 +173,7 @@ def reasignar_paciente(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """Permite solo a administradores cambiar el paciente y replica su expediente."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores pueden reasignar paciente")
     consulta = db.get(ConsultaModel, consulta_id)
@@ -247,6 +252,7 @@ def eliminar_consulta(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Elimina físicamente una consulta mediante el servicio de mantenimiento."""
     return service_eliminar_consulta(consulta_id, db)
 
 

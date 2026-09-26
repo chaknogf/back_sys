@@ -1,3 +1,5 @@
+"""Hash de contraseñas, emisión de JWT y dependencias de autorización."""
+
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import uuid4
@@ -33,10 +35,12 @@ oauth2_scheme = OAuth2PasswordBearer(
 
 
 def hash_password(password: str) -> str:
+    """Guarda contraseñas con Argon2; nunca se conserva el texto original."""
     return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Compara una contraseña en texto claro con su hash Argon2 almacenado."""
     return pwd_context.verify(plain_password, hashed_password)
 
 
@@ -44,6 +48,7 @@ def create_access_token(
     data: dict,
     expires_delta: timedelta | None = None
 ) -> str:
+    """Firma un JWT con expiración y un identificador único de emisión."""
     to_encode = data.copy()
     now = datetime.now(timezone.utc)
     expire = now + (
@@ -83,6 +88,7 @@ def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     db: Session = Depends(get_db),
 ):
+    """Valida firma y sujeto del JWT y exige que la cuenta permanezca activa."""
     from modules.users.models import UserModel
 
     credentials_exception = HTTPException(
@@ -126,6 +132,7 @@ def get_current_user(
 def get_current_admin_user(
     current_user=Depends(get_current_user),
 ):
+    """Restringe la dependencia al rol administrador."""
     if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -1,3 +1,5 @@
+"""Reglas del préstamo y devolución de expedientes o documentos de pacientes."""
+
 from typing import Optional
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
@@ -19,6 +21,7 @@ def _normalizar_opcional(valor):
 
 
 def _validar_paciente(db: Session, id_paciente: int) -> None:
+    """Verifica que el préstamo apunte a un paciente existente."""
     existe = db.query(PacienteModel.id).filter(PacienteModel.id == id_paciente).first()
     if not existe:
         raise HTTPException(
@@ -28,6 +31,7 @@ def _validar_paciente(db: Session, id_paciente: int) -> None:
 
 
 def crear_prestamo(data: PrestamoCreate, username: str, db: Session):
+    """Valida paciente/consulta y registra al usuario que entrega el documento."""
     _validar_paciente(db, data.id_paciente)
 
     if data.id_consulta is not None:
@@ -68,6 +72,7 @@ def listar_prestamos(
     skip: int = 0,
     limit: int = 20,
 ):
+    """Filtra préstamos y trata fecha_hasta como inclusiva para abarcar el día completo."""
     query = db.query(Prestamo).join(
         PacienteModel, Prestamo.id_paciente == PacienteModel.id, isouter=True
     )
@@ -115,6 +120,7 @@ def obtener_prestamo(prestamo_id: int, db: Session):
 
 
 def actualizar_prestamo(prestamo_id: int, data: PrestamoUpdate, username: str, db: Session):
+    """Al registrar fecha de devolución guarda quién recibe y cierra el préstamo."""
     prestamo = db.query(Prestamo).filter(Prestamo.id == prestamo_id).first()
     if not prestamo:
         raise HTTPException(status_code=404, detail="Préstamo no encontrado")
@@ -150,6 +156,7 @@ def actualizar_prestamo(prestamo_id: int, data: PrestamoUpdate, username: str, d
 
 
 def eliminar_prestamo(prestamo_id: int, db: Session):
+    """Desactiva el préstamo sin eliminar su historial."""
     prestamo = db.query(Prestamo).filter(Prestamo.id == prestamo_id).first()
     if not prestamo:
         raise HTTPException(status_code=404, detail="Préstamo no encontrado")

@@ -1,9 +1,12 @@
+"""Validación de datos de servicios de encamamiento y camas censables."""
+
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
 
 
 class EncamamientoBase(BaseModel):
+    """Datos compartidos; la capacidad censable no admite cantidades negativas."""
     nombre_servicio: str = Field(..., max_length=100)
     descripcion: Optional[str] = None
     camas_censables: int = Field(..., ge=0)

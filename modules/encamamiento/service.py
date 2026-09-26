@@ -1,3 +1,5 @@
+"""Reglas de alta, consulta y mantenimiento de servicios de encamamiento."""
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -7,6 +9,7 @@ from modules.encamamiento.schemas import EncamamientoCreate, EncamamientoUpdate
 
 
 def crear_servicio(data: EncamamientoCreate, db: Session) -> EncamamientoModel:
+    """Evita nombres repetidos y usa el nombre como descripción si esta viene vacía."""
     existe = db.query(EncamamientoModel).filter(
         EncamamientoModel.nombre_servicio == data.nombre_servicio
     ).first()
@@ -30,6 +33,7 @@ def listar_servicios(
     activo: bool | None = None,
     limit: int = 100
 ) -> List[EncamamientoModel]:
+    """Filtra opcionalmente por actividad y limita el resultado a 500 filas."""
     query = db.query(EncamamientoModel)
     if activo is not None:
         query = query.filter(EncamamientoModel.activo == activo)
@@ -67,6 +71,7 @@ def actualizar_servicio(servicio_id: int, data: EncamamientoUpdate, db: Session)
 
 
 def eliminar_servicio(servicio_id: int, db: Session) -> None:
+    """Traduce fallos de integridad referencial en un error de eliminación comprensible."""
     servicio = db.query(EncamamientoModel).filter(EncamamientoModel.id == servicio_id).first()
     if not servicio:
         raise HTTPException(status_code=404, detail="Servicio de encamamiento no encontrado")

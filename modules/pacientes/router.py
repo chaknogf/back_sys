@@ -1,3 +1,5 @@
+"""Endpoints autenticados de búsqueda y mantenimiento del registro de pacientes."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -42,6 +44,7 @@ def buscar_pacientes_endpoint(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Combina solo los filtros enviados y delega la búsqueda paginada al servicio."""
     filters = {k: v for k, v in {
         "q": q, "id": id, "cui": cui, "expediente": expediente,
         "nombre": nombre, "primer_nombre": primer_nombre,
@@ -158,6 +161,7 @@ def gestionar_paciente(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Aplica cambios o acciones de expediente; metadatos se gestionan internamente."""
     paciente = db.get(PacienteModel, paciente_id)
     if not paciente:
         raise HTTPException(status_code=404, detail=f"Paciente con ID {paciente_id} no encontrado")
@@ -288,6 +292,7 @@ def eliminar_paciente_permanente(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Exige rol administrador y confirmación literal antes del borrado físico."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar permanentemente")
     if confirmacion != "CONFIRMAR":

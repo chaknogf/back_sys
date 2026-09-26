@@ -1,3 +1,5 @@
+"""Captura IP y agente de usuario y persiste eventos de auditoría."""
+
 import re
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -64,6 +66,7 @@ def detectar_so(user_agent: str | None) -> str | None:
 
 
 def obtener_ip(request: Request) -> str | None:
+    """Prefiere la primera IP de X-Forwarded-For; el proxy debe sanear ese encabezado."""
     fwd = request.headers.get("x-forwarded-for")
     if fwd:
         return fwd.split(",")[0].strip()

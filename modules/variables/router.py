@@ -1,3 +1,5 @@
+"""API de catálogos, mediciones y reportes de variables hospitalarias."""
+
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -195,6 +197,7 @@ def eliminar_medicion_endpoint(measurement_id: int, db: Session = Depends(get_db
 
 @router.post("/mediciones/bulk", response_model=BulkImportResponse)
 def bulk_upsert_endpoint(body: BulkImportRequest, db: Session = Depends(get_db)):
+    """Aplica inserción/actualización en lote para las mediciones recibidas."""
     return svc_bulk_upsert(body.mediciones, db)
 
 

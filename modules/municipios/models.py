@@ -1,3 +1,5 @@
+"""Modelo ORM del catálogo de municipios y códigos geográficos RENAP."""
+
 from sqlalchemy import Column, String
 from core.database import Base
 

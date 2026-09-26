@@ -1,9 +1,12 @@
+"""Modelo de lectura y conservación de los registros históricos de nacimientos."""
+
 from sqlalchemy import Column, Integer, String, Date, Time, BigInteger, TIMESTAMP
 from sqlalchemy.sql import func
 from core.database import Base
 
 
 class NacimientoLegacy(Base):
+    """Representa columnas de origen para conservar la estructura legacy importada."""
     __tablename__ = "nacimientos_legacy"
 
     id = Column(Integer, primary_key=True, index=True)

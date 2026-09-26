@@ -1,3 +1,5 @@
+"""Endpoints autenticados para el registro SIGSA-3 normalizado."""
+
 from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, status

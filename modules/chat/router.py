@@ -1,3 +1,5 @@
+"""Endpoints autenticados del asistente de consultas sobre datos hospitalarios."""
+
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -27,6 +29,7 @@ def consulta_chat(
     db: Session = Depends(get_db_readonly),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """Delega la consulta a la sesión de solo lectura y normaliza su respuesta."""
     mensajes = [m.model_dump() for m in body.mensajes]
     try:
         resultado = consultar(

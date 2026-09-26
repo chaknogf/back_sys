@@ -1,4 +1,6 @@
 # modules/consultas/schemas.py
+"""Contratos de validación y respuesta para consultas e historia clínica."""
+
 from typing import List, Literal, Optional, Dict, Any, Union
 from datetime import date, time
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -28,6 +30,7 @@ class Indicador(BaseModel):
     @field_validator("personal_hospital", mode="before")
     @classmethod
     def normalize_personal_hospital(cls, v):
+        """Mantiene compatibilidad con clientes booleanos al persistir S/N."""
         if v is True:
             return "S"
         if v is False:
@@ -90,6 +93,7 @@ class CicloClinico(BaseModel):
     @field_validator('estado', mode='before')
     @classmethod
     def normalizar_estado(cls, v):
+        """Normaliza a minúsculas antes de validar el literal de estado."""
         if isinstance(v, str):
             return v.lower()
         return v
@@ -97,6 +101,7 @@ class CicloClinico(BaseModel):
     @field_validator('comentario', mode='before')
     @classmethod
     def normalizar_comentario(cls, v):
+        """Convierte el objeto vacío legado de comentario en ausencia de valor."""
         if isinstance(v, dict) and not v:
             return None
         return v
@@ -120,6 +125,7 @@ class CicloUpdate(BaseModel):
         return v.lower() if isinstance(v, str) else v
 
     def model_dump_clean(self, **kwargs) -> dict:
+        """Excluye valores nulos y contenedores vacíos al preparar una actualización."""
         data = super().model_dump(exclude_none=True, **kwargs)
         return {k: v for k, v in data.items() if v != '' and v != {} and v != []}
 
@@ -179,6 +185,7 @@ class ConsultaUpdate(BaseModel):
     @field_validator("ciclo", mode="before")
     @classmethod
     def no_aceptar_listas(cls, v):
+        """Conserva el contrato de actualización: ciclo acepta un objeto, no una lista."""
         if isinstance(v, list):
             raise ValueError("El campo 'ciclo' debe ser un objeto, no una lista")
         return v
@@ -191,6 +198,7 @@ class ConsultaOut(ConsultaBase):
     @model_validator(mode="before")
     @classmethod
     def ciclo_from_historial(cls, data):
+        """Adapta historial legado al campo ciclo solo cuando ciclo aún no está presente."""
         historial = None
         has_ciclo = False
         if hasattr(data, 'historial'):
@@ -222,6 +230,7 @@ class ConsultaOut(ConsultaBase):
     @field_validator('ciclo', mode='before')
     @classmethod
     def convertir_ciclo_a_lista(cls, v):
+        """Normaliza ciclo a lista para la respuesta sin descartar ciclos ya listados."""
         if v is None:
             return []
         if isinstance(v, dict) and not v:

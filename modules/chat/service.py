@@ -1,3 +1,5 @@
+"""Adapta el chat HTTP al intérprete determinístico de consultas estadísticas."""
+
 import re
 import time
 from typing import List, Optional

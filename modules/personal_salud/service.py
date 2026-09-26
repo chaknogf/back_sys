@@ -1,3 +1,5 @@
+"""Gestión del catálogo de nombres de personal usados en SIGSA-3."""
+
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -17,6 +19,7 @@ def listar_personal_salud(
     especialidad_id: int | None = None,
     personal_atencion_id: int | None = None,
 ) -> list:
+    """Filtra el catálogo por nombre, especialidad o vínculo al personal de atención."""
     query = db.query(PersonalSaludModel)
     if nombre:
         query = query.filter(PersonalSaludModel.nombre.ilike(f"%{nombre}%"))
@@ -28,6 +31,7 @@ def listar_personal_salud(
 
 
 def crear_personal_salud(nombre: str, especialidad_id: int | None, personal_atencion_id: int | None, db: Session) -> PersonalSaludModel:
+    """Rechaza nombres ya existentes para evitar duplicados en el catálogo."""
     existente = db.query(PersonalSaludModel).filter(PersonalSaludModel.nombre == nombre).first()
     if existente:
         raise HTTPException(status_code=409, detail=f"'{nombre}' ya existe en personal_salud")

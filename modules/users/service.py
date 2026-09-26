@@ -33,6 +33,7 @@ def get_user_by_id(db: Session, user_id: int):
 
 
 def create_user(db: Session, user_data: UserCreate):
+    """Crea cuentas inactivas; el usuario define su contraseña mediante recuperación."""
     if db.query(UserModel).filter(UserModel.username == user_data.username).first():
         raise HTTPException(status_code=400, detail="Username ya existe")
     if db.query(UserModel).filter(UserModel.email == user_data.email).first():

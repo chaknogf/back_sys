@@ -1,4 +1,6 @@
 # modules/ciclos/schemas.py
+"""Esquemas de ciclos clínicos y de la historia agrupada por consulta."""
+
 from typing import List, Literal, Optional, Dict, Any, Union
 from datetime import date, time, datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -21,6 +23,7 @@ class Egreso(BaseModel):
 # Schema base (común)
 # ===================================================================
 class CicloConsultaBase(BaseModel):
+    """Datos de escritura de un ciclo; el servidor determina usuario y número."""
     consulta_id: int
     numero: int = 0
     activo: bool = True
@@ -34,6 +37,7 @@ class CicloConsultaBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class CicloConsulta (CicloConsultaBase):
+    """Representación persistida que incorpora el identificador del ciclo."""
     id: int
     
     model_config = ConfigDict(from_attributes=True)

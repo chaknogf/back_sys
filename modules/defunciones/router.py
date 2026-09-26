@@ -40,6 +40,7 @@ def registrar_defuncion(
     data: RegistrarDefuncionRequest,
     db: Session = Depends(get_db),
 ):
+    """Registra la defunción y después marca al paciente; son commits separados."""
     paciente = db.get(PacienteModel, paciente_id)
     if not paciente:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")

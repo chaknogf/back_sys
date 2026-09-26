@@ -1,3 +1,5 @@
+"""Tabla de préstamos de documentos y expedientes ligados a pacientes."""
+
 from sqlalchemy import (
     Column,
     BigInteger,
@@ -13,6 +15,7 @@ from core.database import Base
 
 
 class Prestamo(Base):
+    """Registra entrega, fecha límite y devolución; la consulta puede quedar desvinculada."""
     __tablename__ = "prestamos"
     id = Column(BigInteger, primary_key=True, index=True)
     id_paciente = Column(

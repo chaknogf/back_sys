@@ -99,6 +99,7 @@ def ejecutar_consulta(texto: str, db: Session, username: str = None,
 
 
 def _ejecutar(plan: dict, db: Session, max_filas: int) -> tuple:
+    """Ejecuta el plan generado y convierte fechas/binarios para la salida JSON."""
     inicio = time.time()
     result = db.execute(text(plan["sql"]), plan["params"])
     filas_raw = result.fetchmany(max_filas)

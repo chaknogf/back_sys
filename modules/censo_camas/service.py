@@ -1,3 +1,5 @@
+"""Reglas y consultas del censo diario; los totales se derivan de sus componentes."""
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
@@ -23,6 +25,7 @@ def _calc_camas_ocupadas(ocupados: int, otro_ingresos: int, ingresos: int, huesp
 
 
 def _to_out(r: CensoCamasModel) -> dict:
+    """Calcula los totales de salida a partir de los componentes guardados."""
     egresos_totales = _calc_egresos_totales(r.egresos, r.fallecidos, r.referido, r.traslado, r.contraindicados)
     camas_ocupadas = _calc_camas_ocupadas(r.ocupados, r.otro_ingresos, r.ingresos, r.huespedes, r.emergencia, egresos_totales)
     return {

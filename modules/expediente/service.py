@@ -1,3 +1,5 @@
+"""Generación de correlativos anuales para expedientes y documentos clínicos."""
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
@@ -6,6 +8,7 @@ from core.config import APP_TIMEZONE
 
 
 def _generar_correlativo(db: Session, tipo: str, formato: str) -> str:
+    """Bloquea la fila anual durante el incremento y confirma el contador antes de devolverlo."""
     anio_actual = int(datetime.now(APP_TIMEZONE).strftime("%y"))
     control = (
         db.query(CorrelativoControl)

@@ -1,3 +1,5 @@
+"""Endpoint autenticado y cacheado para los indicadores del panel hospitalario."""
+
 import logging
 from fastapi import APIRouter, Depends, Query
 from fastapi_cache.decorator import cache
@@ -26,4 +28,5 @@ def obtener_totales(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """Devuelve los indicadores de la fecha solicitada o de hoy."""
     return get_totales(db, fecha)

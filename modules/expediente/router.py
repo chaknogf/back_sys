@@ -1,3 +1,5 @@
+"""Endpoints autenticados que generan correlativos clínicos y registran su emisor."""
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, status

@@ -1,3 +1,5 @@
+"""Cliente HTTPS con certificado mutuo para consultar el servicio RENAP."""
+
 import os
 import httpx
 from typing import Dict
@@ -14,6 +16,7 @@ API_URL = "https://salud-digital.mspas.gob.gt/personas"
 
 
 async def fetch_persona(filtros: Dict[str, str]) -> RespuestaRenap:
+    """Consulta RENAP con mTLS y normaliza el CUI devuelto a 13 dígitos."""
     if not API_KEY:
         raise RuntimeError(
             "RENAP_API_KEY no configurada. "

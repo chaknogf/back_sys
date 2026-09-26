@@ -19,6 +19,8 @@ from datetime import datetime
 from pathlib import Path
 
 class AdvancedExcelImporter:
+    """Importa mediciones mensuales desde la hoja Variables a PostgreSQL."""
+
     def __init__(self, excel_path, db_host='localhost', db_user='postgres', 
                  db_password='postgres', db_name='transfusiones', db_port=5432, verbose=True):
         """Inicializar importador avanzado"""

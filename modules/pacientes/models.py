@@ -1,3 +1,5 @@
+"""Modelo de paciente con datos demográficos y clínicos semiestructurados en JSONB."""
+
 from sqlalchemy import Column, Integer, String, Date, Text, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.mutable import MutableList
@@ -6,6 +8,7 @@ from core.database import Base
 
 
 class PacienteModel(Base):
+    """Entidad central; validadores sincronizan JSONB y columnas compatibles."""
     __tablename__ = "pacientes"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -34,6 +37,7 @@ class PacienteModel(Base):
 
     @validates("datos_extra")
     def sync_socioeconomicos(self, key, value):
+        """Proyecta datos socioeconómicos/demográficos JSONB en columnas históricas."""
         if value and isinstance(value, dict):
             socio = value.get("socioeconomicos", {})
             if socio and isinstance(socio, dict):
@@ -85,6 +89,7 @@ class PacienteModel(Base):
 
     @validates("nombre")
     def actualizar_nombre_completo(self, key: str, nombre_dict: dict) -> dict:
+        """Normaliza componentes y materializa nombre_completo para búsquedas SQL."""
         campos = ["primer_nombre", "segundo_nombre", "otro_nombre",
                 "primer_apellido", "segundo_apellido", "apellido_casada"]
 

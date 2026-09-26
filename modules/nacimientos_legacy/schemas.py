@@ -1,9 +1,12 @@
+"""Esquemas que conservan nombres de campo del formato de nacimientos legacy."""
+
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import date, time, datetime
 
 
 class NacimientoLegacyBase(BaseModel):
+    """Campos opcionales del formato original para soportar actualizaciones parciales."""
     fecha: Optional[date] = None
     cor: Optional[int] = None
     ao: Optional[int] = None

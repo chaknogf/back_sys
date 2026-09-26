@@ -14,6 +14,7 @@ TIPO_CONSULTA_MAP = {1: "COEX", 2: "Hospitalización", 3: "Emergencia"}
 
 
 def _parse_fechas(desde: str, hasta: str) -> tuple[date, date]:
+    """Valida fechas ISO; los reportes aplican ambos extremos del rango de forma inclusiva."""
     try:
         return (
             datetime.strptime(desde, "%Y-%m-%d").date(),

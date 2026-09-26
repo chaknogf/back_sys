@@ -1,3 +1,5 @@
+"""Convierte errores de validación, integridad y ejecución en respuestas HTTP."""
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -6,12 +8,14 @@ from starlette.formparsers import FormData
 
 
 def _serializable_body(body):
+    """Aplana FormData para que el cuerpo de validación pueda serializarse a JSON."""
     if isinstance(body, FormData):
         return {k: v for k, v in body.items()}
     return body
 
 
 def register_exception_handlers(app):
+    """Registra respuestas comunes; las violaciones de integridad se exponen como 409."""
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
         return JSONResponse(

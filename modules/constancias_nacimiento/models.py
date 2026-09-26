@@ -1,3 +1,5 @@
+"""Persistencia de constancias de nacimiento y sus instantáneas de cambios."""
+
 from sqlalchemy import (Column, Integer, String, Date, Text, ForeignKey, UniqueConstraint, text)
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import relationship
@@ -5,6 +7,7 @@ from core.database import Base
 
 
 class ConstanciaNacimientoModel(Base):
+    """Constancia ligada al recién nacido, con vínculo opcional a la madre."""
     __tablename__ = "constancia_nacimiento"
 
     __table_args__ = (UniqueConstraint("documento", name="constancia_nacimiento_documento_key"),)
@@ -43,6 +46,7 @@ class ConstanciaNacimientoModel(Base):
 
 
 class ConstanciaNacimientoHistorialModel(Base):
+    """Instantánea de datos previos vinculada al usuario que efectuó el cambio."""
     __tablename__ = "constancia_nacimiento_historial"
 
     id = Column(Integer, primary_key=True)

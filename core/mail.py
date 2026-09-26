@@ -1,3 +1,5 @@
+"""Configuración SMTP compartida para los correos transaccionales."""
+
 from fastapi_mail import ConnectionConfig
 import os
 from dotenv import load_dotenv

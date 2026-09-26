@@ -1,3 +1,5 @@
+"""Alta de recién nacidos derivados de una madre con sus registros relacionados."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import date, datetime
@@ -24,6 +26,7 @@ def calcular_edad(fecha_nacimiento: date) -> int:
 
 
 def construir_datos_extra_derivados(madre: PacienteModel) -> dict:
+    """Hereda datos demográficos e identificadores, conservando la clave legacy como fallback."""
     madre_extra = madre.datos_extra or {}
     # ``demograficos`` is the canonical API key. Keep the singular spelling as
     # a read-only fallback for records created by older versions.
@@ -65,6 +68,7 @@ def crear_paciente_desde_madre(
     auto_expediente: bool = Query(True, description="Generar expediente automáticamente"),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Valida elegibilidad y reglas del parto antes de crear pacientes, constancias y nacimientos."""
     madre = db.get(PacienteModel, madre_id)
     if not madre:
         raise HTTPException(404, "Madre no encontrada")

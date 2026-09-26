@@ -1,3 +1,5 @@
+"""Cálculo SQL de indicadores para el panel hospitalario."""
+
 from datetime import date, datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -8,6 +10,7 @@ from modules.totales.schemas import TotalesResponse, TotalesItem
 
 
 def get_totales(db: Session, fecha: str | None = None) -> TotalesResponse:
+    """Valida la fecha, calcula KPIs y usa el censo del día previo como ocupación de apertura."""
     if fecha:
         try:
             fecha_consulta = datetime.strptime(fecha, "%Y-%m-%d").date()

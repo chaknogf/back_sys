@@ -60,6 +60,7 @@ _DEF_COLS = """
 
 
 def _edad_en_momento(fecha_nac: date | datetime | None, fecha_def: datetime | None) -> dict:
+    """Devuelve la edad en una sola unidad: horas, días, meses o años según el intervalo."""
     if not fecha_nac or not fecha_def:
         return {"horas": None, "dias": None, "meses": None, "anios": None}
 

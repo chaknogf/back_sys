@@ -1,3 +1,5 @@
+"""Modelo ORM del catálogo de países identificado por código ISO alfa-3."""
+
 from sqlalchemy import Column, Integer, String
 from core.database import Base
 

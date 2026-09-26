@@ -1,3 +1,5 @@
+"""Validación, búsqueda y serialización de registros SIGSA-3 normalizados."""
+
 from datetime import date
 from fastapi import HTTPException, status
 from sqlalchemy import or_
@@ -195,6 +197,7 @@ def listar_registros(
     skip: int = 0,
     limit: int = 50,
 ):
+    """Enriquece resultados con catálogos mediante JOIN externos y limita cada página."""
     conds = _filtros(
         paciente_id=paciente_id,
         personal_atencion_id=personal_atencion_id,
@@ -234,6 +237,7 @@ def obtener_registro(registro_id: int, db: Session) -> dict:
 
 
 def crear_registro(data: Sigsa3RegistroCreate, db: Session) -> dict:
+    """Valida referencias y coherencia paciente-consulta antes de persistir el registro."""
     _validar_fks(db, data)
     _validar_coherencia_consulta(db, data.paciente_id, data.consulta_id)
     if not data.fecha_consulta:
@@ -253,6 +257,7 @@ def crear_registro(data: Sigsa3RegistroCreate, db: Session) -> dict:
 
 
 def actualizar_registro(registro_id: int, data: Sigsa3RegistroUpdate, db: Session) -> dict:
+    """Valida las claves foráneas con el estado final, incluso para campos no enviados."""
     registro = db.get(Sigsa3RegistroModel, registro_id)
     if not registro:
         raise HTTPException(

@@ -1,9 +1,12 @@
+"""Esquemas de entrada/salida para filas SIGSA-3 normalizadas y enriquecidas."""
+
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from datetime import date, datetime
 
 
 class Sigsa3RegistroBase(BaseModel):
+    """Datos normalizados; paciente y fecha son obligatorios, las referencias son opcionales."""
     paciente_id: int = Field(..., description="ID del paciente (obligatorio)")
     personal_atencion_id: Optional[int] = Field(None, description="ID del médico (opcional)")
     personal_salud_id: Optional[int] = None
@@ -34,6 +37,7 @@ class Sigsa3RegistroUpdate(BaseModel):
 
 
 class Sigsa3RegistroOut(Sigsa3RegistroBase):
+    """Respuesta enriquecida con nombres legibles de paciente y catálogos."""
     id: int
     normalized_at: Optional[datetime] = None
     paciente_nombre: Optional[str] = None

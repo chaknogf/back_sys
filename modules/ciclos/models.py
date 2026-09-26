@@ -1,4 +1,6 @@
 # modules/ciclos/models.py
+"""Persistencia de notas clínicas secuenciales asociadas a una consulta."""
+
 from sqlalchemy import Column, Integer, Text, Boolean, TIMESTAMP, ForeignKey, UniqueConstraint, CheckConstraint, Index
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -7,6 +9,7 @@ from core.database import Base
 
 
 class CiclosConsulta(Base):
+    """Ciclo clínico numerado; la base impone unicidad por consulta y número positivo."""
     __tablename__ = "ciclos_consulta"
 
     id = Column(Integer, primary_key=True, index=True)

@@ -1,3 +1,5 @@
+"""Contratos de salida para listados ISO y opciones de selección."""
+
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,11 +22,13 @@ class PaisOut(BaseModel):
 
 
 class PaisSelect(BaseModel):
+    """Opción de selector que separa el ID interno del texto visible."""
     value: int = Field(..., description="ID del país (value del option)")
     label: str = Field(..., description="Texto visible (ej: Guatemala (GTM))")
 
     @staticmethod
     def from_orm(pais) -> "PaisSelect":
+        """Añade el código alfa-3 entre paréntesis cuando el catálogo lo contiene."""
         iso = pais.codigo_iso3 or ""
         label = f"{pais.nombre}"
         if iso:

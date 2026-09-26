@@ -1,4 +1,6 @@
 # modules/eventos/service.py
+"""Operaciones de eventos clínicos asociados a las consultas."""
+
 from fastapi import Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -22,6 +24,7 @@ def listar_eventos(
     skip: int = 0,
     limit: int = 50,
 ):
+    """Filtra por consulta, tipo, responsable y estado; devuelve primero los recientes."""
     query = db.query(EventoConsultaModel).order_by(desc(EventoConsultaModel.creado_en))
 
     if consulta_id:
@@ -49,6 +52,7 @@ def obtener_evento(evento_id: int, db: Session):
 
 
 def crear_evento(evento_in: EventoConsultaCreate, db: Session, current_user):
+    """Completa el responsable con la identidad autenticada cuando no se envía."""
     if evento_in.responsable is None:
         evento_in.responsable = {
             "nombre": current_user.nombre,
@@ -78,6 +82,7 @@ def actualizar_evento(evento_id: int, update_data: EventoConsultaUpdate, db: Ses
 
 
 def eliminar_evento(evento_id: int, db: Session, current_user=None):
+    """Inactiva el evento sin borrar su registro clínico."""
     evento = db.get(EventoConsultaModel, evento_id)
     if not evento:
         raise HTTPException(status_code=404, detail="Evento no encontrado")

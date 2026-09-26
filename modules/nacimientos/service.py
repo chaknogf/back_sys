@@ -741,6 +741,7 @@ def sincronizar_nacimientos(
 
 
 def _peso_legacy_a_str(lb: int | None, onz: int | None) -> str | None:
+    """Conserva el peso legado en libras/onzas como texto neonatal de origen."""
     if lb is None and onz is None:
         return None
     partes = []
@@ -1014,6 +1015,7 @@ def importar_desde_legacy(
     limit: int = 500,
     offset: int = 0,
 ) -> dict:
+    """Importa solo IDs legacy aún no vinculados; cada registro se confirma por separado."""
     where = ""
     if solo_con_madre:
         where = " WHERE expediente IS NOT NULL AND CAST(expediente AS VARCHAR) IN (SELECT expediente FROM pacientes WHERE expediente IS NOT NULL AND expediente <> '')"

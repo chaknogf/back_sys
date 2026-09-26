@@ -1,3 +1,5 @@
+"""Endpoints autenticados para el catálogo de personal asociado a SIGSA-3."""
+
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -27,6 +29,7 @@ def listar(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    """Busca personal por nombre, especialidad o médico vinculado."""
     return service_listar(
         db,
         nombre=nombre,

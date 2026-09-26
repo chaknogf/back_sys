@@ -1,4 +1,6 @@
 # modules/consultas/service.py
+"""Reglas de búsqueda, registro, actualización y cierre de consultas clínicas."""
+
 from fastapi import Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import String, cast, desc, func, text, or_, and_, case

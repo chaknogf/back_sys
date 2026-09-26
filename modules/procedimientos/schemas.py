@@ -1,3 +1,5 @@
+"""Validación de entradas y respuestas del catálogo y registro de procedimientos."""
+
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import date, datetime
 from typing import Optional
@@ -30,6 +32,7 @@ class ProcedimientoResponse(ProcedimientoOut):
 
 
 class ProceMedicoBase(BaseModel):
+    """Datos clínicos del procedimiento; valida sexo y cantidades/anestesia no negativas."""
     fecha: Optional[date] = None
     lugar_servicio: Optional[str] = None
     sexo: Optional[str] = Field(None, pattern="^[MF]$")

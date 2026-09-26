@@ -1,3 +1,5 @@
+"""Endpoints autenticados para consulta, entrega y devolución de préstamos."""
+
 from typing import Optional
 from datetime import date
 from fastapi import APIRouter, Depends, Query
@@ -29,6 +31,7 @@ def crear_prestamo(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Crea un préstamo atribuyendo la entrega al usuario autenticado."""
     return service_crear(data, current_user.username, db)
 
 
@@ -71,6 +74,7 @@ def actualizar_prestamo(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Entrega al servicio el usuario autenticado para registrar una devolución."""
     return service_actualizar(prestamo_id, data, current_user.username, db)
 
 

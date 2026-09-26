@@ -27,6 +27,7 @@ def asegurar_tabla():
 
 
 def descargar_catalogo(db: Session) -> int:
+    """Carga el CSV remoto solo si el catálogo está vacío y confirma el lote al final."""
     existe = db.query(Cie10Model).first()
     if existe:
         total = db.query(Cie10Model).count()

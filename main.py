@@ -1,3 +1,5 @@
+"""Configura la aplicación FastAPI, sus routers y servicios compartidos."""
+
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI

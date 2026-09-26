@@ -1,4 +1,5 @@
 # modules/eventos/router.py
+"""Endpoints autenticados para consultar y mantener eventos de atención clínica."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session

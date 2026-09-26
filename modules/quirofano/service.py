@@ -1,3 +1,5 @@
+"""Reglas de catálogos quirúrgicos, importación CSV e intervenciones."""
+
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, text, inspect as sa_inspect
 from fastapi import HTTPException, status
@@ -248,6 +250,7 @@ def _obtener_especialidad_o_404(especialidad_id: int, db: Session) -> Especialid
 def _verificar_duplicado_esp_nombre(
     db: Session, especialidad_id: int | None, nombre: str, exclude_id: int | None = None
 ) -> None:
+    """Considera duplicado el nombre normalizado dentro de la misma especialidad o catálogo mixto."""
     query = db.query(ProcedimientoQuirofanoModel).filter(
         func.lower(ProcedimientoQuirofanoModel.nombre) == nombre.strip().lower(),
     )
@@ -667,6 +670,7 @@ def obtener_intervencion(intervencion_id: int, db: Session) -> dict:
 
 
 def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_by: str | None = None) -> dict:
+    """Verifica paciente y referencias opcionales, y hereda expediente si no se envía."""
     # Validar paciente existe
     from modules.pacientes.models import PacienteModel
     paciente = db.query(PacienteModel).filter(PacienteModel.id == data.paciente_id).first()
@@ -732,6 +736,7 @@ def actualizar_intervencion(intervencion_id: int, data: IntervencionQuirurgicaUp
 
 
 def eliminar_intervencion(intervencion_id: int, db: Session) -> dict:
+    """Marca la intervención inactiva para conservar su historial quirúrgico."""
     reg = db.query(IntervencionQuirurgicaModel).filter(
         IntervencionQuirurgicaModel.intervencion_id == intervencion_id
     ).first()

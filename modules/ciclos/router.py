@@ -1,4 +1,5 @@
 # modules/ciclos/router.py
+"""Endpoints autenticados para consultar y registrar ciclos de historia clínica."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
@@ -39,6 +40,7 @@ def obtener_ciclos_por_consulta(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Lista los ciclos de una consulta, activos por defecto."""
     return service_obtener_ciclos_por_consulta(consulta_id, activo, db)
 
 
@@ -57,4 +59,5 @@ def crear_ciclo(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Registra un ciclo atribuyéndolo al usuario autenticado."""
     return service_crear_ciclo(data, db, current_user)

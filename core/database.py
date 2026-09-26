@@ -1,3 +1,5 @@
+"""Motores y sesiones SQLAlchemy para operaciones normales y de solo lectura."""
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.orm import declarative_base
@@ -71,6 +73,7 @@ Base = declarative_base()
 
 
 def get_db() -> Session:
+    """Entrega una sesión por solicitud y la cierra al terminar la dependencia."""
     db = SessionLocal()
     try:
         yield db
@@ -82,15 +85,16 @@ _SessionRO = None  # Lazy init
 
 
 def get_db_readonly() -> Session:
+    """Usa credenciales de solo lectura cuando están configuradas."""
     global _SessionRO
     if _engine_ro:
         if _SessionRO is None:
             _SessionRO = sessionmaker(autocommit=False, autoflush=False, bind=_engine_ro)
         db = _SessionRO()
     else:
+        # Sin credenciales RO se reutiliza la sesión normal; no implica aislamiento de lectura.
         db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-

@@ -1,3 +1,5 @@
+"""Validación y serialización de constancias e historial de nacimiento."""
+
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Dict, Any
 from datetime import date, datetime
@@ -64,6 +66,7 @@ class ConstanciaNacimientoListResponse(BaseModel):
     
 
 class EstadoInformeUpdate(BaseModel):
+    """Limita el estado del informe a los valores reconocidos por el flujo de entrega."""
     estado_informe: str = Field(
         ...,
         pattern=r"^(creado|entregado|reimpreso|perdido|anulado)$"

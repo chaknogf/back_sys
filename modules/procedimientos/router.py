@@ -1,3 +1,5 @@
+"""Endpoints del catálogo y de los procedimientos registrados por personal médico."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_cache.decorator import cache
 from sqlalchemy.orm import Session, joinedload
@@ -143,6 +145,7 @@ def eliminar_procedimiento(
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """Impide borrar un elemento del catálogo mientras existan registros asociados."""
     procedimiento = (
         db.query(ProcedimientoModel)
         .filter(ProcedimientoModel.id == id)
@@ -266,6 +269,7 @@ def reporte_proce_medicos(
     lugar_servicio: Optional[str] = Query(None),
     sexo: Optional[str] = Query(None, pattern="^[MF]$"),
 ):
+    """Agrupa cantidades por especialidad, servicio y sexo usando parámetros SQL para filtros."""
     filtros = []
     params = {}
 
@@ -368,6 +372,7 @@ def crear_procedimiento_medico(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Registra al usuario y calcula anestesia como valor de catálogo por cantidad."""
     catalogo = None
     if datos.id_procedimiento:
         catalogo = db.get(ProcedimientoModel, datos.id_procedimiento)
@@ -399,6 +404,7 @@ def actualizar_procedimiento_medico(
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """Recalcula anestesia desde catálogo y cantidad, sin aceptar ese valor del cliente."""
     procedimiento = (
         db.query(ProceMedicoModel)
         .filter(ProceMedicoModel.id == id)

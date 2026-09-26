@@ -1,3 +1,5 @@
+"""Endpoints públicos de consulta del catálogo ISO 3166-1."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -30,6 +32,7 @@ def paises_para_select(
     q: Optional[str] = Query(None, min_length=1, description="Buscar por nombre o código"),
     db: Session = Depends(get_db)
 ):
+    """Normaliza el término y devuelve hasta 50 coincidencias por nombre o código ISO3."""
     query = db.query(PaisIsoModel).order_by(PaisIsoModel.nombre)
 
     if q:
@@ -45,6 +48,7 @@ def paises_para_select(
 
 @router.get("/{codigo}", response_model=PaisOut)
 def pais_por_codigo(codigo: str, db: Session = Depends(get_db)):
+    """Busca por código alfa-3 sin distinguir mayúsculas."""
     codigo = codigo.upper()
     pais = db.query(PaisIsoModel).filter(
         PaisIsoModel.codigo_iso3 == codigo

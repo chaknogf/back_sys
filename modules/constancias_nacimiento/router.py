@@ -1,3 +1,5 @@
+"""Endpoints de constancias de nacimiento, su historial y metadatos de informe."""
+
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 from typing import Optional
@@ -26,6 +28,7 @@ router = APIRouter(prefix="/constancias-nacimiento", tags=["Constancias Nacimien
 
 
 def _serializar(v):
+    """Convierte fechas y decimales de una instantánea ORM a valores JSON."""
     if isinstance(v, (date, datetime)):
         return v.isoformat()
     if isinstance(v, Decimal):
@@ -61,6 +64,7 @@ def crear_constancia(
     data: ConstanciaNacimientoCreate,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)):
+    """Crea la constancia, fija el registrador autenticado e inicia el historial del informe."""
     data_dict = data.model_dump(exclude={"registrador_id"})
     nueva = ConstanciaNacimientoModel(**data_dict)
     nueva.registrador_id = current_user.id
@@ -196,6 +200,7 @@ def actualizar_constancia(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Guarda una instantánea previa y genera correlativo solo si falta el documento."""
     constancia = db.get(ConstanciaNacimientoModel, constancia_id)
     if not constancia:
         raise HTTPException(status_code=404, detail="Constancia no encontrada")
@@ -236,6 +241,7 @@ def actualizar_estado_informe(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    """Actualiza el estado del informe y marca el JSONB para persistir su historial."""
     constancia = db.get(ConstanciaNacimientoModel, constancia_id)
     if not constancia:
         raise HTTPException(status_code=404, detail="Constancia no encontrada")

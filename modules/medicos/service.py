@@ -1,3 +1,5 @@
+"""Operaciones del catálogo de personal de atención médica."""
+
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -31,6 +33,7 @@ def listar_medicos(
     skip: int = 0,
     limit: int = 50,
 ):
+    """Busca médicos con filtros opcionales y devuelve conteo junto con la página."""
     query = db.query(MedicoModel)
 
     if id is not None:
@@ -97,6 +100,7 @@ def actualizar_medico(personal_atencion_id: int, data: MedicoUpdate, db: Session
 
 
 def eliminar_medico(personal_atencion_id: int, db: Session):
+    """Elimina el registro si no tiene referencias; revierte la sesión si falla la FK."""
     medico = db.query(MedicoModel).filter(MedicoModel.id == personal_atencion_id).first()
 
     if not medico:

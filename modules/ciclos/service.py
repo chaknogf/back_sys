@@ -1,4 +1,6 @@
 # modules/ciclos/service.py
+"""Consultas y registro de ciclos, incluida la composición de historia clínica."""
+
 from fastapi import Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -17,6 +19,7 @@ def obtener_ciclos_por_consulta(
     activo: Optional[bool] = True,
     db: Session = None,
 ):
+    """Ordena por número y aplica el filtro de actividad cuando se especifica."""
     query = db.query(CiclosConsulta).filter(
         CiclosConsulta.consulta_id == consulta_id
     )
@@ -49,6 +52,7 @@ def obtener_ciclo(ciclo_id: int, db: Session):
 
 
 def crear_ciclo(data: CicloConsultaBase, db: Session, current_user):
+    """Asigna el siguiente número y confirma el ciclo; la restricción única respalda la secuencia."""
     consulta = db.get(ConsultaModel, data.consulta_id)
     if not consulta:
         raise HTTPException(status_code=404, detail="Consulta no encontrada")

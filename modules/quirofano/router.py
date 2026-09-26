@@ -1,3 +1,5 @@
+"""Rutas autenticadas de intervenciones y catálogos quirúrgicos; cambios de catálogo son administrativos."""
+
 from fastapi import APIRouter, Depends, Query, status, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -161,6 +163,7 @@ async def importar_csv_procedimientos(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_admin_user),
 ):
+    """Importa CSV solo para administradores, con UTF-8 y fallback de decodificación cp1252."""
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="El archivo debe ser un CSV (.csv)")
     raw = await file.read()

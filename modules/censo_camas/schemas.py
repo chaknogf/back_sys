@@ -3,10 +3,7 @@ from typing import Optional
 from datetime import date, datetime
 
 
-class CensoCamasCreate(BaseModel):
-    fecha: date
-    servicio_id: int
-    sexo: int = Field(..., ge=0, le=1, description="0=M, 1=F")
+class CensoCamasSexCreate(BaseModel):
     ocupados: int = Field(0, ge=0)
     egresos: int = Field(0, ge=0)
     fallecidos: int = Field(0, ge=0)
@@ -19,7 +16,7 @@ class CensoCamasCreate(BaseModel):
     emergencia: int = Field(0, ge=0)
 
 
-class CensoCamasUpdate(BaseModel):
+class CensoCamasSexUpdate(BaseModel):
     ocupados: Optional[int] = Field(None, ge=0)
     egresos: Optional[int] = Field(None, ge=0)
     fallecidos: Optional[int] = Field(None, ge=0)
@@ -32,14 +29,25 @@ class CensoCamasUpdate(BaseModel):
     emergencia: Optional[int] = Field(None, ge=0)
 
 
-class CensoCamasOut(BaseModel):
-    id: int
+class CensoCamasCreate(BaseModel):
     fecha: date
     servicio_id: int
-    sexo: int
+    masculino: CensoCamasSexCreate
+    femenino: CensoCamasSexCreate
+
+
+class CensoCamasUpdate(BaseModel):
+    masculino: Optional[CensoCamasSexUpdate] = None
+    femenino: Optional[CensoCamasSexUpdate] = None
+
+
+class CensoCamasSexOut(CensoCamasSexCreate):
+    camas_ocupadas: int = Field(description="Calculado a partir de ingresos y egresos")
+    egresos_totales: int = Field(description="Suma de todos los movimientos de egreso")
+
+
+class CensoCamasTotales(BaseModel):
     ocupados: int
-    camas_ocupadas: int = Field(description="Calculado: (emergencia + huespedes + ingresos + otro_ingresos + ocupados) - egresos_totales")
-    egresos_totales: int = Field(description="Calculado: egresos + fallecidos + referido + traslado + contraindicados")
     egresos: int
     fallecidos: int
     referido: int
@@ -49,6 +57,17 @@ class CensoCamasOut(BaseModel):
     ingresos: int
     huespedes: int
     emergencia: int
+    camas_ocupadas: int
+    egresos_totales: int
+
+
+class CensoCamasOut(CensoCamasTotales):
+    id: int
+    fecha: date
+    servicio_id: int
+    masculino: CensoCamasSexOut
+    femenino: CensoCamasSexOut
+    totales: CensoCamasTotales
     created_at: datetime
     updated_at: datetime
 
@@ -59,8 +78,8 @@ class ServicioResumen(BaseModel):
     servicio_id: int
     servicio_nombre: str
     camas_censables: int
-    masculino: Optional[CensoCamasOut] = None
-    femenino: Optional[CensoCamasOut] = None
+    masculino: Optional[CensoCamasSexOut] = None
+    femenino: Optional[CensoCamasSexOut] = None
 
     model_config = ConfigDict(from_attributes=True)
 

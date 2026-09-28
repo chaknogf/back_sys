@@ -99,7 +99,7 @@ All routes under root path `/fah` (e.g., `https://host/fah/auth/login`).
 | Correlatives | `/correlativos` | `POST /expediente`, `/emergencia`, `/constancia_nacimiento`, `/constancia_defuncion`, `/constancia_medica` |
 | Birth Certs | `/constancias-nacimiento` | `GET/POST`, `GET /{id}`, `/historial/{id}`, `PATCH /{id}/estado-informe` |
 | Deaths | `/defunciones` | `POST/GET`, `GET/PATCH/DELETE /{id}`, `/registrar/{paciente_id}`, `/sincronizar`, `/pacientes` |
-| Censo Camas | `/censo-camas` | `GET/POST`, `PUT/DELETE /{id}`, `/upsert`, `/bulk`, `/importar-csv`, `/resumen/{fecha}`, `/estadisticas` |
+| Censo Camas | `/censo-camas` | One row per date/service with nested male/female movement counts; `GET/POST`, `PUT/DELETE /{id}`, `/upsert`, `/bulk`, `/importar-csv`, `/resumen/{fecha}`, `/estadisticas` |
 | CIE-10 | `/cie10` | `GET /catalogo`, `GET /buscar`, `POST /sugerir` |
 | Loans | `/prestamos` | `GET/POST`, `GET/PUT/DELETE /{id}` |
 | Municipalities | `/municipios` | `GET /` (filtros: `q`, `codigo`, `municipio`, `departamento`, `vecindad`), `GET /departamentos` |
@@ -244,7 +244,7 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Censo Camas | POST | `/censo-camas/upsert` | auth | `CensoCamasOut` | Upsert |
 | Censo Camas | POST | `/censo-camas/bulk` | auth | dict (201) | Bulk create |
 | Censo Camas | POST | `/censo-camas/importar-csv` | auth | dict | Importar CSV |
-| Censo Camas | GET | `/censo-camas/` | auth | `CensoCamasListResponse` | List (filtros: fecha, servicio, sexo) |
+| Censo Camas | GET | `/censo-camas/` | auth | `CensoCamasListResponse` | List (filtros: fecha, servicio) |
 | Censo Camas | GET | `/censo-camas/resumen/{fecha}` | auth | `CensoDiarioResumen` | Resumen diario |
 | Censo Camas | GET | `/censo-camas/estadisticas` | auth | `CensoEstadisticasResponse` | Stats (desde, hasta) |
 | Censo Camas | GET | `/censo-camas/{registro_id}` | auth | `CensoCamasOut` | By ID |

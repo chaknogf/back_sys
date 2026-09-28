@@ -15,6 +15,12 @@ from modules.censo_camas.schemas import (
     HospitalizacionEspecialidadItem,
 )
 
+_SEXES = ("masculino", "femenino")
+_RAW_FIELDS = (
+    "ocupados", "egresos", "fallecidos", "referido", "traslado",
+    "contraindicados", "otro_ingresos", "ingresos", "huespedes", "emergencia",
+)
+
 
 def _calc_egresos_totales(egresos: int, fallecidos: int, referido: int, traslado: int, contraindicados: int) -> int:
     return egresos + fallecidos + referido + traslado + contraindicados
@@ -24,54 +30,110 @@ def _calc_camas_ocupadas(ocupados: int, otro_ingresos: int, ingresos: int, huesp
     return (emergencia + huespedes + ingresos + otro_ingresos + ocupados) - egresos_totales
 
 
+def _sex_out(r: CensoCamasModel, sexo: str) -> dict:
+    values = {field: getattr(r, f"{field}_{sexo}") for field in _RAW_FIELDS}
+    egresos_totales = _calc_egresos_totales(
+        values["egresos"], values["fallecidos"], values["referido"],
+        values["traslado"], values["contraindicados"],
+    )
+    values["egresos_totales"] = egresos_totales
+    values["camas_ocupadas"] = _calc_camas_ocupadas(
+        values["ocupados"], values["otro_ingresos"], values["ingresos"],
+        values["huespedes"], values["emergencia"], egresos_totales,
+    )
+    return values
+
+
+def _aggregate_values(masculino: dict, femenino: dict) -> dict:
+    totals = {
+        field: masculino[field] + femenino[field]
+        for field in _RAW_FIELDS
+    }
+    totals["egresos_totales"] = sum(
+        _calc_egresos_totales(
+            values["egresos"], values["fallecidos"], values["referido"],
+            values["traslado"], values["contraindicados"],
+        )
+        for values in (masculino, femenino)
+    )
+    totals["camas_ocupadas"] = sum(
+        _calc_camas_ocupadas(
+            values["ocupados"], values["otro_ingresos"], values["ingresos"],
+            values["huespedes"], values["emergencia"],
+            _calc_egresos_totales(
+                values["egresos"], values["fallecidos"], values["referido"],
+                values["traslado"], values["contraindicados"],
+            ),
+        )
+        for values in (masculino, femenino)
+    )
+    return totals
+
+
+def _refresh_aggregates(registro: CensoCamasModel) -> None:
+    by_sex = {
+        sexo: {field: getattr(registro, f"{field}_{sexo}") for field in _RAW_FIELDS}
+        for sexo in _SEXES
+    }
+    for field, value in _aggregate_values(by_sex["masculino"], by_sex["femenino"]).items():
+        setattr(registro, field, value)
+
+
 def _to_out(r: CensoCamasModel) -> dict:
-    """Calcula los totales de salida a partir de los componentes guardados."""
-    egresos_totales = _calc_egresos_totales(r.egresos, r.fallecidos, r.referido, r.traslado, r.contraindicados)
-    camas_ocupadas = _calc_camas_ocupadas(r.ocupados, r.otro_ingresos, r.ingresos, r.huespedes, r.emergencia, egresos_totales)
+    masculino = _sex_out(r, "masculino")
+    femenino = _sex_out(r, "femenino")
+    totales = {
+        **{field: getattr(r, field) for field in _RAW_FIELDS},
+        "egresos_totales": r.egresos_totales,
+        "camas_ocupadas": r.camas_ocupadas,
+    }
     return {
         "id": r.id,
         "fecha": r.fecha,
         "servicio_id": r.servicio_id,
-        "sexo": r.sexo,
-        "ocupados": r.ocupados,
-        "camas_ocupadas": camas_ocupadas,
-        "egresos_totales": egresos_totales,
-        "egresos": r.egresos,
-        "fallecidos": r.fallecidos,
-        "referido": r.referido,
-        "traslado": r.traslado,
-        "contraindicados": r.contraindicados,
-        "otro_ingresos": r.otro_ingresos,
-        "ingresos": r.ingresos,
-        "huespedes": r.huespedes,
-        "emergencia": r.emergencia,
+        **totales,
+        "masculino": masculino,
+        "femenino": femenino,
+        "totales": totales,
         "created_at": r.created_at,
         "updated_at": r.updated_at,
     }
 
 
 def _build_model(data: CensoCamasCreate) -> dict:
-    d = data.model_dump()
-    egresos_totales = _calc_egresos_totales(
-        d["egresos"], d["fallecidos"], d["referido"], d["traslado"], d["contraindicados"]
-    )
-    d["egresos_totales"] = egresos_totales
-    d["camas_ocupadas"] = _calc_camas_ocupadas(
-        d["ocupados"], d["otro_ingresos"], d["ingresos"], d["huespedes"], d["emergencia"], egresos_totales
-    )
-    return d
+    result = {"fecha": data.fecha, "servicio_id": data.servicio_id}
+    by_sex = {}
+    for sexo in _SEXES:
+        by_sex[sexo] = getattr(data, sexo).model_dump()
+        result.update({f"{field}_{sexo}": value for field, value in by_sex[sexo].items()})
+    result.update(_aggregate_values(by_sex["masculino"], by_sex["femenino"]))
+    return result
+
+
+def _apply_update(registro: CensoCamasModel, data: CensoCamasUpdate) -> None:
+    for sexo in _SEXES:
+        sex_data = getattr(data, sexo)
+        if sex_data is not None:
+            for field, value in sex_data.model_dump(exclude_unset=True).items():
+                setattr(registro, f"{field}_{sexo}", value)
+    _refresh_aggregates(registro)
+
+
+def _replace_values(registro: CensoCamasModel, data: CensoCamasCreate) -> None:
+    for field, value in _build_model(data).items():
+        if field not in ("fecha", "servicio_id"):
+            setattr(registro, field, value)
 
 
 def crear_registro(data: CensoCamasCreate, db: Session) -> dict:
     existe = db.query(CensoCamasModel).filter(
         CensoCamasModel.fecha == data.fecha,
         CensoCamasModel.servicio_id == data.servicio_id,
-        CensoCamasModel.sexo == data.sexo,
     ).first()
     if existe:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Ya existe un registro para esa fecha, servicio y sexo"
+            detail="Ya existe un registro para esa fecha y servicio"
         )
     registro = CensoCamasModel(**_build_model(data))
     db.add(registro)
@@ -84,19 +146,9 @@ def upsert_registro(data: CensoCamasCreate, db: Session) -> dict:
     existe = db.query(CensoCamasModel).filter(
         CensoCamasModel.fecha == data.fecha,
         CensoCamasModel.servicio_id == data.servicio_id,
-        CensoCamasModel.sexo == data.sexo,
     ).first()
     if existe:
-        d = data.model_dump(exclude_unset=True)
-        campos_actualizables = {k: v for k, v in d.items() if k not in ("fecha", "servicio_id", "sexo")}
-        for key, value in campos_actualizables.items():
-            setattr(existe, key, value)
-        existe.egresos_totales = _calc_egresos_totales(
-            existe.egresos, existe.fallecidos, existe.referido, existe.traslado, existe.contraindicados
-        )
-        existe.camas_ocupadas = _calc_camas_ocupadas(
-            existe.ocupados, existe.otro_ingresos, existe.ingresos, existe.huespedes, existe.emergencia, existe.egresos_totales
-        )
+        _replace_values(existe, data)
         db.commit()
         db.refresh(existe)
         return _to_out(existe)
@@ -113,7 +165,6 @@ def listar_registros(
     fecha_desde: Optional[date] = None,
     fecha_hasta: Optional[date] = None,
     servicio_id: Optional[int] = None,
-    sexo: Optional[int] = None,
     skip: int = 0,
     limit: int = 100,
 ) -> tuple[list[dict], int]:
@@ -132,16 +183,11 @@ def listar_registros(
     if servicio_id:
         query = query.filter(CensoCamasModel.servicio_id == servicio_id)
         count_query = count_query.filter(CensoCamasModel.servicio_id == servicio_id)
-    if sexo is not None:
-        query = query.filter(CensoCamasModel.sexo == sexo)
-        count_query = count_query.filter(CensoCamasModel.sexo == sexo)
-
     total = count_query.scalar()
     limit = min(limit, 500)
     registros = query.order_by(
         CensoCamasModel.fecha.desc(),
         CensoCamasModel.servicio_id,
-        CensoCamasModel.sexo,
     ).offset(skip).limit(limit).all()
 
     return [_to_out(r) for r in registros], total
@@ -158,15 +204,7 @@ def actualizar_registro(registro_id: int, data: CensoCamasUpdate, db: Session) -
     registro = db.query(CensoCamasModel).filter(CensoCamasModel.id == registro_id).first()
     if not registro:
         raise HTTPException(status_code=404, detail="Registro de censo no encontrado")
-    update_data = data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(registro, key, value)
-    registro.egresos_totales = _calc_egresos_totales(
-        registro.egresos, registro.fallecidos, registro.referido, registro.traslado, registro.contraindicados
-    )
-    registro.camas_ocupadas = _calc_camas_ocupadas(
-        registro.ocupados, registro.otro_ingresos, registro.ingresos, registro.huespedes, registro.emergencia, registro.egresos_totales
-    )
+    _apply_update(registro, data)
     db.commit()
     db.refresh(registro)
     return _to_out(registro)
@@ -199,26 +237,23 @@ def resumen_diario(fecha: date, db: Session) -> dict:
         CensoCamasModel.fecha == fecha
     ).all()
 
-    reg_map: dict[tuple[int, int], CensoCamasModel] = {}
-    for r in registros:
-        reg_map[(r.servicio_id, r.sexo)] = r
+    reg_map = {r.servicio_id: r for r in registros}
 
     total_ocupados = 0
     servicios_resumen = []
 
     for svc in servicios:
-        masc = reg_map.get((svc.id, 0))
-        fem = reg_map.get((svc.id, 1))
-        ocupados_m = masc.ocupados if masc else 0
-        ocupados_f = fem.ocupados if fem else 0
-        total_ocupados += ocupados_m + ocupados_f
+        registro = reg_map.get(svc.id)
+        masc = _sex_out(registro, "masculino") if registro else None
+        fem = _sex_out(registro, "femenino") if registro else None
+        total_ocupados += registro.ocupados if registro else 0
 
         servicios_resumen.append({
             "servicio_id": svc.id,
             "servicio_nombre": svc.nombre_servicio,
             "camas_censables": svc.camas_censables,
-            "masculino": _to_out(masc) if masc else None,
-            "femenino": _to_out(fem) if fem else None,
+            "masculino": masc,
+            "femenino": fem,
         })
 
     promedio = round(total_ocupados / len(servicios), 2) if servicios else 0
@@ -235,36 +270,31 @@ def bulk_create(registros: list[CensoCamasCreate], db: Session) -> dict:
     creados = 0
     actualizados = 0
     errores = []
+    por_clave: dict[tuple[date, int], CensoCamasModel] = {}
 
     for data in registros:
         try:
-            existe = db.query(CensoCamasModel).filter(
-                CensoCamasModel.fecha == data.fecha,
-                CensoCamasModel.servicio_id == data.servicio_id,
-                CensoCamasModel.sexo == data.sexo,
-            ).first()
+            clave = (data.fecha, data.servicio_id)
+            existe = por_clave.get(clave)
+            if existe is None:
+                existe = db.query(CensoCamasModel).filter(
+                    CensoCamasModel.fecha == data.fecha,
+                    CensoCamasModel.servicio_id == data.servicio_id,
+                ).first()
             if existe:
-                d = data.model_dump(exclude_unset=True)
-                campos = {k: v for k, v in d.items() if k not in ("fecha", "servicio_id", "sexo")}
-                for key, value in campos.items():
-                    setattr(existe, key, value)
-                existe.egresos_totales = _calc_egresos_totales(
-                    existe.egresos, existe.fallecidos, existe.referido, existe.traslado, existe.contraindicados
-                )
-                existe.camas_ocupadas = _calc_camas_ocupadas(
-                    existe.ocupados, existe.otro_ingresos, existe.ingresos, existe.huespedes, existe.emergencia, existe.egresos_totales
-                )
+                _replace_values(existe, data)
+                por_clave[clave] = existe
                 actualizados += 1
             else:
                 registro = CensoCamasModel(**_build_model(data))
                 db.add(registro)
+                por_clave[clave] = registro
                 creados += 1
         except Exception as e:
             db.rollback()
             errores.append({
                 "fecha": str(data.fecha),
                 "servicio_id": data.servicio_id,
-                "sexo": data.sexo,
                 "error": str(e),
             })
 
@@ -392,8 +422,7 @@ def importar_csv(contenido_csv: str, db: Session) -> dict:
             detail=f"Faltan columnas en el CSV: {', '.join(faltantes)}"
         )
 
-    creados = 0
-    actualizados = 0
+    agrupados: dict[tuple[date, int], dict] = {}
     errores = []
 
     for i, row in enumerate(reader, start=2):
@@ -407,55 +436,37 @@ def importar_csv(contenido_csv: str, db: Session) -> dict:
                 errores.append({"fila": i, "error": f"Servicio no encontrado: '{row['servicio_nombre']}'"})
                 continue
 
-            data = CensoCamasCreate(
-                fecha=fecha,
-                servicio_id=servicio_id,
-                sexo=sexo,
-                ocupados=int(row["ocupados"]),
-                egresos=int(row["egresos"]),
-                fallecidos=int(row["fallecidos"]),
-                referido=int(row["referido"]),
-                traslado=int(row["traslado"]),
-                contraindicados=int(row["contraindicados"]),
-                otro_ingresos=int(row["otro_ingresos"]),
-                ingresos=int(row["ingresos"]),
-                huespedes=int(row["huespedes"]),
-                emergencia=int(row["emergencia"]),
-            )
-
-            existe = db.query(CensoCamasModel).filter(
-                CensoCamasModel.fecha == data.fecha,
-                CensoCamasModel.servicio_id == data.servicio_id,
-                CensoCamasModel.sexo == data.sexo,
-            ).first()
-
-            if existe:
-                existe.ocupados = data.ocupados
-                existe.egresos = data.egresos
-                existe.fallecidos = data.fallecidos
-                existe.referido = data.referido
-                existe.traslado = data.traslado
-                existe.contraindicados = data.contraindicados
-                existe.otro_ingresos = data.otro_ingresos
-                existe.ingresos = data.ingresos
-                existe.huespedes = data.huespedes
-                existe.emergencia = data.emergencia
-                existe.egresos_totales = _calc_egresos_totales(
-                    data.egresos, data.fallecidos, data.referido, data.traslado, data.contraindicados
-                )
-                existe.camas_ocupadas = _calc_camas_ocupadas(
-                    data.ocupados, data.otro_ingresos, data.ingresos, data.huespedes, data.emergencia, existe.egresos_totales
-                )
-                actualizados += 1
-            else:
-                registro = CensoCamasModel(**_build_model(data))
-                db.add(registro)
-                creados += 1
+            values = {field: int(row[field]) for field in _RAW_FIELDS}
+            key = (fecha, servicio_id)
+            combined = agrupados.setdefault(key, {
+                "fecha": fecha,
+                "servicio_id": servicio_id,
+                "masculino": {field: 0 for field in _RAW_FIELDS},
+                "femenino": {field: 0 for field in _RAW_FIELDS},
+            })
+            combined[_SEXES[sexo]] = values
 
         except HTTPException:
             raise
         except Exception as e:
             errores.append({"fila": i, "error": str(e)})
+
+    creados = 0
+    actualizados = 0
+    for values in agrupados.values():
+        data = CensoCamasCreate(**values)
+        existe = db.query(CensoCamasModel).filter(
+            CensoCamasModel.fecha == data.fecha,
+            CensoCamasModel.servicio_id == data.servicio_id,
+        ).first()
+        if existe:
+            for key, value in _build_model(data).items():
+                if key not in ("fecha", "servicio_id"):
+                    setattr(existe, key, value)
+            actualizados += 1
+        else:
+            db.add(CensoCamasModel(**_build_model(data)))
+            creados += 1
 
     if creados or actualizados:
         db.commit()
@@ -547,7 +558,7 @@ def hospitalizacion_por_especialidad(desde: date, hasta: date, db: Session) -> d
 def copiar_dia_anterior(origen: date, destino: date, servicio_id: Optional[int], db: Session) -> dict:
     """Copia registros de censo de una fecha origen a una fecha destino.
 
-    - Si el par (destino, servicio, sexo) ya existe, se actualiza con los valores del origen.
+    - Si el par (destino, servicio) ya existe, se actualiza con los valores del origen.
     - Si no existe, se crea.
     - `servicio_id` opcional: si se omite, se copian todos los servicios del día origen.
     """
@@ -563,30 +574,18 @@ def copiar_dia_anterior(origen: date, destino: date, servicio_id: Optional[int],
         existe = db.query(CensoCamasModel).filter(
             CensoCamasModel.fecha == destino,
             CensoCamasModel.servicio_id == src.servicio_id,
-            CensoCamasModel.sexo == src.sexo,
         ).first()
 
-        datos = {
-            "ocupados": src.ocupados,
-            "egresos": src.egresos,
-            "fallecidos": src.fallecidos,
-            "referido": src.referido,
-            "traslado": src.traslado,
-            "contraindicados": src.contraindicados,
-            "otro_ingresos": src.otro_ingresos,
-            "ingresos": src.ingresos,
-            "huespedes": src.huespedes,
-            "emergencia": src.emergencia,
+        by_sex = {
+            sexo: {field: getattr(src, f"{field}_{sexo}") for field in _RAW_FIELDS}
+            for sexo in _SEXES
         }
-        egresos_totales = _calc_egresos_totales(
-            datos["egresos"], datos["fallecidos"], datos["referido"],
-            datos["traslado"], datos["contraindicados"],
-        )
-        datos["egresos_totales"] = egresos_totales
-        datos["camas_ocupadas"] = _calc_camas_ocupadas(
-            datos["ocupados"], datos["otro_ingresos"], datos["ingresos"],
-            datos["huespedes"], datos["emergencia"], egresos_totales,
-        )
+        datos = {
+            f"{field}_{sexo}": value
+            for sexo, values in by_sex.items()
+            for field, value in values.items()
+        }
+        datos.update(_aggregate_values(by_sex["masculino"], by_sex["femenino"]))
 
         if existe:
             for key, value in datos.items():
@@ -596,7 +595,6 @@ def copiar_dia_anterior(origen: date, destino: date, servicio_id: Optional[int],
             nuevo = CensoCamasModel(
                 fecha=destino,
                 servicio_id=src.servicio_id,
-                sexo=src.sexo,
                 **datos,
             )
             db.add(nuevo)

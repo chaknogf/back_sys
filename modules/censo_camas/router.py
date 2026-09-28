@@ -65,14 +65,13 @@ def listar_registros(
     fecha_desde: Optional[date] = Query(None, description="Fecha desde (YYYY-MM-DD)"),
     fecha_hasta: Optional[date] = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
     servicio_id: Optional[int] = Query(None, description="Filtrar por servicio"),
-    sexo: Optional[int] = Query(None, ge=0, le=1, description="0=M, 1=F"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
     registros, total = service_listar(
         db=db, fecha=fecha, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
-        servicio_id=servicio_id, sexo=sexo, skip=skip, limit=limit,
+        servicio_id=servicio_id, skip=skip, limit=limit,
     )
     return CensoCamasListResponse(total=total, registros=registros)
 

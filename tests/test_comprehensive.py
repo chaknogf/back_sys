@@ -1580,8 +1580,8 @@ class TestCensoCamas:
             json={
                 "fecha": date.today().isoformat(),
                 "servicio_id": sid,
-                "sexo": 0,
-                "ocupados": 20,
+                "masculino": {"ocupados": 20},
+                "femenino": {"ocupados": 0},
             },
         )
         assert r.status_code in (200, 201), f"Failed: {r.text}"
@@ -1597,8 +1597,8 @@ class TestCensoCamas:
             json={
                 "fecha": date.today().isoformat(),
                 "servicio_id": sid,
-                "sexo": 1,
-                "ocupados": 15,
+                "masculino": {"ocupados": 20},
+                "femenino": {"ocupados": 15},
             },
         )
         assert r.status_code == 200
@@ -1642,7 +1642,7 @@ class TestCensoCamas:
         r = client.put(
             f"/censo-camas/{cid}",
             headers=admin_headers,
-            json={"ocupados": 25},
+            json={"masculino": {"ocupados": 25}},
         )
         assert r.status_code == 200
 

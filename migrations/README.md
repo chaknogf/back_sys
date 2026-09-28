@@ -1,10 +1,10 @@
-# Migraciones — `back_sys`
+# Migraciones - `back_sys`
 
 Mapeo de las modificaciones SQL del proyecto y comandos para aplicarlas.
 
 - **Motor**: PostgreSQL, base `hospital` en `localhost`.
 - **Conexión usada**: `psql -h localhost -U admin -d hospital` (password `secreto123`).
-- **Estado actual**: migraciones `002` → `028` aplicadas. No existe `001`
+- **Estado actual**: migraciones `002` → `029` aplicadas. No existe `001`
   (el esquema base de `medicos`, `pacientes`, `personal_salud`, etc. se crea
   aparte: `variables/database_schema.sql` / `migrations/archive/`).
 
@@ -14,7 +14,7 @@ Una migración:
 
 ```bash
 PGPASSWORD=secreto123 psql -h localhost -U admin -d hospital \
-  -v ON_ERROR_STOP=1 -f migrations/028_procedimiento_quirofano_mixta.sql
+  -v ON_ERROR_STOP=1 -f migrations/030_censo_camas_unificar_sexos.sql
 ```
 
 Todas (en orden, deteniéndose al primer error):
@@ -58,6 +58,8 @@ Todas (en orden, deteniéndose al primer error):
 | 026 | `026_especialidades_estado_sop.sql` | Agrega a `especialidades`: `estado` y `sop` (+ índices). |
 | 027 | `027_quirofano_procedimiento_quirofano.sql` | Renombra `tipo_procedimiento` → `procedimiento_quirofano` (columna/secuencia/PK/constraints/índice) + `UNIQUE(especialidad_id, lower(nombre))`. |
 | 028 | `028_procedimiento_quirofano_mixta.sql` | `procedimiento_quirofano.especialidad_id` → nullable (NULL = "Todas (mixta)"); reconstruye el único con `NULLS NOT DISTINCT`. |
+| 029 | `029_personal_atencion_citas.sql` | Renombra `medicos` → `personal_atencion` + columnas FK `medico_id` → `personal_atencion_id` (personal_salud, defunciones, intervenciones_quirurgicas, sigsa3, sigsa3_registros, constancia_nacimiento); crea `citas_dias_inhabiles`; agrega `citas.personal_atencion_id`. |
+| 030 | `030_censo_camas_unificar_sexos.sql` | Migra `censo_camas` a una fila por fecha/servicio; conserva movimientos por sexo, recalcula las columnas agregadas y reemplaza la unicidad por `(fecha, servicio_id)`. |
 
 ## Cadena de cambios del catálogo Quirófano
 
@@ -76,4 +78,3 @@ estado vigente es el resultado de `022 → 024 → 025 → 027 → 028`:
   `TRUNCATE ... RESTART IDENTITY`; si un test restaura con `setval` debe hacer
   `flush` antes (los `SessionLocal` del proyecto usan `autoflush=False`).
 - No hay otros `ALTER`/`CREATE`/`DROP` aplicados a mano fuera de estos archivos.
-| 029 | `029_personal_atencion_citas.sql` | Renombra `medicos` → `personal_atencion` + columnas FK `medico_id` → `personal_atencion_id` (personal_salud, defunciones, intervenciones_quirurgicas, sigsa3, sigsa3_registros, constancia_nacimiento); crea `citas_dias_inhabiles`; agrega `citas.personal_atencion_id`. |

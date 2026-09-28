@@ -30,7 +30,7 @@ TABLAS_CONOCIDAS = {
     "nacimientos_legacy": "Datos históricos de nacimientos migrados de sistema anterior",
     "prestamos": "Préstamos de expedientes. paciente_id, tipo_documento, fecha_prestamo, fecha_devolucion, activo",
     "encamamiento": "Catálogo de servicios de encamamiento. nombre, activo",
-    "censo_camas": "Censo diario de camas. fecha, servicio, disponibles, ocupadas, sexo",
+    "censo_camas": "Censo diario por servicio con conteos de movimientos separados por sexo",
     "defunciones": "Registro de defunciones. paciente_id, es_fetal, fecha_defuncion, causa, estado",
     "sigsa3": "Registro SIGSA-3 de consultas externas. personal_salud, fecha_consulta, tipo_consulta, especialidad, cie10, sexo, area",
     "cie10_catalogo": "Catálogo CIE-10 de diagnósticos. codigo, descripcion, nivel, codigo_padre",

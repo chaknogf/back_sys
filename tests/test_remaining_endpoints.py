@@ -26,13 +26,13 @@ def cleanup():
     db = SessionLocal()
     try:
         # Order matters: child tables first
-        from modules.censo_camas.models import CensoCamas
+        from modules.censo_camas.models import CensoCamasModel
         from modules.sigsa3.models import Sigsa3Model
         from modules.personal_salud.models import PersonalSaludModel as PersonalSalud
         from modules.encamamiento.models import EncamamientoModel
 
         for cc_id in created_ids["censo_camas"]:
-            db.query(CensoCamas).filter(CensoCamas.id == cc_id).delete()
+            db.query(CensoCamasModel).filter(CensoCamasModel.id == cc_id).delete()
         for ps_id in created_ids["personal_salud"]:
             db.query(PersonalSalud).filter(PersonalSalud.id == ps_id).delete()
         for s3_id in created_ids["sigsa3"]:
@@ -86,33 +86,28 @@ class TestCensoCamas:
             json={
                 "fecha": date.today().isoformat(),
                 "servicio_id": TestCensoCamas.SERVICIO_ID,
-                "sexo": 0,
-                "ocupados": 10,
-                "ingresos": 2,
-                "egresos": 1,
+                "masculino": {"ocupados": 10, "ingresos": 2, "egresos": 1},
+                "femenino": {"ocupados": 8},
             },
         )
         assert r.status_code == 201
         data = r.json()
         assert data["servicio_id"] == TestCensoCamas.SERVICIO_ID
-        assert data["sexo"] == 0
-        assert data["ocupados"] == 10
+        assert data["masculino"]["ocupados"] == 10
+        assert data["femenino"]["ocupados"] == 8
+        assert data["totales"]["ocupados"] == 18
         created_ids["censo_camas"].append(data["id"])
 
-    def test_create_censo_femenino(self, client):
+    def test_create_censo_duplicate_pair_conflicts(self, client):
         if not TestCensoCamas.SERVICIO_ID:
             pytest.skip("No servicio created")
-        r = client.post(
-            "/censo-camas/",
-            json={
-                "fecha": date.today().isoformat(),
-                "servicio_id": TestCensoCamas.SERVICIO_ID,
-                "sexo": 1,
-                "ocupados": 8,
-            },
-        )
-        assert r.status_code == 201
-        created_ids["censo_camas"].append(r.json()["id"])
+        r = client.post("/censo-camas/", json={
+            "fecha": date.today().isoformat(),
+            "servicio_id": TestCensoCamas.SERVICIO_ID,
+            "masculino": {},
+            "femenino": {},
+        })
+        assert r.status_code == 409
 
     def test_upsert_censo(self, client):
         if not TestCensoCamas.SERVICIO_ID:
@@ -122,13 +117,14 @@ class TestCensoCamas:
             json={
                 "fecha": date.today().isoformat(),
                 "servicio_id": TestCensoCamas.SERVICIO_ID,
-                "sexo": 0,
-                "ocupados": 15,
+                "masculino": {"ocupados": 15},
+                "femenino": {"ocupados": 9},
             },
         )
         assert r.status_code == 200
         data = r.json()
-        assert data["ocupados"] == 15
+        assert data["masculino"]["ocupados"] == 15
+        assert data["femenino"]["ocupados"] == 9
 
     def test_list_censo(self, client):
         r = client.get("/censo-camas/")
@@ -140,9 +136,7 @@ class TestCensoCamas:
     def test_list_censo_with_filters(self, client):
         if not TestCensoCamas.SERVICIO_ID:
             pytest.skip("No servicio created")
-        r = client.get(
-            f"/censo-camas/?servicio_id={TestCensoCamas.SERVICIO_ID}&sexo=0"
-        )
+        r = client.get(f"/censo-camas/?servicio_id={TestCensoCamas.SERVICIO_ID}")
         assert r.status_code == 200
         data = r.json()
         assert data["total"] >= 1
@@ -165,10 +159,10 @@ class TestCensoCamas:
         cid = created_ids["censo_camas"][0]
         r = client.put(
             f"/censo-camas/{cid}",
-            json={"ocupados": 20, "egresos": 3},
+            json={"masculino": {"ocupados": 20, "egresos": 3}},
         )
         assert r.status_code == 200
-        assert r.json()["ocupados"] == 20
+        assert r.json()["masculino"]["ocupados"] == 20
 
     def test_resumen_diario(self, client):
         r = client.get(f"/censo-camas/resumen/{date.today().isoformat()}")
@@ -195,14 +189,8 @@ class TestCensoCamas:
                 {
                     "fecha": ayer,
                     "servicio_id": TestCensoCamas.SERVICIO_ID,
-                    "sexo": 0,
-                    "ocupados": 5,
-                },
-                {
-                    "fecha": ayer,
-                    "servicio_id": TestCensoCamas.SERVICIO_ID,
-                    "sexo": 1,
-                    "ocupados": 7,
+                    "masculino": {"ocupados": 5},
+                    "femenino": {"ocupados": 7},
                 },
             ],
         )

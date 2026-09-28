@@ -116,7 +116,6 @@ ENTIDADES = {
         "join_servicio": "LEFT JOIN encamamiento s ON s.id = cc.servicio_id",
         "agrupaciones": {
             "servicio": ("COALESCE(s.nombre_servicio,'S/D')", "servicio"),
-            "sexo": ("COALESCE(cc.sexo,'S/D')", "sexo"),
             "dia": ("DATE(cc.fecha)", "dia"),
         },
         "medidas": {

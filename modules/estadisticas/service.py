@@ -734,6 +734,533 @@ def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str, top: int = 10, tip
 
 
 # =====================================================================
+# INDICADORES DE CONSULTA (jsonb consultas.indicadores)
+# =====================================================================
+
+# Etiquetas legibles del jsonb. El orden define cómo se presentsi un
+# indicador aparece por primera vez en el rango; el resto se ordena al final.
+INDICADORES_CONSULTA: dict[str, dict] = {
+    "estudiante_publico": {"etiqueta": "Estudiante público", "tipo": "booleano"},
+    "personal_hospital": {"etiqueta": "Personal del hospital", "tipo": "booleano"},
+    "empleado_publico": {"etiqueta": "Empleado público", "tipo": "booleano"},
+    "embarazo": {"etiqueta": "Embarazo", "tipo": "booleano"},
+    "accidente_laboral": {"etiqueta": "Accidente laboral", "tipo": "booleano"},
+    "accidente_transito": {"etiqueta": "Accidente de tránsito", "tipo": "booleano"},
+    "discapacidad": {"etiqueta": "Discapacidad", "tipo": "booleano"},
+    "ambulancia": {"etiqueta": "Llegada en ambulancia", "tipo": "booleano"},
+    "arma_fuego": {"etiqueta": "Arma de fuego", "tipo": "booleano"},
+    "arma_blanca": {"etiqueta": "Arma blanca", "tipo": "booleano"},
+    "viene_referido": {"etiqueta": "Viene referido desde", "tipo": "texto"},
+    "fue_referido": {"etiqueta": "Fue referido a", "tipo": "texto"},
+}
+
+# `personal_hospital` se persiste como S/N/null mientras el resto son booleanos,
+# así que un mismo predicado cubre ambas convenciones.
+INDICADOR_VALORES_VERDADEROS = ("true", "s", "1")
+INDICADOR_VALORES_FALSOS = ("false", "n", "0")
+
+_SQL_VERDADEROS = "('true', 's', '1')"
+_SQL_FALSOS = "('false', 'n', '0')"
+_JSONB_VACIO = "'{}'::jsonb"
+
+# `consultas.indicadores` no siempre es un objeto: 202,479 filas lo guardan como
+# el JSON literal `null`, que en PostgreSQL no es lo mismo que SQL NULL, por eso
+# COALESCE no basta y `jsonb_each_text` aborta la transicion con
+# "no se puede invocar jsonb_each_text en un no-objeto". `jsonb_typeof` es la
+# unica guarda que distingue el JSON null del objeto vacio.
+_JSONB_INDICADORES = (
+    "CASE WHEN jsonb_typeof(c.indicadores) = 'object' "
+    f"THEN c.indicadores ELSE {_JSONB_VACIO} END"
+)
+
+
+def _jsonb_es_objeto(columna: str = "c.indicadores") -> str:
+    """Devuelve el predicado que confirma que la columna es un objeto JSON."""
+    return f"jsonb_typeof({columna}) = 'object'"
+
+
+def _clasificar_valor_indicador(valor) -> str:
+    """Clasifica un valor de `jsonb_each_text` como verdadero, falso, sin_valor o texto."""
+    if valor is None:
+        return "sin_valor"
+    texto = str(valor).strip()
+    if texto == "":
+        return "sin_valor"
+    if texto.lower() in INDICADOR_VALORES_VERDADEROS:
+        return "verdadero"
+    if texto.lower() in INDICADOR_VALORES_FALSOS:
+        return "falso"
+    return "texto"
+
+
+TIPO_CONSULTA_NOMBRE = {1: "COEX", 2: "Hospitalización", 3: "Emergencia"}
+
+
+def referencias_consultas(
+    db: Session,
+    desde: str,
+    hasta: str,
+    tipo_consulta: int | None = None,
+    especialidad: str | None = None,
+    skip: int = 0,
+    limit: int = 100,
+) -> dict:
+    """Lista paginada y resumen de referencias del rango indicado.
+
+    El resumen agrupa por nombre normalizado para que "CAP de Pátzun",
+    "cap de patzun" y "CAP DE PATZUN" cuenten como una sola institucion, y
+    expone `variantes` con los textos crudos quecollapsed en ese grupo.
+    """
+    f_desde, f_hasta = _parse_fechas(desde, hasta)
+    skip = max(0, skip)
+    limit = max(1, min(limit, 1000))
+
+    filtros = ["c.fecha_consulta BETWEEN :desde AND :hasta"]
+    params: dict = {"desde": f_desde, "hasta": f_hasta}
+    if tipo_consulta is not None:
+        filtros.append("c.tipo_consulta = :tipo_consulta")
+        params["tipo_consulta"] = tipo_consulta
+    if especialidad:
+        filtros.append("c.especialidad = :especialidad")
+        params["especialidad"] = especialidad
+    where_sql = " AND ".join(filtros)
+
+    totales = db.execute(text(f"""
+        SELECT
+            COUNT(*) AS total,
+            COUNT(DISTINCT c.paciente_id) AS pacientes,
+            COUNT(DISTINCT c.fecha_consulta) AS dias,
+            COUNT(*) FILTER (
+                WHERE {_JSONB_INDICADORES} <> {_JSONB_VACIO}
+            ) AS con_jsonb,
+            COUNT(*) FILTER (
+                WHERE NULLIF(BTRIM(c.indicadores ->> 'viene_referido_de'), '') IS NOT NULL
+                   OR NULLIF(BTRIM(c.indicadores ->> 'viene_referido'), '') IS NOT NULL
+            ) AS con_origen,
+            COUNT(*) FILTER (
+                WHERE NULLIF(BTRIM(c.indicadores ->> 'va_referido_a'), '') IS NOT NULL
+                   OR NULLIF(BTRIM(c.indicadores ->> 'fue_referido'), '') IS NOT NULL
+            ) AS con_destino,
+            COUNT(*) FILTER (
+                WHERE (
+                    NULLIF(BTRIM(c.indicadores ->> 'viene_referido_de'), '') IS NOT NULL
+                    OR NULLIF(BTRIM(c.indicadores ->> 'viene_referido'), '') IS NOT NULL
+                  )
+                  AND (
+                    NULLIF(BTRIM(c.indicadores ->> 'va_referido_a'), '') IS NOT NULL
+                    OR NULLIF(BTRIM(c.indicadores ->> 'fue_referido'), '') IS NOT NULL
+                  )
+            ) AS con_ambos,
+            COUNT(*) FILTER (
+                WHERE NULLIF(BTRIM(c.indicadores ->> 'viene_referido_de'), '') IS NOT NULL
+                   OR NULLIF(BTRIM(c.indicadores ->> 'viene_referido'), '') IS NOT NULL
+                   OR NULLIF(BTRIM(c.indicadores ->> 'va_referido_a'), '') IS NOT NULL
+                   OR NULLIF(BTRIM(c.indicadores ->> 'fue_referido'), '') IS NOT NULL
+            ) AS con_alguna
+        FROM consultas c
+        WHERE {where_sql}
+    """), params).mappings().one()
+
+    # El resumen se calcula en SQL sobre todo el rango, sin el LIMIT de la lista.
+    resumen_sql = f"""
+        WITH base AS (
+            SELECT
+                c.id,
+                c.paciente_id,
+                COALESCE(
+                    NULLIF(BTRIM(c.indicadores ->> 'viene_referido_de'), ''),
+                    NULLIF(BTRIM(c.indicadores ->> 'viene_referido'), '')
+                ) AS origen,
+                COALESCE(
+                    NULLIF(BTRIM(c.indicadores ->> 'va_referido_a'), ''),
+                    NULLIF(BTRIM(c.indicadores ->> 'fue_referido'), '')
+                ) AS destino
+            FROM consultas c
+            WHERE {where_sql}
+        ),
+        pares AS (
+            SELECT 'viene' AS direccion, origen AS valor, id, paciente_id FROM base WHERE origen IS NOT NULL
+            UNION ALL
+            SELECT 'va' AS direccion, destino AS valor, id, paciente_id FROM base WHERE destino IS NOT NULL
+        ),
+        normalizado AS (
+            SELECT direccion, valor, id, paciente_id,
+                   UNACCENT(UPPER(BTRIM(valor))) AS clave
+            FROM pares
+        )
+        SELECT
+            direccion,
+            clave,
+            COUNT(*) AS total,
+            COUNT(DISTINCT id) AS consultas,
+            COUNT(DISTINCT paciente_id) AS pacientes,
+            COUNT(DISTINCT valor) AS variantes
+        FROM normalizado
+        GROUP BY direccion, clave
+        ORDER BY direccion, total DESC, clave ASC
+    """
+
+    filas_resumen = db.execute(text(resumen_sql), params).fetchall()
+
+    # Variantes crudas por direccion + clave normalizada.
+    variantes_sql = f"""
+        WITH base AS (
+            SELECT
+                COALESCE(
+                    NULLIF(BTRIM(c.indicadores ->> 'viene_referido_de'), ''),
+                    NULLIF(BTRIM(c.indicadores ->> 'viene_referido'), '')
+                ) AS origen,
+                COALESCE(
+                    NULLIF(BTRIM(c.indicadores ->> 'va_referido_a'), ''),
+                    NULLIF(BTRIM(c.indicadores ->> 'fue_referido'), '')
+                ) AS destino
+            FROM consultas c
+            WHERE {where_sql}
+        ),
+        pares AS (
+            SELECT 'viene' AS direccion, origen AS valor FROM base WHERE origen IS NOT NULL
+            UNION ALL
+            SELECT 'va' AS direccion, destino AS valor FROM base WHERE destino IS NOT NULL
+        )
+        SELECT
+            direccion,
+            UNACCENT(UPPER(BTRIM(valor))) AS clave,
+            BTRIM(valor) AS variante,
+            COUNT(*) AS total
+        FROM pares
+        GROUP BY direccion, clave, variante
+        ORDER BY direccion, clave, total DESC, variante ASC
+    """
+
+    filas_variantes = db.execute(text(variantes_sql), params).fetchall()
+
+    variantes: dict[tuple[str, str], list[dict]] = {}
+    for r in filas_variantes:
+        m = r._mapping
+        variantes.setdefault((str(m["direccion"]), str(m["clave"])), []).append({
+            "valor": str(m["variante"]),
+            "total": int(m["total"]),
+        })
+
+    resumen: list[dict] = []
+    for r in filas_resumen:
+        m = r._mapping
+        direccion = str(m["direccion"])
+        clave = str(m["clave"])
+        resumen.append({
+            "direccion": direccion,
+            "direccion_nombre": "Viene referido de" if direccion == "viene" else "Va referido a",
+            "referencia": clave,
+            "referencia_normalizada": clave,
+            "total_consultas": int(m["total"]),
+            "consultas_distintas": int(m["consultas"]),
+            "pacientes_distintos": int(m["pacientes"]),
+            "variantes": variantes.get((direccion, clave), []),
+        })
+
+    # Lista paginada de las consultas con referencia.
+    lista_sql = f"""
+        SELECT
+            c.id,
+            c.paciente_id,
+            c.expediente,
+            c.tipo_consulta,
+            c.especialidad,
+            c.fecha_consulta,
+            NULLIF(BTRIM(c.indicadores ->> 'viene_referido_de'), '') AS viene_referido_de,
+            NULLIF(BTRIM(c.indicadores ->> 'va_referido_a'), '') AS va_referido_a,
+            NULLIF(BTRIM(c.indicadores ->> 'viene_referido'), '') AS viene_referido,
+            NULLIF(BTRIM(c.indicadores ->> 'fue_referido'), '') AS fue_referido
+        FROM consultas c
+        WHERE {where_sql}
+          AND (
+              NULLIF(BTRIM(c.indicadores ->> 'viene_referido_de'), '') IS NOT NULL
+              OR NULLIF(BTRIM(c.indicadores ->> 'viene_referido'), '') IS NOT NULL
+              OR NULLIF(BTRIM(c.indicadores ->> 'va_referido_a'), '') IS NOT NULL
+              OR NULLIF(BTRIM(c.indicadores ->> 'fue_referido'), '') IS NOT NULL
+          )
+        ORDER BY c.fecha_consulta DESC, c.id DESC
+        LIMIT :limit OFFSET :skip
+    """
+
+    filas_lista = db.execute(
+        text(lista_sql), {**params, "limit": limit, "skip": skip}
+    ).fetchall()
+
+    lista = []
+    for r in filas_lista:
+        m = r._mapping
+        lista.append({
+            "id": int(m["id"]),
+            "paciente_id": m["paciente_id"],
+            "expediente": m["expediente"],
+            "tipo_consulta": m["tipo_consulta"],
+            "tipo_consulta_nombre": TIPO_CONSULTA_NOMBRE.get(m["tipo_consulta"]),
+            "especialidad": m["especialidad"],
+            "fecha_consulta": m["fecha_consulta"],
+            "viene_referido_de": m["viene_referido_de"],
+            "va_referido_a": m["va_referido_a"],
+            "viene_referido": m["viene_referido"],
+            "fue_referido": m["fue_referido"],
+        })
+
+    total_consultas = int(totales["total"] or 0)
+    con_jsonb = int(totales["con_jsonb"] or 0)
+    con_alguna = int(totales["con_alguna"] or 0)
+    con_origen = int(totales["con_origen"] or 0)
+    con_destino = int(totales["con_destino"] or 0)
+
+    return {
+        "titulo": "Referencias de Consultas (viene_referido_de / va_referido_a)",
+        "desde": f_desde,
+        "hasta": f_hasta,
+        "total_consultas": total_consultas,
+        "pacientes_distintos": int(totales["pacientes"] or 0),
+        "dias_con_registros": int(totales["dias"] or 0),
+        "cobertura": {
+            "consultas_con_jsonb": con_jsonb,
+            "consultas_sin_jsonb": total_consultas - con_jsonb,
+            "consultas_con_referencia": con_alguna,
+            "consultas_sin_referencia": total_consultas - con_alguna,
+            "con_origen": con_origen,
+            "con_destino": con_destino,
+            "porcentaje_con_referencia": round(100.0 * con_alguna / total_consultas, 1) if total_consultas else 0.0,
+            "ambos_sentidos": int(totales["con_ambos"] or 0),
+        },
+        "lista": lista,
+        "resumen": resumen,
+        "total_general": con_alguna,
+        "skip": skip,
+        "limit": limit,
+        "generado_en": datetime.now(APP_TIMEZONE).isoformat(),
+    }
+
+
+def indicadores_consultas(
+    db: Session,
+    desde: str,
+    hasta: str,
+    tipo_consulta: int | None = None,
+    especialidad: str | None = None,
+    top_referencias: int = 10,
+) -> dict:
+    """Resume el jsonb `consultas.indicadores` por rango de fechas.
+
+    Las banderas se cuentan como marcadas cuando valen true o S; el null y la
+    cadena vacía se reportan aparte porque no equivalen a un negativo.
+    """
+    f_desde, f_hasta = _parse_fechas(desde, hasta)
+    top_referencias = max(1, min(top_referencias, 100))
+
+    filtros = ["c.fecha_consulta BETWEEN :desde AND :hasta"]
+    params: dict = {"desde": f_desde, "hasta": f_hasta}
+    if tipo_consulta is not None:
+        filtros.append("c.tipo_consulta = :tipo_consulta")
+        params["tipo_consulta"] = tipo_consulta
+    if especialidad:
+        filtros.append("c.especialidad = :especialidad")
+        params["especialidad"] = especialidad
+    where_sql = " AND ".join(filtros)
+
+    totales = db.execute(text(f"""
+        SELECT
+            COUNT(*) AS total,
+            COUNT(DISTINCT c.paciente_id) AS pacientes,
+            COUNT(DISTINCT c.fecha_consulta) AS dias,
+            COUNT(*) FILTER (WHERE c.indicadores IS NULL) AS sin_columna,
+            COUNT(*) FILTER (WHERE {_jsonb_es_objeto()} AND c.indicadores = {_JSONB_VACIO}) AS sin_claves
+        FROM consultas c
+        WHERE {where_sql}
+    """), params).mappings().one()
+
+    total_consultas = int(totales["total"] or 0)
+    pacientes_distintos = int(totales["pacientes"] or 0)
+
+    # Distribución de valores por clave. Cada jsonb aporta una fila por clave,
+    # así que la suma de `registros` por indicador son las consultas que lo traen.
+    filas_valor = db.execute(text(f"""
+        SELECT
+            e.key AS indicador,
+            e.value AS valor,
+            COUNT(*) AS registros,
+            COUNT(DISTINCT c.paciente_id) AS pacientes
+        FROM consultas c
+        CROSS JOIN LATERAL jsonb_each_text({_JSONB_INDICADORES}) AS e(key, value)
+        WHERE {where_sql}
+        GROUP BY 1, 2
+    """), params).fetchall()
+
+    por_indicador: dict[str, dict] = {}
+    total_pares_clave = 0
+
+    for r in filas_valor:
+        m = r._mapping
+        clave = str(m["indicador"])
+        registros = int(m["registros"])
+        clasificacion = _clasificar_valor_indicador(m["valor"])
+
+        acc = por_indicador.setdefault(clave, {
+            "con_clave": 0,
+            "sin_valor": 0,
+            "verdadero": 0,
+            "falso": 0,
+            "con_texto": 0,
+            "valores": set(),
+        })
+        acc["con_clave"] += registros
+        total_pares_clave += registros
+
+        if clasificacion == "sin_valor":
+            acc["sin_valor"] += registros
+        elif clasificacion == "verdadero":
+            acc["verdadero"] += registros
+        elif clasificacion == "falso":
+            acc["falso"] += registros
+        else:
+            acc["con_texto"] += registros
+            acc["valores"].add(str(m["valor"]).strip())
+
+    # Pacientes distintos por indicador: requiere el agregado aparte porque un
+    # mismo paciente puede aparecer bajo varios valores de una clave.
+    filas_pacientes = db.execute(text(f"""
+        SELECT
+            e.key AS indicador,
+            COUNT(DISTINCT c.paciente_id) AS pacientes
+        FROM consultas c
+        CROSS JOIN LATERAL jsonb_each_text({_JSONB_INDICADORES}) AS e(key, value)
+        WHERE {where_sql}
+          AND e.value IS NOT NULL
+          AND btrim(e.value) <> ''
+          AND (
+            lower(btrim(e.value)) IN {_SQL_VERDADEROS}
+            OR e.key IN ('viene_referido', 'fue_referido')
+          )
+        GROUP BY 1
+    """), params).fetchall()
+    pacientes_por_clave = {
+        str(r._mapping["indicador"]): int(r._mapping["pacientes"]) for r in filas_pacientes
+    }
+
+    filas_tipo = db.execute(text(f"""
+        SELECT
+            e.key AS indicador,
+            c.tipo_consulta,
+            COUNT(*) AS total
+        FROM consultas c
+        CROSS JOIN LATERAL jsonb_each_text({_JSONB_INDICADORES}) AS e(key, value)
+        WHERE {where_sql}
+          AND e.value IS NOT NULL
+          AND lower(btrim(e.value)) IN {_SQL_VERDADEROS}
+        GROUP BY 1, 2
+    """), params).fetchall()
+
+    por_tipo: dict[str, dict[int, int]] = {}
+    for r in filas_tipo:
+        m = r._mapping
+        por_tipo.setdefault(str(m["indicador"]), {})[int(m["tipo_consulta"])] = int(m["total"])
+
+    # Referencias: texto libre, se rankea por indicador para no mezcalos.
+    filas_ref = db.execute(text(f"""
+        SELECT indicador, valor, total
+        FROM (
+            SELECT
+                e.key AS indicador,
+                btrim(e.value) AS valor,
+                COUNT(*) AS total,
+                ROW_NUMBER() OVER (
+                    PARTITION BY e.key ORDER BY COUNT(*) DESC, btrim(e.value) ASC
+                ) AS rn
+            FROM consultas c
+            CROSS JOIN LATERAL jsonb_each_text({_JSONB_INDICADORES}) AS e(key, value)
+            WHERE {where_sql}
+              AND e.key IN ('viene_referido', 'fue_referido')
+              AND e.value IS NOT NULL
+              AND btrim(e.value) <> ''
+            GROUP BY 1, 2
+        ) t
+        WHERE rn <= :top_referencias
+        ORDER BY indicador, rn
+    """), {**params, "top_referencias": top_referencias}).fetchall()
+
+    referencias = [
+        {
+            "indicador": str(r._mapping["indicador"]),
+            "valor": str(r._mapping["valor"]),
+            "total": int(r._mapping["total"]),
+        }
+        for r in filas_ref
+    ]
+
+    def _porcentaje(numerador: int, denominador: int) -> float:
+        return round(100.0 * numerador / denominador, 1) if denominador else 0.0
+
+    def _tipo_dato(clave: str) -> str:
+        return INDICADORES_CONSULTA.get(clave, {}).get("tipo", "texto")
+
+    datos = []
+    for clave, acc in por_indicador.items():
+        tipo = _tipo_dato(clave)
+        es_texto = tipo == "texto"
+
+        if es_texto:
+            magnitud = acc["con_texto"]
+        else:
+            magnitud = acc["verdadero"]
+
+        datos.append({
+            "indicador": clave,
+            "etiqueta": INDICADORES_CONSULTA.get(clave, {}).get("etiqueta", clave),
+            "tipo_dato": tipo,
+            "clave_ausente": max(total_consultas - acc["con_clave"], 0),
+            "sin_valor": acc["sin_valor"],
+            "verdadero": acc["verdadero"],
+            "falso": acc["falso"],
+            "con_texto": acc["con_texto"] if es_texto else 0,
+            "valores_distintos": len(acc["valores"]) if es_texto else 0,
+            "pacientes": pacientes_por_clave.get(clave, 0),
+            "porcentaje_consultas": _porcentaje(magnitud, total_consultas),
+            "porcentaje_pacientes": _porcentaje(pacientes_por_clave.get(clave, 0), pacientes_distintos),
+            "por_tipo_consulta": [
+                {
+                    "tipo_consulta": tc,
+                    "tipo_consulta_nombre": TIPO_CONSULTA_MAP.get(tc, f"Tipo {tc}"),
+                    "total": n,
+                }
+                for tc, n in sorted(por_tipo.get(clave, {}).items())
+            ] if not es_texto else [],
+        })
+
+    # Ordena por magnitud descendente; los indicadores del catálogo conocido
+    # conservan su posición declarada cuando empatan en cero.
+    prioridad = {clave: i for i, clave in enumerate(INDICADORES_CONSULTA)}
+    def _orden(d):
+        magnitud = d["con_texto"] if d["tipo_dato"] == "texto" else d["verdadero"]
+        return (-magnitud, prioridad.get(d["indicador"], len(prioridad)), d["indicador"])
+    datos.sort(key=_orden)
+
+    return {
+        "titulo": "Resumen de Indicadores de Consultas",
+        "desde": f_desde,
+        "hasta": f_hasta,
+        "total_consultas": total_consultas,
+        "pacientes_distintos": pacientes_distintos,
+        "dias_con_registros": int(totales["dias"] or 0),
+        "cobertura": {
+            "consultas_sin_columna": int(totales["sin_columna"] or 0),
+            "consultas_sin_claves": int(totales["sin_claves"] or 0),
+            "claves_distintas": len(por_indicador),
+            "promedio_claves_por_consulta": (
+                round(total_pares_clave / total_consultas, 2) if total_consultas else 0.0
+            ),
+        },
+        "datos": datos,
+        "referencias": referencias,
+        "total_general": total_consultas,
+        "generado_en": datetime.now(APP_TIMEZONE).isoformat(),
+    }
+
+
+# =====================================================================
 # REINGRESOS Y CONSULTAS ACTIVAS (movidos desde consultas/service.py)
 # =====================================================================
 

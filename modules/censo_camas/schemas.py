@@ -134,6 +134,19 @@ class CopiarDiaResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CensoCamasEliminarPorPeriodoRequest(BaseModel):
+    desde: date = Field(..., description="Fecha inicio del periodo (YYYY-MM-DD)")
+    hasta: date = Field(..., description="Fecha fin del periodo (YYYY-MM-DD)")
+
+
+class CensoCamasEliminarPorPeriodoResponse(BaseModel):
+    desde: date
+    hasta: date
+    eliminados: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class EstadisticaServicio(BaseModel):
     servicio_id: int
     servicio_nombre: str

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from typing import Optional
 from core.database import get_db
 from core.security import get_current_user
 from modules.users.models import UserModel
@@ -15,6 +16,8 @@ from .schemas import (
     NacimientosStatsResponse,
     Sigsa3EspecialidadResponse,
     Sigsa3DxFrecuentesResponse,
+    IndicadoresConsultasResponse,
+    ReferenciasResponse,
 )
 from .service import (
     pacientes_atendidos as svc_pacientes_atendidos,
@@ -28,6 +31,8 @@ from .service import (
     sigsa3_dx_frecuentes as svc_sigsa3_dx,
     consultas_activas_admision_mayores_7_dias as svc_activas_admision_mayores_7_dias,
     reingresos_consulta_tipo3 as svc_reingresos_tipo3,
+    indicadores_consultas as svc_indicadores,
+    referencias_consultas as svc_referencias,
 )
 
 router = APIRouter(prefix="/estadisticas", tags=["Estadísticas y Reportes"])
@@ -113,6 +118,43 @@ def consultas_mayores_7_dias(
     current_user: UserModel = Depends(get_current_user),
 ):
     return svc_activas_admision_mayores_7_dias(db, skip=skip, limit=limit)
+
+
+@router.get("/consultas/indicadores", response_model=IndicadoresConsultasResponse)
+def consultas_indicadores(
+    desde: str = Query(..., description="Fecha inicio (YYYY-MM-DD)"),
+    hasta: str = Query(..., description="Fecha fin (YYYY-MM-DD)"),
+    tipo_consulta: Optional[int] = Query(None, ge=1, le=3, description="1=COEX, 2=Hospitalización, 3=Emergencia"),
+    especialidad: Optional[str] = Query(None, description="Filtrar por especialidad médica"),
+    top_referencias: int = Query(10, ge=1, le=100, description="Orígenes/destinos de referencia más frecuentes"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Resume las banderas del jsonb `consultas.indicadores` en el rango indicado."""
+    return svc_indicadores(
+        db, desde, hasta, tipo_consulta, especialidad, top_referencias
+    )
+
+
+@router.get("/consultas/referencias", response_model=ReferenciasResponse)
+def consultas_referencias(
+    desde: str = Query(..., description="Fecha inicio (YYYY-MM-DD)"),
+    hasta: str = Query(..., description="Fecha fin (YYYY-MM-DD)"),
+    tipo_consulta: Optional[int] = Query(None, ge=1, le=3, description="1=COEX, 2=Hospitalización, 3=Emergencia"),
+    especialidad: Optional[str] = Query(None, description="Filtrar por especialidad médica"),
+    skip: int = Query(0, ge=0, description="Offset de la lista"),
+    limit: int = Query(100, ge=1, le=1000, description="Cantidad de registros de la lista"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Lista paginada y resumen de referencias del rango indicado.
+
+    Lee `viene_referido_de` y `va_referido_a` del jsonb `consultas.indicadores`,
+    con fallback a `viene_referido` y `fue_referido` para el dato histórico.
+    """
+    return svc_referencias(
+        db, desde, hasta, tipo_consulta, especialidad, skip, limit
+    )
 
 
 @router.get("/nacimientos", response_model=NacimientosStatsResponse)

@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, Query, UploadFile, File, status, HTTPExc
 from sqlalchemy.orm import Session
 
 from core.database import get_db
+from core.security import get_current_admin_user
+from modules.users.models import UserModel
 from .schemas import (
     CensoCamasCreate,
     CensoCamasUpdate,
@@ -14,6 +16,8 @@ from .schemas import (
     HospitalizacionEspecialidadResponse,
     CopiarDiaRequest,
     CopiarDiaResponse,
+    CensoCamasEliminarPorPeriodoRequest,
+    CensoCamasEliminarPorPeriodoResponse,
 )
 from .service import (
     crear_registro as service_crear,
@@ -22,10 +26,12 @@ from .service import (
     obtener_registro as service_obtener,
     actualizar_registro as service_actualizar,
     eliminar_registro as service_eliminar,
+    eliminar_por_periodo as service_eliminar_periodo,
     resumen_diario as service_resumen,
     bulk_create as service_bulk,
     estadisticas as service_estadisticas,
     importar_csv as service_importar_csv,
+    importar_csv_transversal as service_importar_csv_transversal,
     hospitalizacion_por_especialidad as service_hospitalizacion,
     copiar_dia_anterior as service_copiar_dia,
 )
@@ -57,6 +63,26 @@ async def importar_csv(file: UploadFile = File(...), db: Session = Depends(get_d
         raise HTTPException(status_code=400, detail="El archivo debe ser un CSV (.csv)")
     contenido = (await file.read()).decode("utf-8")
     return service_importar_csv(contenido, db)
+
+
+@router.post("/importar-csv-transversal")
+async def importar_csv_transversal(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Importa la hoja de censo en matriz: dos encabezados y una fila por variable."""
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="El archivo debe ser un CSV (.csv)")
+    crudo = await file.read()
+    for encoding in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
+        try:
+            contenido = crudo.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="No se pudo decodificar el archivo. Use UTF-8 o Latin-1",
+        )
+    return service_importar_csv_transversal(contenido, db)
 
 
 @router.get("/", response_model=CensoCamasListResponse)
@@ -102,6 +128,15 @@ def estadisticas(
     db: Session = Depends(get_db),
 ):
     return service_estadisticas(desde, hasta, db)
+
+
+@router.delete("/eliminar-por-periodo", response_model=CensoCamasEliminarPorPeriodoResponse)
+def eliminar_por_periodo(
+    data: CensoCamasEliminarPorPeriodoRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_admin_user),
+):
+    return service_eliminar_periodo(data.desde, data.hasta, db)
 
 
 @router.get("/{registro_id}", response_model=CensoCamasOut)

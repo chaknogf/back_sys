@@ -235,3 +235,119 @@ class Sigsa3DxFrecuentesResponse(BaseModel):
     totales_por_grupo: List[Sigsa3DxTotalGrupoItem]
     total_general: int = Field(..., ge=0)
     generado_en: str
+
+
+# =====================================================================
+# INDICADORES DE CONSULTA (jsonb consultas.indicadores)
+# =====================================================================
+class IndicadorTipoConsultaItem(BaseModel):
+    tipo_consulta: int = Field(..., description="1=COEX, 2=Hospitalización, 3=Emergencia")
+    tipo_consulta_nombre: str
+    total: int = Field(..., ge=0)
+
+
+class IndicadorConsultaItem(BaseModel):
+    indicador: str = Field(..., description="Clave dentro del jsonb indicadores")
+    etiqueta: str = Field(..., description="Nombre legible del indicador")
+    tipo_dato: str = Field(..., description="booleano o texto")
+    clave_ausente: int = Field(0, ge=0, description="Consultas cuyo jsonb no incluye la clave")
+    sin_valor: int = Field(0, ge=0, description="Consultas con la clave presente pero nula o vacía")
+    verdadero: int = Field(0, ge=0, description="Consultas con el indicador marcado (solo booleanos)")
+    falso: int = Field(0, ge=0, description="Consultas con el indicador en negativo (solo booleanos)")
+    con_texto: int = Field(0, ge=0, description="Consultas con texto no vacío (solo indicadores de texto)")
+    valores_distintos: int = Field(0, ge=0, description="Valores de texto diferentes (solo indicadores de texto)")
+    pacientes: int = Field(0, ge=0, description="Pacientes distintos con el indicador marcado")
+    porcentaje_consultas: float = Field(0, ge=0, description="Porcentaje sobre las consultas del período")
+    porcentaje_pacientes: float = Field(0, ge=0, description="Porcentaje sobre los pacientes del período")
+    por_tipo_consulta: List[IndicadorTipoConsultaItem] = Field(default_factory=list)
+
+
+class IndicadorReferenciaItem(BaseModel):
+    indicador: str = Field(..., description="viene_referido o fue_referido")
+    valor: str
+    total: int = Field(..., ge=0)
+
+
+class IndicadoresCobertura(BaseModel):
+    consultas_sin_columna: int = Field(0, ge=0, description="Consultas con indicadores IS NULL")
+    consultas_sin_claves: int = Field(0, ge=0, description="Consultas con el jsonb vacío")
+    claves_distintas: int = Field(0, ge=0, description="Claves diferentes halladas en el período")
+    promedio_claves_por_consulta: float = Field(0, ge=0)
+
+
+class IndicadoresConsultasResponse(BaseModel):
+    titulo: str = "Resumen de Indicadores de Consultas"
+    desde: date
+    hasta: date
+    total_consultas: int = Field(..., ge=0)
+    pacientes_distintos: int = Field(..., ge=0)
+    dias_con_registros: int = Field(..., ge=0)
+    cobertura: IndicadoresCobertura
+    datos: List[IndicadorConsultaItem]
+    referencias: List[IndicadorReferenciaItem] = Field(
+        default_factory=list, description="Orígenes y destinos más frecuentes de las referencias"
+    )
+    total_general: int = Field(..., ge=0)
+    generado_en: str
+
+
+# =====================================================================
+# REFERENCIAS (consultas.indicadores: viene_referido_de, va_referido_a)
+# =====================================================================
+class ReferenciaItemLista(BaseModel):
+    id: int = Field(..., description="ID de la consulta")
+    paciente_id: Optional[int] = None
+    expediente: Optional[str] = None
+    tipo_consulta: Optional[int] = None
+    tipo_consulta_nombre: Optional[str] = None
+    especialidad: Optional[str] = None
+    fecha_consulta: Optional[date] = None
+    viene_referido_de: Optional[str] = None
+    va_referido_a: Optional[str] = None
+    viene_referido: Optional[str] = None
+    fue_referido: Optional[str] = None
+
+
+class ReferenciaVarianteItem(BaseModel):
+    valor: str = Field(..., description="Texto tal como se capturó en la consulta")
+    total: int = Field(..., ge=0)
+
+
+class ReferenciaResumenItem(BaseModel):
+    direccion: str = Field(..., description="viene = viene_referido_de, va = va_referido_a")
+    direccion_nombre: str = Field(..., description="Viene referido de / Va referido a")
+    referencia: str = Field(..., description="Nombre normalizado (upper, sin acentos)")
+    referencia_normalizada: str = Field(..., description="Alias de referencia, mismo valor")
+    total_consultas: int = Field(0, ge=0)
+    consultas_distintas: int = Field(0, ge=0)
+    pacientes_distintos: int = Field(0, ge=0)
+    variantes: List[ReferenciaVarianteItem] = Field(
+        default_factory=list, description="Textos crudos que colapsan en esta referencia"
+    )
+
+
+class ReferenciasCobertura(BaseModel):
+    consultas_con_jsonb: int = Field(0, ge=0)
+    consultas_sin_jsonb: int = Field(0, ge=0)
+    consultas_con_referencia: int = Field(0, ge=0)
+    consultas_sin_referencia: int = Field(0, ge=0)
+    con_origen: int = Field(0, ge=0, description="Consultas con viene_referido_de")
+    con_destino: int = Field(0, ge=0, description="Consultas con va_referido_a")
+    ambos_sentidos: int = Field(0, ge=0)
+    porcentaje_con_referencia: float = Field(0, ge=0)
+
+
+class ReferenciasResponse(BaseModel):
+    titulo: str = "Referencias de Consultas (viene_referido_de / va_referido_a)"
+    desde: date
+    hasta: date
+    total_consultas: int = Field(..., ge=0)
+    pacientes_distintos: int = Field(..., ge=0)
+    dias_con_registros: int = Field(..., ge=0)
+    cobertura: ReferenciasCobertura
+    lista: List[ReferenciaItemLista] = Field(default_factory=list)
+    resumen: List[ReferenciaResumenItem] = Field(default_factory=list)
+    total_general: int = Field(..., ge=0)
+    skip: int = Field(..., ge=0)
+    limit: int = Field(..., ge=1)
+    generado_en: str

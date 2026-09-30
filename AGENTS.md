@@ -99,14 +99,14 @@ All routes under root path `/fah` (e.g., `https://host/fah/auth/login`).
 | Correlatives | `/correlativos` | `POST /expediente`, `/emergencia`, `/constancia_nacimiento`, `/constancia_defuncion`, `/constancia_medica` |
 | Birth Certs | `/constancias-nacimiento` | `GET/POST`, `GET /{id}`, `/historial/{id}`, `PATCH /{id}/estado-informe` |
 | Deaths | `/defunciones` | `POST/GET`, `GET/PATCH/DELETE /{id}`, `/registrar/{paciente_id}`, `/sincronizar`, `/pacientes` |
-| Censo Camas | `/censo-camas` | One row per date/service with nested male/female movement counts; `GET/POST`, `PUT/DELETE /{id}`, `/upsert`, `/bulk`, `/importar-csv`, `/resumen/{fecha}`, `/estadisticas` |
+| Censo Camas | `/censo-camas` | One row per date/service with nested male/female movement counts; `GET/POST`, `PUT/DELETE /{id}`, `/upsert`, `/bulk`, `/importar-csv`, `/importar-csv-transversal`, `/eliminar-por-periodo`, `/resumen/{fecha}`, `/estadisticas` |
 | CIE-10 | `/cie10` | `GET /catalogo`, `GET /buscar`, `POST /sugerir` |
 | Loans | `/prestamos` | `GET/POST`, `GET/PUT/DELETE /{id}` |
 | Municipalities | `/municipios` | `GET /` (filtros: `q`, `codigo`, `municipio`, `departamento`, `vecindad`), `GET /departamentos` |
 | Births | `/nacimientos` | `GET/POST`, `GET/PATCH/DELETE /{id}`, `/desde-paciente/{id}`, `/sincronizar` (unifica madre-hijo + legacy), `/referenciar-legacy` (cruza con `nacimientos_legacy`). **Sin datos redundantes:** expediente, sexo, fecha_nac, neonatales se obtienen vía JOIN con `pacientes`. Columnas computadas: `peso_gramos`, `clasificacion_nacimiento` (EBP/MBP/BP/PN), `trabajo_parto` (Prematuro/a Termino/Prolongado) |
 | Countries | `/paises` | `GET /`, `GET /select` |
 | RENAP | `/renap` | `GET /persona` |
-| Statistics | `/estadisticas` | `/consultas/pacientesAtendidos`, `/consultas/hospitalizacion-infantil`, `/consultas/promedioDiario`, `/consultas/personal-hospital`, `/consultas/estudiante-publico`, `/consultas/reingresos`, `/consultas/reingresos-tipo3`, `/consultas/mayores-a-7-dias`, `/nacimientos`, `/sigsa3/por-especialidad`, `/sigsa3/dx-frecuentes` |
+| Statistics | `/estadisticas` | `/consultas/pacientesAtendidos`, `/consultas/hospitalizacion-infantil`, `/consultas/promedioDiario`, `/consultas/personal-hospital`, `/consultas/estudiante-publico`, `/consultas/reingresos`, `/consultas/reingresos-tipo3`, `/consultas/mayores-a-7-dias`, `/consultas/indicadores`, `/consultas/referencias`, `/nacimientos`, `/sigsa3/por-especialidad`, `/sigsa3/dx-frecuentes` |
 | SIGSA-3 | `/sigsa3` | `GET/POST`, `GET/PUT/DELETE /{id}`, `POST /importar-excel`, `POST /eliminar-por-ids`, `POST /eliminar-por-periodo`, `POST /asociar-medico`, `POST /asociar-todo`, filtros: personal_salud, fecha, nombre, sexo, tipo_consulta, especialidad, cie10, q |
 | Totales | `/totales` | `GET /` (KPIs dashboard, 7 indicadores, opcional `fecha`) |
 | Audit | `/audit-log` | `GET /` |
@@ -226,6 +226,8 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Estadisticas | GET | `/estadisticas/consultas/reingresos` | auth | `ReingresoResponse` | Reingresos hospitalarios clasificados (<8d / complicaciones). req: `desde`, `hasta` |
 | Estadisticas | GET | `/estadisticas/consultas/reingresos-tipo3` | auth | `ConsultaListResponse` | Reingresos tipo 3 paginados (filtros: `skip`, `limit`) |
 | Estadisticas | GET | `/estadisticas/consultas/mayores-a-7-dias` | auth | `ConsultaListResponse` | Consultas activas con >7 días desde fecha_consulta, incluye `dias_acumulados` (filtros: `skip`, `limit`) |
+| Estadisticas | GET | `/estadisticas/consultas/indicadores` | auth | `IndicadoresConsultasResponse` | Resumen del jsonb `consultas.indicadores` (req: `desde`, `hasta`; opt: `tipo_consulta`, `especialidad`, `top_referencias`) |
+| Estadisticas | GET | `/estadisticas/consultas/referencias` | auth | `ReferenciasResponse` | Lista paginada + resumen de referencias `viene_referido_de`/`va_referido_a` (req: `desde`, `hasta`; opt: `tipo_consulta`, `especialidad`, `skip`, `limit`) |
 | Estadisticas | GET | `/estadisticas/nacimientos` | auth | `NacimientosStatsResponse` | Estadísticas de nacimientos por sexo/estado, clase de parto, clasificación y trabajo de parto (req: `desde`, `hasta`) |
 | Totales | GET | `/totales/` | auth | `TotalesResponse` | KPIs dashboard (7 indicadores: pacientes totales/activos, consultas totales/día, COEX/hosp/emerg del día). Opcional: `fecha` |
 | Chat | POST | `/chat/consulta` | auth | `ChatResponse` | Consulta NL→SQL (read-only, LLM genera SELECT). Rate: 10/min |
@@ -243,7 +245,9 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Censo Camas | POST | `/censo-camas/` | auth | `CensoCamasOut` (201) | Create registro |
 | Censo Camas | POST | `/censo-camas/upsert` | auth | `CensoCamasOut` | Upsert |
 | Censo Camas | POST | `/censo-camas/bulk` | auth | dict (201) | Bulk create |
-| Censo Camas | POST | `/censo-camas/importar-csv` | auth | dict | Importar CSV |
+| Censo Camas | POST | `/censo-camas/importar-csv` | auth | dict | Importar CSV (formato largo: una fila por fecha+servicio+sexo) |
+| Censo Camas | POST | `/censo-camas/importar-csv-transversal` | auth | dict | Importar CSV (formato matriz: 2 encabezados + una fila por variable; nombres largos de servicio resueltos por alias contra `encamamiento`) |
+| Censo Camas | DELETE | `/censo-camas/eliminar-por-periodo` | admin | `CensoCamasEliminarPorPeriodoResponse` | Borra el rango `desde`/`hasta` (inclusive). 422 si `desde > hasta`, 404 si el periodo está vacío |
 | Censo Camas | GET | `/censo-camas/` | auth | `CensoCamasListResponse` | List (filtros: fecha, servicio) |
 | Censo Camas | GET | `/censo-camas/resumen/{fecha}` | auth | `CensoDiarioResumen` | Resumen diario |
 | Censo Camas | GET | `/censo-camas/estadisticas` | auth | `CensoEstadisticasResponse` | Stats (desde, hasta) |
@@ -322,6 +326,56 @@ curl -H "$AUTH" "https://host/fah/estadisticas/consultas/reingresos-tipo3?skip=0
 # Consultas activas con más de 30 días de antigüedad
 curl -H "$AUTH" "https://host/fah/estadisticas/consultas/mayores-a-7-dias?skip=0&limit=50"
 ```
+
+### Indicadores de consulta (jsonb `consultas.indicadores`)
+
+```bash
+# Resumen de las 12 banderas del mes, con pacientes distintos y desglose por tipo
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/indicadores?desde=2026-09-01&hasta=2026-09-30"
+
+# Acotado a emergencias y con más referencias listadas
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/indicadores?desde=2026-09-01&hasta=2026-09-30&tipo_consulta=3&top_referencias=25"
+```
+
+Convención de valores: `personal_hospital` se persiste como `S`/`N`/`null`
+(validador en `modules/consultas/schemas.py`) y el resto de banderas como
+booleanos `true`/`false`. El reporte cuenta como **marcada** tanto `true` como
+`S`, y separa `sin_valor` (null o cadena vacía) porque **no equivale a un
+negativo** — 1,089 consultas de septiembre 2026 tienen `personal_hospital` en
+`null`. `viene_referido` y `fue_referido` son texto libre, no banderas: el
+reporte los devuelve en `referencias` con su ranking.
+
+> Nota: `/estadisticas/consultas/personal-hospital` y `/estudiante-publico` leen
+> `sigsa3_registros`, no `consultas.indicadores`, así que sus totales difieren
+> del reporte de indicadores (SIGSA-3 solo cubre lo normalizado).
+
+### Referencias (jsonb `consultas.indicadores`)
+
+```bash
+# Lista paginada de consultas con referencia + resumen por institucion
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/referencias?desde=2026-09-01&hasta=2026-09-30"
+
+# Solo detalle paginado
+curl -H "$AUTH" "https://host/fah/estadisticas/consultas/referencias?desde=2026-09-01&hasta=2026-09-30&skip=0&limit=50"
+```
+
+Devuelve `lista` (las consultas que traen referencia, paginada) y `resumen`
+(agrupado por institución), más `cobertura` con cuántas consultas del rango
+tienen y no tienen referencia.
+
+Convención de claves: el reporte lee `viene_referido_de` y `va_referido_a`, con
+fallback a `viene_referido` y `fue_referido`. En la base actual **las claves
+`_de`/`_a` están vacías** y todo el dato histórico vive en
+`viene_referido`/`fue_referido`, así que el fallback es el que produce los
+resultados; la columna de la lista mantiene ambos pares para no perder
+información si se migran las claves.
+
+El resumen normaliza con `unaccent(upper(btrim(...)))`, de modo que
+`cap de patzun`, `CAP DE PATZUN` y `TECPÁN`/`TECPAN` caen en una sola
+institución. Cada grupo expone `variantes` con los textos crudos capturados y
+sus conteos. Quedan separados los casi-duplicados que difieren en una palabra
+(`CAP DE PATZUN` vs `CAP PATZUN`, 6 vs 3 en septiembre 2026); unirlos exigiría
+un catálogo de instituciones, no una normalización de texto.
 
 ### Nacimientos
 

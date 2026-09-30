@@ -4,9 +4,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 import csv
 import io
+import unicodedata
 
 from modules.censo_camas.models import CensoCamasModel
 from modules.censo_camas.schemas import (
@@ -224,6 +225,34 @@ def eliminar_registro(registro_id: int, db: Session) -> None:
             detail="No se puede eliminar, está relacionado con otros registros"
         )
     return None
+
+
+def eliminar_por_periodo(desde: date, hasta: date, db: Session) -> dict:
+    if desde > hasta:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La fecha 'desde' debe ser menor o igual a 'hasta'"
+        )
+    query = db.query(CensoCamasModel).filter(
+        CensoCamasModel.fecha >= desde,
+        CensoCamasModel.fecha <= hasta,
+    )
+    eliminados = query.count()
+    if eliminados == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontraron registros en el periodo {desde} al {hasta}"
+        )
+    try:
+        query.delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Error al eliminar los registros del periodo"
+        )
+    return {"desde": desde, "hasta": hasta, "eliminados": eliminados}
 
 
 def resumen_diario(fecha: date, db: Session) -> dict:
@@ -451,6 +480,17 @@ def importar_csv(contenido_csv: str, db: Session) -> dict:
         except Exception as e:
             errores.append({"fila": i, "error": str(e)})
 
+    creados, actualizados = _persistir_por_fecha_servicio(agrupados, db)
+
+    return {
+        "creados": creados,
+        "actualizados": actualizados,
+        "errores": errores,
+    }
+
+
+def _persistir_por_fecha_servicio(agrupados: dict, db: Session) -> tuple[int, int]:
+    """Inserta o actualiza cada grupo por su clave natural (fecha, servicio_id)."""
     creados = 0
     actualizados = 0
     for values in agrupados.values():
@@ -471,11 +511,7 @@ def importar_csv(contenido_csv: str, db: Session) -> dict:
     if creados or actualizados:
         db.commit()
 
-    return {
-        "creados": creados,
-        "actualizados": actualizados,
-        "errores": errores,
-    }
+    return creados, actualizados
 
 
 def hospitalizacion_por_especialidad(desde: date, hasta: date, db: Session) -> dict:
@@ -609,4 +645,290 @@ def copiar_dia_anterior(origen: date, destino: date, servicio_id: Optional[int],
         "copiados": copiados,
         "actualizados": actualizados,
         "sin_datos": 0 if (copiados or actualizados) else len(origen_rows),
+    }
+
+
+# ── CSV transversal: dos filas de encabezado y una fila por variable ──────
+#
+# La hoja viene en formato matriz, no en el formato largo de `importar_csv`:
+#
+#   fila 1: Masculino Femenino Masculino Femenino ...   (sexo por columna)
+#   fila 2: FECHA  VARIABLE  MADRE CANGURO MADRE CANGURO UCIA UCIA ...
+#   fila 3+: 1/01/2026  Cama Ocupada  0  0  1  5 ...
+#
+# El nombre del servicio se propaga hacia adelante (celdas repetidas), así que
+# Ginecología y Maternidad ocupan una sola columna (Femenino) mientras el resto
+# ocupa una por sexo.
+
+_CSV_CAMPOS = {
+    "ocupados": "ocupados",
+    "egresos": "egresos",
+    "fallecidos": "fallecidos",
+    "referido": "referido",
+    "traslado": "traslado",
+    "contraindicados": "contraindicados",
+    "otro ingresos": "otro_ingresos",
+    "ingresos": "ingresos",
+    "huespedes": "huespedes",
+    "emergencia": "emergencia",
+}
+
+# La hoja trae "Cama Ocupada" y "Egresos Totales" como filas propias, pero la
+# tabla los deriva de los movimientos; se descartan para no duplicar la fuente.
+_CSV_CAMPOS_DERIVADOS = {
+    "cama ocupada", "camas ocupadas", "egresos totales", "egreso total",
+}
+
+_CSV_SEXOS = {
+    "m": "masculino", "masculino": "masculino", "hombres": "masculino", "varones": "masculino",
+    "f": "femenino", "femenino": "femenino", "mujeres": "femenino", "femeninas": "femenino",
+}
+
+# El CSV nombra los servicios con su nombre completo y el catálogo de
+# encamamiento usa códigos cortos. Sin este mapa, solo coincidiría UCIA.
+_CSV_SERVICIOS = {
+    "madre canguro": "CANGURO",
+    "canguro": "CANGURO",
+    "canguro madre": "CANGURO",
+    "ucia": "UCIA",
+    "medicina": "MEDI",
+    "medicina general": "MEDI",
+    "cirugia": "CIRU",
+    "cirugia general": "CIRU",
+    "pediatria cirugia": "CIRU PEDIA",
+    "cirugia pediatrica": "CIRU PEDIA",
+    "traumatologia": "TRAUMA",
+    "traumatologia general": "TRAUMA",
+    "pediatria trauma": "TRAUMA PEDIA",
+    "traumatologia pediatrica": "TRAUMA PEDIA",
+    "ginecologia": "GINE",
+    "ginecologia obstetricia": "GINE",
+    "obstetricia": "GINE",
+    "maternidad": "MATER",
+    "pediatria": "PEDIA",
+    "neonatos": "NEO",
+    "neonatologia": "NEO",
+    "neonatos canguro": "NEO",
+    "ucin": "UCIN",
+    "crn": "CRN",
+    "cuidados intermedio": "CRN",
+    "cuidados intensivos": "CRN",
+}
+
+_CSV_ETIQUETAS_IGNORADAS = {"", "total", "totales", "total general", "suma"}
+
+# Un servicio reportado en una sola columna no permite deducir el sexo por
+# posición. Ginecología y Maternidad no tienen camas masculinas, así que el valor
+# por defecto es Femenino; el importador lo reporta en `advertencias`.
+_CSV_SEXO_UNICOLUMNA = "femenino"
+
+
+def _normalizar_texto(valor: str) -> str:
+    """Minúsculas, sin acentos y con espacios colapsados, para comparar nombres."""
+    valor = unicodedata.normalize("NFD", (valor or "").strip().lower())
+    valor = "".join(c for c in valor if unicodedata.category(c) != "Mn")
+    return " ".join(valor.split())
+
+
+def _parse_fecha_censo(valor: str) -> Optional[date]:
+    """Acepta el formato dd/mm/aaaa de la hoja (1/01/2026) además de ISO."""
+    valor = (valor or "").strip()
+    if not valor:
+        return None
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d/%m/%y", "%d-%m-%y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(valor, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_entero_censo(valor: str) -> Optional[int]:
+    """Devuelve 0 para celdas vacías y None para contenido no numérico."""
+    valor = (valor or "").strip()
+    if not valor:
+        return 0
+    try:
+        return int(float(valor))
+    except ValueError:
+        return None
+
+
+def _resolver_servicios_transversal(
+    nombres: list[str], db: Session
+) -> tuple[dict[str, int], list[str]]:
+    """Traduce los nombres largos del CSV a los códigos de `encamamiento`."""
+    from modules.encamamiento.models import EncamamientoModel
+
+    catalogo = {
+        _normalizar_texto(s.nombre_servicio): s.id
+        for s in db.query(EncamamientoModel).filter(EncamamientoModel.activo == True).all()
+    }
+    resoltos: dict[str, int] = {}
+    faltantes: list[str] = []
+    for nombre in nombres:
+        clave = _normalizar_texto(nombre)
+        if clave in resoltos or clave in faltantes:
+            continue
+        servicio_id = catalogo.get(clave) or catalogo.get(_normalizar_texto(_CSV_SERVICIOS.get(clave, "")))
+        if servicio_id:
+            resoltos[clave] = servicio_id
+        else:
+            faltantes.append(nombre)
+    return resoltos, faltantes
+
+
+def _columnas_transversal(filas: list[list[str]]) -> tuple[list[tuple[str, str, int]], list[str]]:
+    """Devuelve (servicio_csv, sexo, índice en la fila de datos) por columna.
+
+    El sexo se toma de la posición dentro del bloque del servicio: cada servicio
+    ocupa dos columnas (Masculino y Femenino) salvo los que la hoja reporta en una
+    sola. La fila de sexo solo interviene para esos bloques de una columna, y
+    únicamente si tiene el mismo ancho que la fila de servicio; si viene recortada
+    o desalineada se descarta y el bloque usa el valor por defecto.
+    """
+    nombres = filas[1][2:]
+    alineado = len(filas[0]) == len(filas[1])
+    etiquetas = filas[0][2:] if alineado else []
+
+    indices: list[tuple[str, int]] = []
+    servicio_actual = ""
+    for i in range(len(nombres)):
+        nombre = (nombres[i] or "").strip()
+        if nombre:
+            servicio_actual = nombre
+        if not servicio_actual:
+            continue
+        indices.append((servicio_actual, i))
+
+    sexos: dict[int, str] = {}
+    unicolumna: list[str] = []
+    inicio = 0
+    for fin in range(1, len(indices) + 1):
+        if fin < len(indices) and indices[fin][0] == indices[inicio][0]:
+            continue
+        bloque = list(range(inicio, fin))
+        for posicion, idx in enumerate(bloque):
+            if len(bloque) > 1:
+                sexos[idx] = "masculino" if posicion == 0 else "femenino"
+            elif etiquetas and idx < len(etiquetas):
+                sexos[idx] = _CSV_SEXOS.get(_normalizar_texto(etiquetas[idx]), _CSV_SEXO_UNICOLUMNA)
+            else:
+                sexos[idx] = _CSV_SEXO_UNICOLUMNA
+                servicio = indices[idx][0]
+                if servicio not in unicolumna:
+                    unicolumna.append(servicio)
+        inicio = fin
+
+    columnas = [(servicio, sexos[idx], idx) for servicio, idx in indices]
+    return columnas, unicolumna
+
+
+def importar_csv_transversal(contenido_csv: str, db: Session) -> dict:
+    """Importa la hoja de censo en formato matriz (dos encabezados + una fila por variable).
+
+    A diferencia de `importar_csv`, el servicio y el sexo son columnas y la
+    variable es la fila. `camas_ocupadas` y `egresos_totales` se recalculan con
+    las fórmulas de la tabla: las filas homónimas del CSV se descartan.
+    """
+    if not contenido_csv.strip():
+        raise HTTPException(status_code=400, detail="El archivo está vacío")
+
+    try:
+        sep = csv.Sniffer().sniff(contenido_csv[:8192], delimiters="\t;,").delimiter
+    except csv.Error:
+        # Con una sola columna por fila el detector no tiene nada que decidir, así
+        # que se gana el separador que más se repite en las primeras líneas.
+        lineas = [l for l in contenido_csv.splitlines() if l.strip()][:20]
+        conteo = {d: max((l.count(d) for l in lineas), default=0) for d in "\t;,"}
+        sep = max(conteo, key=lambda d: conteo[d]) if max(conteo.values()) else "\t"
+
+    filas = [r for r in csv.reader(io.StringIO(contenido_csv), delimiter=sep) if r]
+    if len(filas) < 3:
+        raise HTTPException(
+            status_code=400,
+            detail="Se esperaban dos filas de encabezado y al menos una de datos",
+        )
+    if _normalizar_texto(filas[1][0]) != "fecha" or _normalizar_texto(filas[1][1]) != "variable":
+        raise HTTPException(
+            status_code=400,
+            detail="La segunda fila debe comenzar con FECHA y VARIABLE",
+        )
+
+    columnas, unicolumna = _columnas_transversal(filas)
+    if not columnas:
+        raise HTTPException(status_code=400, detail="No se detectaron columnas de servicio")
+
+    servicios, faltantes = _resolver_servicios_transversal(
+        [s for s, _, _ in columnas], db
+    )
+
+    agrupados: dict[tuple[date, int], dict] = {}
+    errores: list[dict] = []
+    advertencias: list[str] = []
+    variables_ignoradas: set[str] = set()
+    celdas_invalidas = 0
+
+    for num_fila, fila in enumerate(filas[2:], start=3):
+        original = (fila[1] if len(fila) > 1 else "").strip()
+        etiqueta = _normalizar_texto(original)
+        if etiqueta in _CSV_ETIQUETAS_IGNORADAS:
+            continue
+        campo = _CSV_CAMPOS.get(etiqueta)
+        if campo is None:
+            if etiqueta not in _CSV_CAMPOS_DERIVADOS and etiqueta not in variables_ignoradas:
+                variables_ignoradas.add(etiqueta)
+                advertencias.append(f"VARIABLE '{original}' no reconocida; se ignora")
+            continue
+
+        fecha = _parse_fecha_censo(fila[0] if fila else "")
+        if fecha is None:
+            errores.append({"fila": num_fila, "error": f"Fecha inválida: '{(fila[0] or '').strip()}'"})
+            continue
+
+        for nombre, sexo, idx in columnas:
+            servicio_id = servicios.get(_normalizar_texto(nombre))
+            if not servicio_id:
+                continue
+            valor = _parse_entero_censo(fila[idx + 2] if idx + 2 < len(fila) else "")
+            if valor is None:
+                celdas_invalidas += 1
+                continue
+            clave = (fecha, servicio_id)
+            grupo = agrupados.get(clave)
+            if grupo is None:
+                grupo = agrupados[clave] = {
+                    "fecha": fecha,
+                    "servicio_id": servicio_id,
+                    "masculino": {field: 0 for field in _RAW_FIELDS},
+                    "femenino": {field: 0 for field in _RAW_FIELDS},
+                }
+            grupo[sexo][campo] = valor
+
+    if faltantes:
+        advertencias.append(
+            "Servicios del CSV sin coincidencia en el catálogo de encamamiento, se omiten: "
+            + ", ".join(dict.fromkeys(faltantes))
+        )
+    if unicolumna:
+        advertencias.append(
+            f"Servicios con una sola columna, asignados a {_CSV_SEXO_UNICOLUMNA.upper()}: "
+            + ", ".join(dict.fromkeys(unicolumna))
+        )
+    if celdas_invalidas:
+        advertencias.append(f"{celdas_invalidas} celdas no numéricas se trataron como 0")
+    if not agrupados:
+        raise HTTPException(
+            status_code=400,
+            detail="No se encontraron filas de datos válidas. Revise las advertencias del archivo",
+        )
+
+    creados, actualizados = _persistir_por_fecha_servicio(agrupados, db)
+    return {
+        "creados": creados,
+        "actualizados": actualizados,
+        "fechas": len({fecha for fecha, _ in agrupados}),
+        "servicios": len(servicios),
+        "errores": errores,
+        "advertencias": advertencias,
     }

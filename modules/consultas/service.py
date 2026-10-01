@@ -22,6 +22,13 @@ from modules.consultas.schemas import (
 from modules.expediente.service import generar_expediente, generar_emergencia
 
 
+# Indicador canónico de "personal del hospital" dentro de consultas.indicadores.
+# Los alias son claves históricas que guardaban el mismo dato y por eso se
+# pliegan sobre la canónica al sincronizar.
+_INDICADOR_PERSONAL_HOSPITAL = "personal_hospital"
+_ALIAS_PERSONAL_HOSPITAL = ("empleado_publico", "empleado_público")
+
+
 def _agregar_ciclo(db, consulta, nuevo_ciclo, current_user):
     nuevo_ciclo["registro"] = datetime.now(APP_TIMEZONE).isoformat()
     nuevo_ciclo["usuario"] = current_user.username
@@ -485,7 +492,42 @@ def eliminar_consulta(consulta_id: int, db: Session, current_user=None):
     return {"detail": f"Consulta {consulta_id} eliminada permanentemente"}
 
 
+def _normalizar_si_no(valor) -> Optional[str]:
+    """Reduce cualquier variante guardada a "S"/"N"; None si no hay dato."""
+    if valor is None:
+        return None
+    if isinstance(valor, bool):
+        return "S" if valor else "N"
+    v = str(valor).strip().upper()
+    if not v:
+        return None
+    if v in {"S", "SI", "SÍ", "TRUE", "T", "1", "X"}:
+        return "S"
+    if v in {"N", "NO", "FALSE", "F", "0"}:
+        return "N"
+    return None
+
+
+def _personal_hospital_del_paciente(paciente) -> Optional[str]:
+    """Valor canónico tomado del paciente: datos_extra.socioeconomicos."""
+    if paciente is None:
+        return None
+    socio = (paciente.datos_extra or {}).get("socioeconomicos") or {}
+    origen = socio.get(_INDICADOR_PERSONAL_HOSPITAL)
+    if origen is None or str(origen).strip() == "":
+        # Fallback a la columna proyectada por el validador del modelo.
+        origen = paciente.es_personal_hospital
+    return _normalizar_si_no(origen)
+
+
 def sincronizar_indicadores(db: Session, desde: date, hasta: date, current_user):
+    """Proyecta el indicador de personal del hospital del paciente a sus consultas.
+
+    El paciente es la fuente de verdad: el valor se sobrescribe (no solo se
+    rellena) y los alias duplicados se pliegan sobre la clave canónica y se
+    eliminan. Si el paciente no tiene dato, la clave se quita en vez de inventar
+    un "N", para que el reporte la contabilice como "sin la clave".
+    """
     consultas = (
         db.query(ConsultaModel)
         .join(PacienteModel, ConsultaModel.paciente_id == PacienteModel.id)
@@ -495,59 +537,71 @@ def sincronizar_indicadores(db: Session, desde: date, hasta: date, current_user)
     )
 
     actualizados = 0
-    saltados = 0
+    sin_cambio = 0
+    sin_dato_paciente = 0
+    alias_eliminados = 0
+    marcados = 0
+    no_marcados = 0
+    consultas_sin_columna = 0
 
     for consulta in consultas:
-        paciente = consulta.paciente
+        original = consulta.indicadores or {}
+        indicadores = dict(original)
+        if consulta.indicadores is None:
+            consultas_sin_columna += 1
 
-        indicadores = consulta.indicadores or {}
-        cambio = False
+        # 1) Plegar alias históricos sobre la clave canónica.
+        desde_alias = None
+        for alias in _ALIAS_PERSONAL_HOSPITAL:
+            if alias in indicadores:
+                alias_eliminados += 1
+                candidato = _normalizar_si_no(indicadores.pop(alias))
+                if desde_alias is None:
+                    desde_alias = candidato
 
-        if paciente:
-            socio = (paciente.datos_extra or {}).get("socioeconomicos", {})
-            socio_empleado = socio.get("empleado_publico") or socio.get("empleado_público")
-            socio_estudiante = paciente.es_estudiante_publico or socio.get("estudiante_publico")
-            socio_ph = paciente.es_personal_hospital or socio.get("personal_hospital")
+        # 2) El paciente manda; el alias solo rescata cuando el paciente no tiene dato.
+        valor = _personal_hospital_del_paciente(consulta.paciente)
+        if valor is None:
+            valor = desde_alias
+            sin_dato_paciente += 1
 
-            if socio_empleado == "S" and not indicadores.get("empleado_publico"):
-                indicadores["empleado_publico"] = True
-                cambio = True
-            if socio_estudiante == "S" and not indicadores.get("estudiante_publico"):
+        if valor is None:
+            indicadores.pop(_INDICADOR_PERSONAL_HOSPITAL, None)
+        else:
+            indicadores[_INDICADOR_PERSONAL_HOSPITAL] = valor
+            if valor == "S":
+                marcados += 1
+            else:
+                no_marcados += 1
+
+        # 3) estudiante_publico es un concepto aparte: se rellena, no se pisa.
+        if consulta.paciente is not None:
+            socio = (consulta.paciente.datos_extra or {}).get("socioeconomicos") or {}
+            origen_estudiante = socio.get("estudiante_publico") or consulta.paciente.es_estudiante_publico
+            if _normalizar_si_no(origen_estudiante) == "S" and not indicadores.get("estudiante_publico"):
                 indicadores["estudiante_publico"] = True
-                cambio = True
 
-            ph_actual = indicadores.get("personal_hospital")
-            if socio_ph is True or socio_ph == "S":
-                if ph_actual not in ("S", "N"):
-                    indicadores["personal_hospital"] = "S"
-                    cambio = True
-            elif socio_ph is False or socio_ph == "N":
-                if ph_actual not in ("S", "N"):
-                    indicadores["personal_hospital"] = "N"
-                    cambio = True
-
-        ph_actual = indicadores.get("personal_hospital")
-        if ph_actual is True:
-            indicadores["personal_hospital"] = "S"
-            cambio = True
-        elif ph_actual is False:
-            indicadores["personal_hospital"] = "N"
-            cambio = True
-
-        if cambio:
-            consulta.indicadores = indicadores
+        if indicadores != original:
+            consulta.indicadores = indicadores or None
             flag_modified(consulta, "indicadores")
             actualizados += 1
         else:
-            saltados += 1
+            sin_cambio += 1
 
     db.commit()
 
     return {
         "mensaje": "Sincronización completada",
+        "clave_canonica": _INDICADOR_PERSONAL_HOSPITAL,
+        "alias_eliminados": _ALIAS_PERSONAL_HOSPITAL,
         "total_consultas_en_rango": len(consultas),
         "actualizados": actualizados,
-        "saltados": saltados,
+        "saltados": sin_cambio,
+        "consultas_sin_columna": consultas_sin_columna,
+        "resultado_marcado_s": marcados,
+        "resultado_no_marcado_n": no_marcados,
+        "pacientes_sin_dato": sin_dato_paciente,
+        "alias_eliminados_total": alias_eliminados,
         "desde": desde.isoformat(),
         "hasta": hasta.isoformat(),
         "usuario": current_user.username,

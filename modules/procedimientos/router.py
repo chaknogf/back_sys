@@ -509,7 +509,8 @@ def obtener_estadisticas(
     top_query = (
         db.query(
             ProcedimientoModel.nombre,
-            func.count(ProceMedicoModel.id).label('total')
+            func.count(ProceMedicoModel.id).label('total'),
+            func.coalesce(func.sum(ProceMedicoModel.cantidad), 0).label('total_cantidad')
         )
         .join(ProceMedicoModel, ProceMedicoModel.id_procedimiento == ProcedimientoModel.id)
         .filter(
@@ -523,7 +524,7 @@ def obtener_estadisticas(
     top_procedimientos = (
         top_query
         .group_by(ProcedimientoModel.id)
-        .order_by(func.count(ProceMedicoModel.id).desc())
+        .order_by(func.coalesce(func.sum(ProceMedicoModel.cantidad), 0).desc())
         .limit(5)
         .all()
     )
@@ -552,7 +553,8 @@ def obtener_estadisticas(
         "total_registros": total_procedimientos,
         "total_cantidad_procedimientos": total_cantidad,
         "top_procedimientos": [
-            {"nombre": p.nombre, "total": p.total} for p in top_procedimientos
+            {"nombre": p.nombre, "total": p.total, "total_cantidad": int(p.total_cantidad)}
+            for p in top_procedimientos
         ],
         "usg_gine": {
             "total_registros": usg_gine_query.total_registros if usg_gine_query else 0,

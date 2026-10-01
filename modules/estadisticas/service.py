@@ -742,7 +742,6 @@ def sigsa3_dx_frecuentes(db: Session, desde: str, hasta: str, top: int = 10, tip
 INDICADORES_CONSULTA: dict[str, dict] = {
     "estudiante_publico": {"etiqueta": "Estudiante público", "tipo": "booleano"},
     "personal_hospital": {"etiqueta": "Personal del hospital", "tipo": "booleano"},
-    "empleado_publico": {"etiqueta": "Empleado público", "tipo": "booleano"},
     "embarazo": {"etiqueta": "Embarazo", "tipo": "booleano"},
     "accidente_laboral": {"etiqueta": "Accidente laboral", "tipo": "booleano"},
     "accidente_transito": {"etiqueta": "Accidente de tránsito", "tipo": "booleano"},
@@ -777,6 +776,32 @@ _JSONB_INDICADORES = (
 def _jsonb_es_objeto(columna: str = "c.indicadores") -> str:
     """Devuelve el predicado que confirma que la columna es un objeto JSON."""
     return f"jsonb_typeof({columna}) = 'object'"
+
+
+# ---------------------------------------------------------------------------
+# Alias de indicador plegados en el reporte
+#
+# `empleado_publico` guardaba el mismo dato que `personal_hospital`. El reporte
+# lo pliega sobre la clave canónica para no mostrarlo como un indicador
+# distinto, aunque la sincronización (`PATCH /consultas/sincronizar-indicadores`)
+# todavía no haya corrido. Si la consulta ya trae la canónica, el alias se
+# ignora: la clave canónica siempre gana.
+# ---------------------------------------------------------------------------
+_INDICADOR_CANONICO = "personal_hospital"
+_ALIAS_INDICADORES = ("empleado_publico", "empleado_público")
+_ALIAS_INDICADORES_SQL = ", ".join(f"'{a}'" for a in _ALIAS_INDICADORES)
+
+# Expresión que proyecta la clave reportada (alias -> canónica).
+_CLAVE_REPORTADA_SQL = (
+    f"CASE WHEN e.key IN ({_ALIAS_INDICADORES_SQL}) "
+    f"THEN '{_INDICADOR_CANONICO}' ELSE e.key END"
+)
+
+# Filtro que descarta el alias cuando la misma consulta ya trae la canónica.
+_ALIAS_SIN_CANONICA_SQL = (
+    f"(e.key NOT IN ({_ALIAS_INDICADORES_SQL}) "
+    f"OR NOT ({_JSONB_INDICADORES} ? '{_INDICADOR_CANONICO}'))"
+)
 
 
 def _clasificar_valor_indicador(valor) -> str:
@@ -967,11 +992,30 @@ def referencias_consultas(
             c.tipo_consulta,
             c.especialidad,
             c.fecha_consulta,
+            p.sexo,
+            p.fecha_nacimiento,
+            COALESCE(
+                (
+                    SELECT STRING_AGG(
+                        COALESCE(dx ->> 'codigo', '')
+                        || COALESCE(' - ' || NULLIF(BTRIM(dx ->> 'descripcion'), ''), ''),
+                        ' | '
+                    )
+                    FROM JSONB_ARRAY_ELEMENTS(
+                        CASE WHEN JSONB_TYPEOF(c.egreso -> 'diagnosticos') = 'array'
+                             THEN c.egreso -> 'diagnosticos'
+                             ELSE '[]'::jsonb
+                        END
+                    ) AS dx
+                ),
+                NULLIF(BTRIM(c.condicion_egreso), '')
+            ) AS diagnostico,
             NULLIF(BTRIM(c.indicadores ->> 'viene_referido_de'), '') AS viene_referido_de,
             NULLIF(BTRIM(c.indicadores ->> 'va_referido_a'), '') AS va_referido_a,
             NULLIF(BTRIM(c.indicadores ->> 'viene_referido'), '') AS viene_referido,
             NULLIF(BTRIM(c.indicadores ->> 'fue_referido'), '') AS fue_referido
         FROM consultas c
+        LEFT JOIN pacientes p ON p.id = c.paciente_id
         WHERE {where_sql}
           AND (
               NULLIF(BTRIM(c.indicadores ->> 'viene_referido_de'), '') IS NOT NULL
@@ -990,6 +1034,9 @@ def referencias_consultas(
     lista = []
     for r in filas_lista:
         m = r._mapping
+        edad = None
+        if m["fecha_nacimiento"] and m["fecha_consulta"]:
+            edad = (m["fecha_consulta"] - m["fecha_nacimiento"]).days // 365
         lista.append({
             "id": int(m["id"]),
             "paciente_id": m["paciente_id"],
@@ -998,6 +1045,9 @@ def referencias_consultas(
             "tipo_consulta_nombre": TIPO_CONSULTA_NOMBRE.get(m["tipo_consulta"]),
             "especialidad": m["especialidad"],
             "fecha_consulta": m["fecha_consulta"],
+            "sexo": str(m["sexo"]) if m["sexo"] else None,
+            "edad": edad,
+            "diagnostico": str(m["diagnostico"]) if m["diagnostico"] else None,
             "viene_referido_de": m["viene_referido_de"],
             "va_referido_a": m["va_referido_a"],
             "viene_referido": m["viene_referido"],
@@ -1080,13 +1130,14 @@ def indicadores_consultas(
     # así que la suma de `registros` por indicador son las consultas que lo traen.
     filas_valor = db.execute(text(f"""
         SELECT
-            e.key AS indicador,
+            {_CLAVE_REPORTADA_SQL} AS indicador,
             e.value AS valor,
             COUNT(*) AS registros,
             COUNT(DISTINCT c.paciente_id) AS pacientes
         FROM consultas c
         CROSS JOIN LATERAL jsonb_each_text({_JSONB_INDICADORES}) AS e(key, value)
         WHERE {where_sql}
+          AND {_ALIAS_SIN_CANONICA_SQL}
         GROUP BY 1, 2
     """), params).fetchall()
 
@@ -1124,11 +1175,12 @@ def indicadores_consultas(
     # mismo paciente puede aparecer bajo varios valores de una clave.
     filas_pacientes = db.execute(text(f"""
         SELECT
-            e.key AS indicador,
+            {_CLAVE_REPORTADA_SQL} AS indicador,
             COUNT(DISTINCT c.paciente_id) AS pacientes
         FROM consultas c
         CROSS JOIN LATERAL jsonb_each_text({_JSONB_INDICADORES}) AS e(key, value)
         WHERE {where_sql}
+          AND {_ALIAS_SIN_CANONICA_SQL}
           AND e.value IS NOT NULL
           AND btrim(e.value) <> ''
           AND (
@@ -1143,12 +1195,13 @@ def indicadores_consultas(
 
     filas_tipo = db.execute(text(f"""
         SELECT
-            e.key AS indicador,
+            {_CLAVE_REPORTADA_SQL} AS indicador,
             c.tipo_consulta,
             COUNT(*) AS total
         FROM consultas c
         CROSS JOIN LATERAL jsonb_each_text({_JSONB_INDICADORES}) AS e(key, value)
         WHERE {where_sql}
+          AND {_ALIAS_SIN_CANONICA_SQL}
           AND e.value IS NOT NULL
           AND lower(btrim(e.value)) IN {_SQL_VERDADEROS}
         GROUP BY 1, 2

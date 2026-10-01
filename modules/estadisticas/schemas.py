@@ -302,6 +302,9 @@ class ReferenciaItemLista(BaseModel):
     tipo_consulta_nombre: Optional[str] = None
     especialidad: Optional[str] = None
     fecha_consulta: Optional[date] = None
+    sexo: Optional[str] = Field(None, description="Sexo del paciente (M/F)")
+    edad: Optional[int] = Field(None, description="Edad del paciente en años al momento de la consulta")
+    diagnostico: Optional[str] = Field(None, description="Diagnósticos de egreso (código - descripción)")
     viene_referido_de: Optional[str] = None
     va_referido_a: Optional[str] = None
     viene_referido: Optional[str] = None

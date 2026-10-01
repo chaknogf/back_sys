@@ -13,7 +13,9 @@ from modules.pacientes.schemas import PacienteConsultaBase, PacientesNombre
 # ===================================================================
 class Indicador(BaseModel):
     estudiante_publico: Optional[bool] = None
-    empleado_publico: Optional[bool] = None
+    # Clave canónica de "personal del hospital". El alias histórico
+    # `empleado_publico` guardaba el mismo dato y se funde en esta con
+    # PATCH /consultas/sincronizar-indicadores.
     personal_hospital: Optional[Union[str, bool]] = None
     accidente_laboral: Optional[bool] = None
     discapacidad: Optional[bool] = None

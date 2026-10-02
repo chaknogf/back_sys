@@ -181,7 +181,7 @@ def listar_procedimientos_medicos(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=100000),
     especialidad: Optional[str] = Query(None),
     especialidad_id: Optional[int] = Query(None),
     lugar_servicio: Optional[str] = Query(None),
@@ -476,41 +476,61 @@ def eliminar_procedimiento_medico(
 
 @router.get("/estadisticas/resumen")
 def obtener_estadisticas(
-    anio: int = Query(..., ge=2000, le=2100),
+    anio: Optional[int] = Query(None, ge=2000, le=2100),
     mes: Optional[int] = Query(None, ge=1, le=12),
+    desde: Optional[date] = Query(None),
+    hasta: Optional[date] = Query(None),
+    especialidad: Optional[str] = Query(None),
+    lugar_servicio: Optional[str] = Query(None),
+    sexo: Optional[str] = Query(None),
     nombre: Optional[str] = Query(None),
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     query = db.query(ProceMedicoModel)
-    
-    if mes:
-        fecha_inicio = date(anio, mes, 1)
-        if mes == 12:
-            fecha_fin = date(anio + 1, 1, 1) - timedelta(days=1)
+
+    if desde and hasta:
+        fecha_inicio = desde
+        fecha_fin = hasta
+    elif anio:
+        if mes:
+            fecha_inicio = date(anio, mes, 1)
+            if mes == 12:
+                fecha_fin = date(anio + 1, 1, 1) - timedelta(days=1)
+            else:
+                fecha_fin = date(anio, mes + 1, 1) - timedelta(days=1)
         else:
-            fecha_fin = date(anio, mes + 1, 1) - timedelta(days=1)
+            fecha_inicio = date(anio, 1, 1)
+            fecha_fin = date(anio, 12, 31)
     else:
-        fecha_inicio = date(anio, 1, 1)
-        fecha_fin = date(anio, 12, 31)
-    
+        hoy = date.today()
+        fecha_inicio = date(hoy.year, 1, 1)
+        fecha_fin = date(hoy.year, 12, 31)
+
     query = query.filter(
         ProceMedicoModel.fecha >= fecha_inicio,
         ProceMedicoModel.fecha <= fecha_fin
     )
-    
+
+    if especialidad:
+        query = query.filter(ProceMedicoModel.especialidad.ilike(f"%{especialidad}%"))
+    if lugar_servicio:
+        query = query.filter(ProceMedicoModel.lugar_servicio.ilike(f"%{lugar_servicio}%"))
+    if sexo:
+        query = query.filter(ProceMedicoModel.sexo == sexo)
     if nombre:
         query = query.join(ProcedimientoModel, ProcedimientoModel.id == ProceMedicoModel.id_procedimiento)
         query = query.filter(ProcedimientoModel.nombre.ilike(f"%{nombre}%"))
-    
+
     total_procedimientos = query.count()
     total_cantidad = query.with_entities(func.sum(ProceMedicoModel.cantidad)).scalar() or 0
-    
+
     top_query = (
         db.query(
             ProcedimientoModel.nombre,
             func.count(ProceMedicoModel.id).label('total'),
-            func.coalesce(func.sum(ProceMedicoModel.cantidad), 0).label('total_cantidad')
+            func.coalesce(func.sum(ProceMedicoModel.cantidad), 0).label('total_cantidad'),
+            func.coalesce(func.sum(ProceMedicoModel.anestesia), 0).label('total_anestesia')
         )
         .join(ProceMedicoModel, ProceMedicoModel.id_procedimiento == ProcedimientoModel.id)
         .filter(
@@ -518,12 +538,18 @@ def obtener_estadisticas(
             ProceMedicoModel.fecha <= fecha_fin
         )
     )
+    if especialidad:
+        top_query = top_query.filter(ProceMedicoModel.especialidad.ilike(f"%{especialidad}%"))
+    if lugar_servicio:
+        top_query = top_query.filter(ProceMedicoModel.lugar_servicio.ilike(f"%{lugar_servicio}%"))
+    if sexo:
+        top_query = top_query.filter(ProceMedicoModel.sexo == sexo)
     if nombre:
         top_query = top_query.filter(ProcedimientoModel.nombre.ilike(f"%{nombre}%"))
-    
+
     top_procedimientos = (
         top_query
-        .group_by(ProcedimientoModel.id)
+        .group_by(ProcedimientoModel.id, ProcedimientoModel.nombre)
         .order_by(func.coalesce(func.sum(ProceMedicoModel.cantidad), 0).desc())
         .limit(5)
         .all()
@@ -553,11 +579,24 @@ def obtener_estadisticas(
         "total_registros": total_procedimientos,
         "total_cantidad_procedimientos": total_cantidad,
         "top_procedimientos": [
-            {"nombre": p.nombre, "total": p.total, "total_cantidad": int(p.total_cantidad)}
+            {
+                "nombre": p.nombre,
+                "total": p.total,
+                "total_cantidad": int(p.total_cantidad or 0),
+                "total_anestesia": int(p.total_anestesia or 0)
+            }
             for p in top_procedimientos
         ],
         "usg_gine": {
             "total_registros": usg_gine_query.total_registros if usg_gine_query else 0,
             "total_cantidad": int(usg_gine_query.total_cantidad) if usg_gine_query else 0
-        }
+        },
+        "resumen": [
+            {
+                "nombre": p.nombre,
+                "total_cantidad": int(p.total_cantidad or 0),
+                "total_anestesia": int(p.total_anestesia or 0)
+            }
+            for p in top_procedimientos
+        ]
     }

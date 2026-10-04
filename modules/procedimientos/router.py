@@ -418,6 +418,91 @@ def reporte_proce_medicos(
     }
 
 
+@router.get("/mas-usados")
+def listar_mas_usados(
+    especialidad_id: Optional[int] = Query(None, description="Especialidad; si se omite, agrupa por todas"),
+    desde: Optional[date] = Query(None),
+    hasta: Optional[date] = Query(None),
+    limite: int = Query(10, ge=1, le=100),
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Procedimientos más usados por especialidad, según la cantidad registrada.
+
+    Se apoya en el catálogo maestro (`id_catalogo_procedimiento`), que es el que
+    usan los registros actuales. La especialidad se toma del propio registro, no
+    del catálogo, para que un mismo procedimiento no se duplique al cambiar de
+    especialidad en el catálogo.
+    """
+    filtros = ["pm.id_catalogo_procedimiento IS NOT NULL", "pm.fecha IS NOT NULL"]
+
+    if especialidad_id is not None:
+        filtros.append("pm.especialidad_id = :especialidad_id")
+    if desde:
+        filtros.append("pm.fecha >= :desde")
+    if hasta:
+        filtros.append("pm.fecha <= :hasta")
+
+    params = {}
+    if especialidad_id is not None:
+        params["especialidad_id"] = especialidad_id
+    if desde:
+        params["desde"] = desde
+    if hasta:
+        params["hasta"] = hasta
+
+    rows = db.execute(text(f"""
+        WITH uso AS (
+            SELECT
+                pm.especialidad_id,
+                esp.abreviatura AS especialidad,
+                esp.nombre AS especialidad_nombre,
+                cat.id AS id_catalogo_procedimiento,
+                cat.abreviatura,
+                cat.nombre,
+                SUM(pm.cantidad) AS total_cantidad,
+                COUNT(*) AS total_registros,
+                SUM(pm.anestesia) AS total_anestesia,
+                ROW_NUMBER() OVER (
+                    PARTITION BY pm.especialidad_id
+                    ORDER BY SUM(pm.cantidad) DESC, COUNT(*) DESC, cat.nombre
+                ) AS posicion
+            FROM proce_medicos pm
+            JOIN catalogo_procedimientos cat
+              ON cat.id = pm.id_catalogo_procedimiento
+            LEFT JOIN especialidades esp
+              ON esp.id = pm.especialidad_id
+            WHERE {" AND ".join(filtros)}
+            GROUP BY pm.especialidad_id, esp.abreviatura, esp.nombre,
+                     cat.id, cat.abreviatura, cat.nombre
+        )
+        SELECT * FROM uso
+        WHERE posicion <= :limite
+        ORDER BY especialidad, posicion
+    """), {**params, "limite": limite}).fetchall()
+
+    grupos = []
+    for r in rows:
+        m = r._mapping
+        grupos.append({
+            "especialidad_id": m["especialidad_id"],
+            "especialidad": m["especialidad"],
+            "especialidad_nombre": m["especialidad_nombre"],
+            "id_catalogo_procedimiento": m["id_catalogo_procedimiento"],
+            "abreviatura": m["abreviatura"],
+            "nombre": m["nombre"],
+            "total_cantidad": int(m["total_cantidad"] or 0),
+            "total_registros": int(m["total_registros"] or 0),
+            "total_anestesia": int(m["total_anestesia"] or 0),
+            "posicion": int(m["posicion"]),
+        })
+
+    return {
+        "procedimientos": grupos,
+        "total": len(grupos),
+    }
+
+
 def _cantidades_por_sexo(detalle, sexo_legacy, cantidad) -> dict:
     """Cantidades M/F de un registro: desde el JSONB o, si no hay, de su sexo histórico."""
     if detalle:

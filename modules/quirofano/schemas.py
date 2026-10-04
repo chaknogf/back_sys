@@ -170,6 +170,11 @@ class IntervencionQuirurgicaCreate(BaseModel):
     procedimiento_3: str | None = Field(None, max_length=200)
     procedimiento_4: str | None = Field(None, max_length=200)
     procedimiento_5: str | None = Field(None, max_length=200)
+    procedimiento_principal_id: int | None = Field(None, description="FK al catálogo maestro")
+    procedimiento_2_id: int | None = None
+    procedimiento_3_id: int | None = None
+    procedimiento_4_id: int | None = None
+    procedimiento_5_id: int | None = None
     area_cuerpo_intervenida: str | None = Field(None, max_length=100)
     fecha: date = Field(default_factory=date.today, description="Fecha de la cirugía (automática)")
     hora_inicio_anestesia: time | None = None
@@ -191,6 +196,11 @@ class IntervencionQuirurgicaUpdate(BaseModel):
     procedimiento_3: str | None = Field(None, max_length=200)
     procedimiento_4: str | None = Field(None, max_length=200)
     procedimiento_5: str | None = Field(None, max_length=200)
+    procedimiento_principal_id: int | None = None
+    procedimiento_2_id: int | None = None
+    procedimiento_3_id: int | None = None
+    procedimiento_4_id: int | None = None
+    procedimiento_5_id: int | None = None
     area_cuerpo_intervenida: str | None = Field(None, max_length=100)
     fecha: date | None = None
     hora_inicio_anestesia: time | None = None
@@ -209,10 +219,20 @@ class IntervencionQuirurgicaOut(BaseModel):
     personal_atencion_id: int | None = None
     medico_nombre: str | None = None
     procedimiento_principal: str | None = None
+    procedimiento_principal_id: int | None = None
+    procedimiento_principal_catalogo_nombre: str | None = None
     procedimiento_2: str | None = None
+    procedimiento_2_id: int | None = None
+    procedimiento_2_catalogo_nombre: str | None = None
     procedimiento_3: str | None = None
+    procedimiento_3_id: int | None = None
+    procedimiento_3_catalogo_nombre: str | None = None
     procedimiento_4: str | None = None
+    procedimiento_4_id: int | None = None
+    procedimiento_4_catalogo_nombre: str | None = None
     procedimiento_5: str | None = None
+    procedimiento_5_id: int | None = None
+    procedimiento_5_catalogo_nombre: str | None = None
     area_cuerpo_intervenida: str | None = None
     estado_cirugia_id: int | None = None
     estado_cirugia_nombre: str | None = None

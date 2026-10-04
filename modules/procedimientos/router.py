@@ -186,6 +186,8 @@ def listar_procedimientos_medicos(
     especialidad_id: Optional[int] = Query(None),
     lugar_servicio: Optional[str] = Query(None),
     id_procedimiento: Optional[int] = Query(None),
+    id_catalogo_procedimiento: Optional[int] = Query(None),
+    id_area_cuerpo_intervenida: Optional[int] = Query(None),
     mes: Optional[int] = Query(None, ge=1, le=12),
     anio: Optional[int] = Query(None, ge=2000, le=2100),
     fecha_inicio: Optional[date] = Query(None),
@@ -194,6 +196,8 @@ def listar_procedimientos_medicos(
     query = (
         db.query(ProceMedicoModel)
         .options(joinedload(ProceMedicoModel.procedimiento))
+        .options(joinedload(ProceMedicoModel.catalogo))
+        .options(joinedload(ProceMedicoModel.area_cuerpo))
     )
 
     if especialidad:
@@ -213,6 +217,16 @@ def listar_procedimientos_medicos(
     if id_procedimiento:
         query = query.filter(
             ProceMedicoModel.id_procedimiento == id_procedimiento
+        )
+
+    if id_catalogo_procedimiento:
+        query = query.filter(
+            ProceMedicoModel.id_catalogo_procedimiento == id_catalogo_procedimiento
+        )
+
+    if id_area_cuerpo_intervenida:
+        query = query.filter(
+            ProceMedicoModel.id_area_cuerpo_intervenida == id_area_cuerpo_intervenida
         )
 
     if fecha_inicio:

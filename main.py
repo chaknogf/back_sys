@@ -60,6 +60,8 @@ from modules.renap.router import router as renap_router
 from modules.totales.router import router as totales_router
 from modules.prestamos.router import router as prestamos_router
 from modules.procedimientos.router import router as procedimientos_router
+from modules.catalogo_procedimientos.router import router as catalogo_procedimientos_router
+from modules.catalogo_procedimientos.router import router_areas as areas_cuerpo_router
 from modules.eventos.router import router as eventos_router
 from modules.estadisticas.router import router as estadisticas_router
 from modules.audit_log.router import router as audit_log_router
@@ -161,6 +163,8 @@ app.include_router(renap_router)
 app.include_router(totales_router)
 app.include_router(prestamos_router)
 app.include_router(procedimientos_router)
+app.include_router(catalogo_procedimientos_router)
+app.include_router(areas_cuerpo_router)
 app.include_router(eventos_router)
 app.include_router(estadisticas_router)
 app.include_router(audit_log_router)

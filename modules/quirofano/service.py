@@ -538,6 +538,8 @@ def eliminar_quirofano_numero(qn_id: int, db: Session) -> dict:
 
 def _resolve_intervencion(row) -> dict:
     """Convierte una fila con joins en dict serializable."""
+    from modules.catalogo_procedimientos.models import CatalogoProcedimiento
+
     interv, paciente, medico, estado, formato, procedencia, rango, quirofano = row
     paciente_nombre = getattr(paciente, "nombre_completo", None) if paciente else None
     personal_atencion_nombre = getattr(medico, "nombre", None) if medico else None
@@ -547,6 +549,21 @@ def _resolve_intervencion(row) -> dict:
     rango_nombre = getattr(rango, "nombre", None) if rango else None
     quirofano_nombre = getattr(quirofano, "nombre", None) if quirofano else None
 
+    # Resolver procedimientos desde el catálogo maestro
+    proc_ids = [
+        interv.procedimiento_principal_id,
+        interv.procedimiento_2_id,
+        interv.procedimiento_3_id,
+        interv.procedimiento_4_id,
+        interv.procedimiento_5_id,
+    ]
+    proc_nombres = {}
+    if any(proc_ids):
+        for p in db.query(CatalogoProcedimiento).filter(
+            CatalogoProcedimiento.id.in_(i for i in proc_ids if i is not None)
+        ).all():
+            proc_nombres[p.id] = p.nombre
+
     return {
         "intervencion_id": interv.intervencion_id,
         "paciente_id": interv.paciente_id,
@@ -554,11 +571,21 @@ def _resolve_intervencion(row) -> dict:
         "expediente": interv.expediente,
         "personal_atencion_id": interv.personal_atencion_id,
         "personal_atencion_nombre": personal_atencion_nombre,
-        "procedimiento_principal": interv.procedimiento_principal,
-        "procedimiento_2": interv.procedimiento_2,
-        "procedimiento_3": interv.procedimiento_3,
-        "procedimiento_4": interv.procedimiento_4,
-        "procedimiento_5": interv.procedimiento_5,
+        "procedimiento_principal": interv.procedimiento_principal or proc_nombres.get(interv.procedimiento_principal_id),
+        "procedimiento_principal_id": interv.procedimiento_principal_id,
+        "procedimiento_principal_catalogo_nombre": proc_nombres.get(interv.procedimiento_principal_id),
+        "procedimiento_2": interv.procedimiento_2 or proc_nombres.get(interv.procedimiento_2_id),
+        "procedimiento_2_id": interv.procedimiento_2_id,
+        "procedimiento_2_catalogo_nombre": proc_nombres.get(interv.procedimiento_2_id),
+        "procedimiento_3": interv.procedimiento_3 or proc_nombres.get(interv.procedimiento_3_id),
+        "procedimiento_3_id": interv.procedimiento_3_id,
+        "procedimiento_3_catalogo_nombre": proc_nombres.get(interv.procedimiento_3_id),
+        "procedimiento_4": interv.procedimiento_4 or proc_nombres.get(interv.procedimiento_4_id),
+        "procedimiento_4_id": interv.procedimiento_4_id,
+        "procedimiento_4_catalogo_nombre": proc_nombres.get(interv.procedimiento_4_id),
+        "procedimiento_5": interv.procedimiento_5 or proc_nombres.get(interv.procedimiento_5_id),
+        "procedimiento_5_id": interv.procedimiento_5_id,
+        "procedimiento_5_catalogo_nombre": proc_nombres.get(interv.procedimiento_5_id),
         "area_cuerpo_intervenida": interv.area_cuerpo_intervenida,
         "estado_cirugia_id": interv.estado_cirugia_id,
         "estado_cirugia_nombre": estado_nombre,
@@ -699,6 +726,11 @@ def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_
         procedimiento_3=data.procedimiento_3,
         procedimiento_4=data.procedimiento_4,
         procedimiento_5=data.procedimiento_5,
+        procedimiento_principal_id=data.procedimiento_principal_id,
+        procedimiento_2_id=data.procedimiento_2_id,
+        procedimiento_3_id=data.procedimiento_3_id,
+        procedimiento_4_id=data.procedimiento_4_id,
+        procedimiento_5_id=data.procedimiento_5_id,
         area_cuerpo_intervenida=data.area_cuerpo_intervenida,
         estado_cirugia_id=data.estado_cirugia_id,
         formato_procedimiento_id=data.formato_procedimiento_id,

@@ -1,6 +1,6 @@
 """Modelos del catálogo de procedimientos y sus realizaciones clínicas."""
 
-from sqlalchemy import Column, Integer, String, Text, Date, CHAR, TIMESTAMP, CheckConstraint, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, Text, Date, CHAR, TIMESTAMP, CheckConstraint, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -68,7 +68,7 @@ class CatalogoProcedimiento(Base):
     descripcion = Column(Text, nullable=True)
     anestesia = Column(Integer, nullable=True, default=0)
     especialidad_ref = Column(Integer, ForeignKey("especialidades.id", ondelete="SET NULL"), nullable=True)
-    activo = Column(Integer, nullable=True, default=1)
+    activo = Column(Boolean, nullable=True, default=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -85,7 +85,7 @@ class AreaCuerpoIntervenida(Base):
     nombre = Column(String(100), nullable=False)
     region = Column(String(50), nullable=True)
     descripcion = Column(Text, nullable=True)
-    activo = Column(Integer, nullable=True, default=1)
+    activo = Column(Boolean, nullable=True, default=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
 

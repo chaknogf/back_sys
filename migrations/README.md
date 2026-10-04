@@ -60,6 +60,11 @@ Todas (en orden, deteniéndose al primer error):
 | 028 | `028_procedimiento_quirofano_mixta.sql` | `procedimiento_quirofano.especialidad_id` → nullable (NULL = "Todas (mixta)"); reconstruye el único con `NULLS NOT DISTINCT`. |
 | 029 | `029_personal_atencion_citas.sql` | Renombra `medicos` → `personal_atencion` + columnas FK `medico_id` → `personal_atencion_id` (personal_salud, defunciones, intervenciones_quirurgicas, sigsa3, sigsa3_registros, constancia_nacimiento); crea `citas_dias_inhabiles`; agrega `citas.personal_atencion_id`. |
 | 030 | `030_censo_camas_unificar_sexos.sql` | Migra `censo_camas` a una fila por fecha/servicio; conserva movimientos por sexo, recalcula las columnas agregadas y reemplaza la unicidad por `(fecha, servicio_id)`. |
+| 072 | `072_procedimientos_grupo_edad_detalle.sql` | `proce_medicos`: agrega `grupo_edad_detalle` JSONB (`{"NEO":{"m":2,"f":1}}`) con el desglose por grupo etario IMCI/OMS y sexo; respalda desde `edad`/`unidad_edad`/`grupo_edad` si existen, descarta claves de grupo inválidas, crea índices GIN y de expresión, y elimina `edad`, `unidad_edad` y `grupo_edad`. `cantidad` pasa a ser la suma del desglose. **No** elimina `sexo`: los 18 538 registros previos nunca tuvieron grupo etario y lo conservan como dato histórico (los nuevos lo dejan en NULL). |
+| 073 | `073_catalogo_procedimientos_completo.sql` | Carga el catálogo maestro completo desde `data/quirofano_procedimientos.csv`: 195 → **476** procedimientos. Generado, no escrito a mano. Limpieza: quita el prefijo `(VAC)` de 3 nombres y descarta 2 duplicados del CSV con especialidades distintas (`Amputación`, `Circuncisión`), porque `nombre` es UNIQUE. Llena `especialidad_ref` con el mapeo del CSV (CIR/TRA/PED/GIN/MI). `abreviatura` queda NULL en las filas nuevas. Idempotente (`ON CONFLICT (nombre) DO NOTHING`). |
+
+> La tabla de mapeo se mantiene hasta `030`. Las migraciones `031` → `071`
+> están documentadas en el encabezado de cada archivo.
 
 ## Cadena de cambios del catálogo Quirófano
 

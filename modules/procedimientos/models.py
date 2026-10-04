@@ -1,6 +1,7 @@
 """Modelos del catálogo de procedimientos y sus realizaciones clínicas."""
 
 from sqlalchemy import Column, Integer, String, Text, Date, CHAR, TIMESTAMP, CheckConstraint, ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from core.database import Base
@@ -21,11 +22,16 @@ class Procedimiento(Base):
 
 
 class ProceMedico(Base):
-    """Procedimiento realizado; la base exige cantidad positiva y sexo M/F."""
+    """Procedimiento realizado con el desglose de cantidades por grupo de edad y sexo.
+
+    `grupo_edad_detalle` es un JSONB {"NEO": {"m": 2, "f": 1}, ...} y `cantidad`
+    guarda su suma, para no recalcularla en cada reporte. La columna `sexo` se
+    conserva únicamente para los registros históricos, que nunca tuvieron grupo
+    etario; los registros nuevos la dejan en NULL.
+    """
     __tablename__ = "proce_medicos"
     __table_args__ = (
         CheckConstraint("cantidad >= 1", name="proce_medicos_cantidad_check"),
-        CheckConstraint("sexo IN ('M', 'F')", name="proce_medicos_sexo_check"),
         {"schema": "public"}
     )
 
@@ -41,6 +47,7 @@ class ProceMedico(Base):
     cantidad = Column(Integer, nullable=False, default=1)
     responsable = Column(String(20), nullable=True)
     anestesia = Column(Integer, nullable=True, default=0)
+    grupo_edad_detalle = Column(JSONB, nullable=True)
     created_by = Column(String(10), nullable=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
@@ -60,7 +67,7 @@ class CatalogoProcedimiento(Base):
     nombre = Column(String(200), unique=True, nullable=False)
     descripcion = Column(Text, nullable=True)
     anestesia = Column(Integer, nullable=True, default=0)
-    especialidad_ref = Column(Integer, ForeignKey("public.especialidades.id", ondelete="SET NULL"), nullable=True)
+    especialidad_ref = Column(Integer, ForeignKey("especialidades.id", ondelete="SET NULL"), nullable=True)
     activo = Column(Integer, nullable=True, default=1)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())

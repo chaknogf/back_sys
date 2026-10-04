@@ -3,13 +3,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_cache.decorator import cache
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, and_, or_, text
+from sqlalchemy import func, and_, or_, text, Integer
 from typing import List, Optional
 from datetime import datetime, date, time, timedelta
 from core.database import get_db
 from modules.users.models import UserModel
 from modules.procedimientos.models import Procedimiento as ProcedimientoModel
 from modules.procedimientos.models import ProceMedico as ProceMedicoModel
+from modules.procedimientos.models import CatalogoProcedimiento as CatalogoProcedimientoModel
+from modules.especialidades.models import EspecialidadModel
 from modules.procedimientos.schemas import (
     ProcedimientoBase,
     ProcedimientoCreate,
@@ -22,7 +24,8 @@ from modules.procedimientos.schemas import (
     ProceMedicoOut,
     ProceMedicoInDB,
     ProceMedicoResponse,
-    ProcedimientosListResponse
+ProcedimientosListResponse,
+    GRUPOS_EDAD
 )
 from core.security import get_current_user
 
@@ -30,6 +33,41 @@ router = APIRouter(
     prefix="/procedimientos",
     tags=["Procedimientos"]
 )
+
+
+def _detalle_json(detalle) -> Optional[dict]:
+    """Convierte el desglose validado a un JSONB simple {"NEO": {"m": 2, "f": 1}}."""
+    if not detalle:
+        return None
+    return {
+        codigo: {"m": int(cantidades.m), "f": int(cantidades.f)}
+        for codigo, cantidades in detalle.items()
+    }
+
+
+def _filtro_grupo_edad(grupo_edad: str):
+    """Registros cuyo grupo etario tiene cantidad en M o en F."""
+    columna = ProceMedicoModel.grupo_edad_detalle
+    return or_(
+        columna[grupo_edad]["m"].astext.cast(Integer) > 0,
+        columna[grupo_edad]["f"].astext.cast(Integer) > 0,
+    )
+
+
+def _filtro_sexo(sexo: str):
+    """Registros con cantidad de ese sexo en cualquier grupo etario, más los históricos."""
+    columna = ProceMedicoModel.grupo_edad_detalle
+    clave = "m" if sexo == "M" else "f"
+    return or_(
+        *[
+            columna[codigo][clave].astext.cast(Integer) > 0
+            for codigo in GRUPOS_EDAD
+        ],
+        and_(
+            columna.is_(None),
+            ProceMedicoModel.sexo == sexo,
+        ),
+    )
 
 
 @router.get("/catalogo", response_model=list[ProcedimientoOut])
@@ -188,6 +226,8 @@ def listar_procedimientos_medicos(
     id_procedimiento: Optional[int] = Query(None),
     id_catalogo_procedimiento: Optional[int] = Query(None),
     id_area_cuerpo_intervenida: Optional[int] = Query(None),
+    grupo_edad: Optional[str] = Query(None, pattern="^(NEO|LAC|PRI|SEG|ADO|ADU|ADM)$"),
+    sexo: Optional[str] = Query(None, pattern="^[MF]$"),
     mes: Optional[int] = Query(None, ge=1, le=12),
     anio: Optional[int] = Query(None, ge=2000, le=2100),
     fecha_inicio: Optional[date] = Query(None),
@@ -228,6 +268,12 @@ def listar_procedimientos_medicos(
         query = query.filter(
             ProceMedicoModel.id_area_cuerpo_intervenida == id_area_cuerpo_intervenida
         )
+
+    if grupo_edad:
+        query = query.filter(_filtro_grupo_edad(grupo_edad))
+
+    if sexo:
+        query = query.filter(_filtro_sexo(sexo))
 
     if fecha_inicio:
         query = query.filter(
@@ -283,7 +329,12 @@ def reporte_proce_medicos(
     lugar_servicio: Optional[str] = Query(None),
     sexo: Optional[str] = Query(None, pattern="^[MF]$"),
 ):
-    """Agrupa cantidades por especialidad, servicio y sexo usando parámetros SQL para filtros."""
+    """Agrupa cantidades por especialidad, servicio y sexo.
+
+    Las cantidades por sexo salen del desglose `grupo_edad_detalle`; los registros
+    históricos, que no tienen desglose, aportan su columna `sexo`. La anestesia se
+    cuenta una sola vez por registro, no una vez por sexo.
+    """
     filtros = []
     params = {}
 
@@ -300,56 +351,93 @@ def reporte_proce_medicos(
         filtros.append("pm.lugar_servicio = :lugar_servicio")
         params["lugar_servicio"] = lugar_servicio
     if sexo:
-        filtros.append("pm.sexo = :sexo")
+        clave = "m" if sexo == "M" else "f"
+        condiciones = [
+            f"COALESCE((pm.grupo_edad_detalle->>'{codigo}'->>'{clave}')::int, 0) > 0"
+            for codigo in GRUPOS_EDAD
+        ]
+        # Los registros históricos no tienen desglose, así que se filtran por su sexo
+        condiciones.append("(pm.grupo_edad_detalle IS NULL AND pm.sexo = :sexo)")
+        filtros.append("(" + " OR ".join(condiciones) + ")")
         params["sexo"] = sexo
 
     where_sql = " AND ".join(filtros) if filtros else "TRUE"
 
-    rows = db.execute(text(f"""
+    registros = db.execute(text(f"""
         SELECT
             pm.especialidad,
             pm.lugar_servicio,
             pm.sexo,
-            COALESCE(SUM(pm.cantidad), 0) AS total_cantidad,
-            COALESCE(SUM(pm.anestesia), 0) AS total_anestesia,
-            COUNT(*) AS total_registros
+            pm.cantidad,
+            pm.anestesia,
+            pm.grupo_edad_detalle
         FROM proce_medicos pm
         LEFT JOIN procedimientos p ON p.id = pm.id_procedimiento
         WHERE {where_sql}
-        GROUP BY pm.especialidad, pm.lugar_servicio, pm.sexo
-        ORDER BY pm.especialidad, pm.lugar_servicio, pm.sexo
     """), params).fetchall()
 
-    grupos = []
+    grupos: dict[tuple, dict] = {}
     gran_total_cantidad = 0
     gran_total_anestesia = 0
     gran_total_registros = 0
 
-    for r in rows:
+    for r in registros:
         m = r._mapping
-        cant = int(m["total_cantidad"])
-        anest = int(m["total_anestesia"])
-        regs = int(m["total_registros"])
-        gran_total_cantidad += cant
-        gran_total_anestesia += anest
-        gran_total_registros += regs
-        grupos.append({
-            "especialidad": m["especialidad"],
-            "lugar_servicio": m["lugar_servicio"],
-            "sexo": m["sexo"],
-            "total_cantidad": cant,
-            "total_anestesia": anest,
-            "total_registros": regs,
-        })
+        cantidad_por_sexo = _cantidades_por_sexo(m["grupo_edad_detalle"], m["sexo"], m["cantidad"])
+
+        for sx, cant in cantidad_por_sexo.items():
+            if cant <= 0:
+                continue
+            clave = (m["especialidad"], m["lugar_servicio"], sx)
+            g = grupos.setdefault(clave, {
+                "especialidad": m["especialidad"],
+                "lugar_servicio": m["lugar_servicio"],
+                "sexo": sx,
+                "total_cantidad": 0,
+                "total_anestesia": 0,
+                "total_registros": 0,
+            })
+            g["total_cantidad"] += cant
+            g["total_registros"] += 1
+
+        # La anestesia corresponde al registro completo, no a cada sexo
+        gran_total_anestesia += int(m["anestesia"] or 0)
+        gran_total_registros += 1
+        gran_total_cantidad += sum(cantidad_por_sexo.values())
 
     return {
-        "grupos": grupos,
+        "grupos": sorted(
+            grupos.values(),
+            key=lambda g: (g["especialidad"] or "", g["lugar_servicio"] or "", g["sexo"])
+        ),
         "totales": {
             "total_cantidad": gran_total_cantidad,
             "total_anestesia": gran_total_anestesia,
             "total_registros": gran_total_registros,
         },
     }
+
+
+def _cantidades_por_sexo(detalle, sexo_legacy, cantidad) -> dict:
+    """Cantidades M/F de un registro: desde el JSONB o, si no hay, de su sexo histórico."""
+    if detalle:
+        return {
+            "M": sum(int(v.get("m", 0) or 0) for v in detalle.values()),
+            "F": sum(int(v.get("f", 0) or 0) for v in detalle.values()),
+        }
+    if sexo_legacy in ("M", "F"):
+        return {"M": int(cantidad or 0) if sexo_legacy == "M" else 0,
+                "F": int(cantidad or 0) if sexo_legacy == "F" else 0}
+    return {"M": 0, "F": 0}
+
+
+@router.get("/grupos-edad")
+def listar_grupos_edad(current_user: UserModel = Depends(get_current_user)):
+    """Devuelve los grupos de edad (IMCI/OMS) admitidos en los registros."""
+    return [
+        {"codigo": codigo, "nombre": nombre}
+        for codigo, nombre in GRUPOS_EDAD.items()
+    ]
 
 
 @router.get("/{id}", response_model=ProceMedicoResponse)
@@ -386,20 +474,31 @@ def crear_procedimiento_medico(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    """Registra al usuario y calcula anestesia como valor de catálogo por cantidad."""
+    """Registra el desglose por grupo de edad/sexo y calcula el total y la anestesia."""
     catalogo = None
-    if datos.id_procedimiento:
-        catalogo = db.get(ProcedimientoModel, datos.id_procedimiento)
+    if datos.id_catalogo_procedimiento:
+        catalogo = db.get(CatalogoProcedimientoModel, datos.id_catalogo_procedimiento)
         if not catalogo:
+            raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
+    elif datos.id_procedimiento:
+        legacy = db.get(ProcedimientoModel, datos.id_procedimiento)
+        if not legacy:
             raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
 
     data = datos.model_dump(exclude={'created_by'})
-    if catalogo:
-        data.pop('anestesia', None)
     nuevo = ProceMedicoModel(
         **data,
+        sexo=None,
+        cantidad=datos.total_cantidad,
         created_by=current_user.username[:10] if current_user.username else None
     )
+    nuevo.grupo_edad_detalle = _detalle_json(datos.grupo_edad_detalle)
+    nuevo.anestesia = 0
+
+    # Mantiene sincronizado el código legacy de especialidad para reportes
+    if nuevo.especialidad_id and not nuevo.especialidad:
+        esp = db.get(EspecialidadModel, nuevo.especialidad_id)
+        nuevo.especialidad = esp.abreviatura if esp else None
 
     if catalogo:
         nuevo.anestesia = (catalogo.anestesia or 0) * nuevo.cantidad
@@ -431,9 +530,17 @@ def actualizar_procedimiento_medico(
             detail="Procedimiento médico no encontrado"
         )
 
+    cat_id = datos.id_catalogo_procedimiento or procedimiento.id_catalogo_procedimiento
     proc_id = datos.id_procedimiento or procedimiento.id_procedimiento
     catalogo = None
-    if proc_id:
+    if cat_id:
+        catalogo = db.get(CatalogoProcedimientoModel, cat_id)
+        if not catalogo:
+            raise HTTPException(
+                status_code=404,
+                detail="Procedimiento no encontrado"
+            )
+    elif proc_id:
         catalogo = (
             db.query(ProcedimientoModel)
             .filter(
@@ -451,10 +558,22 @@ def actualizar_procedimiento_medico(
     for campo, valor in datos.model_dump(
         exclude_unset=True, exclude={'anestesia'}
     ).items():
+        if campo == 'grupo_edad_detalle':
+            continue
         setattr(procedimiento, campo, valor)
 
+    if datos.grupo_edad_detalle is not None:
+        procedimiento.grupo_edad_detalle = _detalle_json(datos.grupo_edad_detalle)
+        procedimiento.cantidad = datos.total_cantidad
+        procedimiento.sexo = None
+
     if catalogo:
-        procedimiento.anestesia = catalogo.anestesia * procedimiento.cantidad
+        procedimiento.anestesia = (catalogo.anestesia or 0) * procedimiento.cantidad
+
+    # Mantiene sincronizado el código legacy de especialidad para reportes
+    if procedimiento.especialidad_id and not procedimiento.especialidad:
+        esp = db.get(EspecialidadModel, procedimiento.especialidad_id)
+        procedimiento.especialidad = esp.abreviatura if esp else None
 
     db.commit()
     db.refresh(procedimiento)
@@ -531,7 +650,7 @@ def obtener_estadisticas(
     if lugar_servicio:
         query = query.filter(ProceMedicoModel.lugar_servicio.ilike(f"%{lugar_servicio}%"))
     if sexo:
-        query = query.filter(ProceMedicoModel.sexo == sexo)
+        query = query.filter(_filtro_sexo(sexo))
     if nombre:
         query = query.join(ProcedimientoModel, ProcedimientoModel.id == ProceMedicoModel.id_procedimiento)
         query = query.filter(ProcedimientoModel.nombre.ilike(f"%{nombre}%"))
@@ -557,7 +676,7 @@ def obtener_estadisticas(
     if lugar_servicio:
         top_query = top_query.filter(ProceMedicoModel.lugar_servicio.ilike(f"%{lugar_servicio}%"))
     if sexo:
-        top_query = top_query.filter(ProceMedicoModel.sexo == sexo)
+        top_query = top_query.filter(_filtro_sexo(sexo))
     if nombre:
         top_query = top_query.filter(ProcedimientoModel.nombre.ilike(f"%{nombre}%"))
 

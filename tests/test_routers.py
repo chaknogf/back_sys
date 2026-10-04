@@ -1032,15 +1032,16 @@ class TestProcedimientos:
             json={
                 "fecha": date.today().isoformat(),
                 "lugar_servicio": "COEX",
-                "sexo": "M",
                 "id_procedimiento": TestProcedimientos.PROC_ID,
                 "especialidad": "TEST",
-                "cantidad": 1,
                 "responsable": "Dr. Test",
+                "grupo_edad_detalle": {"ADU": {"m": 1, "f": 2}},
             },
         )
         assert r.status_code in (200, 201)
         data = r.json()
+        assert data["cantidad"] == 3
+        assert data["grupo_edad_detalle"]["ADU"] == {"m": 1, "f": 2}
         created_ids["procedimientos_realizados"].append(data["id"])
 
     def test_list_procedimientos_realizados(self, client, auth_headers):

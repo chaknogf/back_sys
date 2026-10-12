@@ -4,9 +4,11 @@ Mapeo de las modificaciones SQL del proyecto y comandos para aplicarlas.
 
 - **Motor**: PostgreSQL, base `hospital` en `localhost`.
 - **Conexión usada**: `psql -h localhost -U admin -d hospital` (password `secreto123`).
-- **Estado actual**: migraciones `002` → `029` aplicadas. No existe `001`
-  (el esquema base de `medicos`, `pacientes`, `personal_salud`, etc. se crea
-  aparte: `variables/database_schema.sql` / `migrations/archive/`).
+- **Estado actual**: `002` → `030` aplicadas, más `032_procedimientos_unificado.sql`.
+  El rango `031` → `073` (parches one-off con IDs hardcodeados del dump de
+  producción) fue **consolidado y eliminado**; no existe `001` (el esquema base de
+  `medicos`, `pacientes`, `personal_salud`, etc. se crea aparte:
+  `variables/database_schema.sql` / `migrations/archive/`).
 
 ## Cómo aplicar
 
@@ -60,11 +62,34 @@ Todas (en orden, deteniéndose al primer error):
 | 028 | `028_procedimiento_quirofano_mixta.sql` | `procedimiento_quirofano.especialidad_id` → nullable (NULL = "Todas (mixta)"); reconstruye el único con `NULLS NOT DISTINCT`. |
 | 029 | `029_personal_atencion_citas.sql` | Renombra `medicos` → `personal_atencion` + columnas FK `medico_id` → `personal_atencion_id` (personal_salud, defunciones, intervenciones_quirurgicas, sigsa3, sigsa3_registros, constancia_nacimiento); crea `citas_dias_inhabiles`; agrega `citas.personal_atencion_id`. |
 | 030 | `030_censo_camas_unificar_sexos.sql` | Migra `censo_camas` a una fila por fecha/servicio; conserva movimientos por sexo, recalcula las columnas agregadas y reemplaza la unicidad por `(fecha, servicio_id)`. |
-| 072 | `072_procedimientos_grupo_edad_detalle.sql` | `proce_medicos`: agrega `grupo_edad_detalle` JSONB (`{"NEO":{"m":2,"f":1}}`) con el desglose por grupo etario IMCI/OMS y sexo; respalda desde `edad`/`unidad_edad`/`grupo_edad` si existen, descarta claves de grupo inválidas, crea índices GIN y de expresión, y elimina `edad`, `unidad_edad` y `grupo_edad`. `cantidad` pasa a ser la suma del desglose. **No** elimina `sexo`: los 18 538 registros previos nunca tuvieron grupo etario y lo conservan como dato histórico (los nuevos lo dejan en NULL). |
-| 073 | `073_catalogo_procedimientos_completo.sql` | Carga el catálogo maestro completo desde `data/quirofano_procedimientos.csv`: 195 → **476** procedimientos. Generado, no escrito a mano. Limpieza: quita el prefijo `(VAC)` de 3 nombres y descarta 2 duplicados del CSV con especialidades distintas (`Amputación`, `Circuncisión`), porque `nombre` es UNIQUE. Llena `especialidad_ref` con el mapeo del CSV (CIR/TRA/PED/GIN/MI). `abreviatura` queda NULL en las filas nuevas. Idempotente (`ON CONFLICT (nombre) DO NOTHING`). |
+| 032 | `032_procedimientos_unificado.sql` | **Consolida** el antiguo rango `031`→`073` en un único archivo idempotente y *name-based* (sin IDs hardcodeados). Ver detalle abajo. |
 
-> La tabla de mapeo se mantiene hasta `030`. Las migraciones `031` → `071`
-> están documentadas en el encabezado de cada archivo.
+> El rango `031` → `073` ya **no existe** como archivos separados: era un conjunto
+> de parches one-off atados a los IDs de un dump de producción. Toda su lógica
+> neta quedó reescrita en `032_procedimientos_unificado.sql`.
+
+## `032_procedimientos_unificado.sql`
+
+Reescritura idempotente (se puede re-ejecutar sin efectos) que:
+- Crea `area_cuerpo_intervenida` (54 zonas) y siembra el catálogo maestro
+  `catalogo_procedimientos` (476 procedimientos) vía `VALUES` + `ON CONFLICT DO
+  NOTHING` (sin target, para cubrir tanto `nombre` como `abreviatura` UNIQUE).
+- Repunta `proce_medicos` a `catalogo_procedimientos` y a `area_cuerpo_intervenida`
+  por **nombre normalizado** (`unaccent(lower(btrim(nombre)))`).
+- Crea el puente `catalogo_procedimiento_area` (32 pares zona↔procedimiento).
+- Reemplaza `grupo_edad_detalle` (JSONB) por columnas desagregadas
+  `nino_m/nino_f/adulto_m/adulto_f/sin_edad_m/sin_edad_f`. Corte 18 años: niño =
+  `NEO+LAC+PRI+SEG+ADO`, adulto = `ADU+ADM`; los históricos sin edad ni grupo se
+  respaldan desde `sexo` hacia `sin_edad_m`/`sin_edad_f` (sumando `cantidad`).
+- Elimina `procedimientos` y `procedimientos_area_cuerpo` (legacy) y `sexo`,
+  `id_procedimiento`, `grupo_edad_detalle`, `edad`, `unidad_edad`, `grupo_edad`.
+- Agrega FKs de procedimiento/zona a `intervenciones_quirurgicas` (aditivo).
+- Crea las vistas `v_catalogo_procedimientos` y `v_areas_cuerpo`.
+
+> **Se conserva** `procedimiento_quirofano` (catálogo vivo del módulo Quirófano).
+> `cantidad` se mantiene como columna normal (la app la recalcula).
+> Verificado idempotente (2 corridas) sobre clon de `hospital` y sobre una BD
+> sintética pre-`032`.
 
 ## Cadena de cambios del catálogo Quirófano
 

@@ -8,7 +8,7 @@ from modules.consultas.models import ConsultaModel, ConsultaHistorialModel
 from modules.citas.models import CitaModel
 from modules.ciclos.models import CiclosConsulta
 from modules.prestamos.models import Prestamo
-from modules.procedimientos.models import Procedimiento, ProceMedico
+from modules.procedimientos.models import CatalogoProcedimiento, ProceMedico
 from modules.eventos.models import EventoConsultaModel
 from modules.constancias_nacimiento.models import ConstanciaNacimientoModel
 from modules.nacimientos.models import NacimientoModel
@@ -1329,16 +1329,13 @@ class TestProcedimientos:
     def test_create_realizado(self, client, admin_headers):
         if not TestProcedimientos.PROC_ID:
             pytest.skip("No proc catalogo")
-        if not created_ids["consultas"]:
-            pytest.skip("No consulta created")
-        cid = created_ids["consultas"][0]
         r = client.post(
             "/procedimientos/",
             headers=admin_headers,
             json={
-                "procedimiento_id": TestProcedimientos.PROC_ID,
-                "consulta_id": cid,
+                "id_catalogo_procedimiento": TestProcedimientos.PROC_ID,
                 "fecha": date.today().isoformat(),
+                "adulto_f": 1,
             },
         )
         assert r.status_code in (200, 201), f"Failed: {r.text}"
@@ -2093,7 +2090,7 @@ def pytest_sessionfinish(session):
             ("ciclos", CiclosConsulta),
             ("eventos", EventoConsultaModel),
             ("procedimientos_realizados", ProceMedico),
-            ("procedimientos_catalogo", Procedimiento),
+            ("procedimientos_catalogo", CatalogoProcedimiento),
             ("citas", CitaModel),
             ("encamamiento", EncamamientoModel),
             ("consultas", ConsultaModel),

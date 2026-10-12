@@ -8,7 +8,7 @@ from modules.consultas.models import ConsultaModel
 from modules.citas.models import CitaModel
 from modules.ciclos.models import CiclosConsulta
 from modules.prestamos.models import Prestamo
-from modules.procedimientos.models import Procedimiento, ProceMedico
+from modules.procedimientos.models import CatalogoProcedimiento, ProceMedico
 from modules.eventos.models import EventoConsultaModel
 from modules.constancias_nacimiento.models import ConstanciaNacimientoModel
 from modules.nacimientos.models import NacimientoModel
@@ -45,7 +45,7 @@ def cleanup():
             "citas": CitaModel,
             "ciclos": CiclosConsulta,
             "prestamos": Prestamo,
-            "procedimientos_catalogo": Procedimiento,
+            "procedimientos_catalogo": CatalogoProcedimiento,
             "procedimientos_realizados": ProceMedico,
             "eventos": EventoConsultaModel,
             "constancias": ConstanciaNacimientoModel,
@@ -1032,16 +1032,18 @@ class TestProcedimientos:
             json={
                 "fecha": date.today().isoformat(),
                 "lugar_servicio": "COEX",
-                "id_procedimiento": TestProcedimientos.PROC_ID,
+                "id_catalogo_procedimiento": TestProcedimientos.PROC_ID,
                 "especialidad": "TEST",
                 "responsable": "Dr. Test",
-                "grupo_edad_detalle": {"ADU": {"m": 1, "f": 2}},
+                "adulto_m": 1,
+                "nino_f": 2,
             },
         )
         assert r.status_code in (200, 201)
         data = r.json()
         assert data["cantidad"] == 3
-        assert data["grupo_edad_detalle"]["ADU"] == {"m": 1, "f": 2}
+        assert data["adulto_m"] == 1
+        assert data["nino_f"] == 2
         created_ids["procedimientos_realizados"].append(data["id"])
 
     def test_list_procedimientos_realizados(self, client, auth_headers):

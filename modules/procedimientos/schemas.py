@@ -1,186 +1,100 @@
 """Validación de entradas y respuestas del catálogo y registro de procedimientos."""
 
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, Self
 
 
-# Grupos of age (IMCI/OMS) accepted in procedure records
-GRUPOS_EDAD = {
-    "NEO": "Neonatos (0 a 28 días)",
-    "LAC": "Lactantes (más de 28 días a 12 meses)",
-    "PRI": "Primera infancia (1 a menos de 5 años)",
-    "SEG": "Segunda infancia (más de 5 años a 11 años)",
-    "ADO": "Adolescentes (12 a menos de 18 años)",
-    "ADU": "Adulto (18 a 59 años)",
-    "ADM": "Adulto mayor (60 años en adelante)",
+# Categorías etarias admitidas en el registro de procedimientos (corte a los 18 años)
+CATEGORIAS_EDAD = {
+    "nino": "PEDIA",
+    "adulto": "ADULTO",
 }
 
-
-class ProcedimientoBase(BaseModel):
-    abreviatura: Optional[str] = Field(None, max_length=10)
-    nombre: str = Field(..., max_length=200)
-    descripcion: Optional[str] = None
-    anestesia: Optional[int] = Field(0, ge=0)
-
-class ProcedimientoCreate(ProcedimientoBase):
-    pass
-
-class ProcedimientoUpdate(BaseModel):
-    abreviatura: Optional[str] = Field(None, max_length=10)
-    nombre: Optional[str] = Field(None, max_length=200)
-    descripcion: Optional[str] = None
-    anestesia: Optional[int] = Field(None, ge=0)
-
-class ProcedimientoOut(ProcedimientoBase):
-    id: int
-
-    model_config = ConfigDict(
-        from_attributes=True
-    )
-
-class ProcedimientoResponse(ProcedimientoOut):
-    pass
-
-
-class GrupoEdadCantidades(BaseModel):
-    """Cantidades de un grupo de edad separadas por sexo."""
-    m: int = Field(0, ge=0)
-    f: int = Field(0, ge=0)
-
-
-def validar_detalle_grupos(valor):
-    """Normaliza el desglose: solo los 7 grupos válidos, cantidades enteras >= 0 y al menos un grupo con cantidad."""
-    if valor is None:
-        return None
-
-    if not isinstance(valor, dict):
-        raise ValueError("grupo_edad_detalle debe ser un objeto con los grupos de edad")
-
-    detalle = {}
-    for codigo, cantidades in valor.items():
-        codigo = str(codigo).upper()
-        if codigo not in GRUPOS_EDAD:
-            raise ValueError(
-                f"grupo de edad inválido: {codigo}. Valores permitidos: {', '.join(GRUPOS_EDAD)}"
-            )
-
-        if not isinstance(cantidades, dict):
-            raise ValueError(f"el grupo {codigo} debe tener las cantidades m y f")
-
-        m = int(cantidades.get("m") or 0)
-        f = int(cantidades.get("f") or 0)
-        if m < 0 or f < 0:
-            raise ValueError(f"las cantidades del grupo {codigo} no pueden ser negativas")
-
-        # Solo se guardan los grupos que realmente tienen cantidad
-        if m or f:
-            detalle[codigo] = {"m": m, "f": f}
-
-    if not detalle:
-        raise ValueError("debe registrar al menos un grupo de edad con cantidad")
-
-    return detalle
-
-
-def total_detalle_grupos(detalle) -> int:
-    """Suma de todas las cantidades del desglose (acepta dicts u objetos)."""
-    if not detalle:
-        return 0
-
-    total = 0
-    for cantidades in detalle.values():
-        if isinstance(cantidades, dict):
-            total += int(cantidades.get("m", 0) or 0) + int(cantidades.get("f", 0) or 0)
-        else:
-            total += int(cantidades.m) + int(cantidades.f)
-    return total
+# Columnas del desglose niño/adulto × sexo (sin_edad_* es exclusivo de históricos)
+CAMPOS_CATEGORIA = ("nino_m", "nino_f", "adulto_m", "adulto_f")
 
 
 class ProceMedicoBase(BaseModel):
-    """Datos clínicos del procedimiento con el desglose de cantidades por grupo de edad y sexo."""
+    """Datos clínicos del procedimiento con el desglose niño/adulto × sexo.
+
+    `nino_*` son los procedimientos sobre menores de 18 años y `adulto_*` los de
+    18 años o más, cada uno separado por sexo (`m`/`f`). `sin_edad_*` solo lo
+    llenan los registros históricos migrados y no se captura desde el formulario.
+    """
     fecha: Optional[date] = None
     lugar_servicio: Optional[str] = None
-    id_procedimiento: Optional[int] = None
     id_catalogo_procedimiento: Optional[int] = None
     id_area_cuerpo_intervenida: Optional[int] = None
     especialidad: Optional[str] = None
     especialidad_id: Optional[int] = None
     responsable: Optional[str] = Field(None, max_length=20)
     anestesia: Optional[int] = Field(0, ge=0)
-    grupo_edad_detalle: Optional[dict[str, GrupoEdadCantidades]] = None
     created_by: Optional[str] = Field(None, max_length=10)
-
-    @field_validator('grupo_edad_detalle', mode='before')
-    @classmethod
-    def validate_detalle(cls, v):
-        return validar_detalle_grupos(v)
+    nino_m: int = Field(0, ge=0)
+    nino_f: int = Field(0, ge=0)
+    adulto_m: int = Field(0, ge=0)
+    adulto_f: int = Field(0, ge=0)
+    sin_edad_m: int = Field(0, ge=0)
+    sin_edad_f: int = Field(0, ge=0)
 
     @property
     def total_cantidad(self) -> int:
-        return total_detalle_grupos(self.grupo_edad_detalle)
+        return (
+            self.nino_m + self.nino_f + self.adulto_m + self.adulto_f
+            + self.sin_edad_m + self.sin_edad_f
+        )
+
 
 class ProceMedicoCreate(ProceMedicoBase):
-    grupo_edad_detalle: dict[str, GrupoEdadCantidades]
+    """Alta de un procedimiento realizado; exige al menos una persona capturada."""
 
-    @field_validator('grupo_edad_detalle', mode='before')
-    @classmethod
-    def validate_detalle_requerido(cls, v):
-        detalle = validar_detalle_grupos(v)
-        if not detalle:
-            raise ValueError("debe registrar al menos un grupo de edad con cantidad")
-        return detalle
+    @model_validator(mode="after")
+    def _validar_cantidad(self) -> Self:
+        if self.nino_m + self.nino_f + self.adulto_m + self.adulto_f <= 0:
+            raise ValueError("debe registrar al menos un niño o adulto (M o F)")
+        return self
+
 
 class ProceMedicoUpdate(BaseModel):
     fecha: Optional[date] = None
     lugar_servicio: Optional[str] = None
-    id_procedimiento: Optional[int] = None
     id_catalogo_procedimiento: Optional[int] = None
     id_area_cuerpo_intervenida: Optional[int] = None
     especialidad: Optional[str] = None
     especialidad_id: Optional[int] = None
     responsable: Optional[str] = Field(None, max_length=20)
     anestesia: Optional[int] = Field(None, ge=0)
-    grupo_edad_detalle: Optional[dict[str, GrupoEdadCantidades]] = None
     created_by: Optional[str] = Field(None, max_length=10)
+    nino_m: Optional[int] = Field(None, ge=0)
+    nino_f: Optional[int] = Field(None, ge=0)
+    adulto_m: Optional[int] = Field(None, ge=0)
+    adulto_f: Optional[int] = Field(None, ge=0)
 
-    @field_validator('grupo_edad_detalle', mode='before')
-    @classmethod
-    def validate_detalle(cls, v):
-        return validar_detalle_grupos(v)
-
-    @property
-    def total_cantidad(self) -> int:
-        return total_detalle_grupos(self.grupo_edad_detalle)
 
 class ProceMedicoOut(ProceMedicoBase):
     id: int
     cantidad: int = 0
-    sexo: Optional[str] = None
-    procedimiento: Optional[ProcedimientoOut] = None
     catalogo: Optional["CatalogoProcedimientoOut"] = None
     area_cuerpo: Optional["AreaCuerpoOut"] = None
 
-    model_config = ConfigDict(
-        from_attributes=True
-    )
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ProceMedicoInDB(ProceMedicoBase):
     id: int
     cantidad: int = 0
-    sexo: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    
-    model_config = ConfigDict(
-        from_attributes=True
-    )
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ProceMedicoResponse(ProceMedicoInDB):
-    procedimiento_info: Optional[ProcedimientoResponse] = None
     catalogo: Optional["CatalogoProcedimientoOut"] = None
     area_cuerpo: Optional["AreaCuerpoOut"] = None
-    
+
+
 class ProcedimientosListResponse(BaseModel):
     total: int
     procedimientos: list[ProceMedicoOut]

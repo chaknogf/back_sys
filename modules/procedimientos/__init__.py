@@ -1,7 +1,9 @@
 from .router import router
-from .models import Procedimiento, ProceMedico
+from .models import CatalogoProcedimiento, AreaCuerpoIntervenida, ProceMedico
 from .schemas import (
-    ProcedimientoBase, ProcedimientoCreate, ProcedimientoUpdate, ProcedimientoOut,
+    CatalogoProcedimientoBase, CatalogoProcedimientoCreate,
+    CatalogoProcedimientoUpdate, CatalogoProcedimientoOut,
+    AreaCuerpoOut,
     ProceMedicoBase, ProceMedicoCreate, ProceMedicoUpdate, ProceMedicoOut,
     ProceMedicoInDB, ProceMedicoResponse, ProcedimientosListResponse
 )

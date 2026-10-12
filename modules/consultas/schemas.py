@@ -55,6 +55,7 @@ EstadoCiclo = Literal[
     "observacion",
     "evolucion",
     "seguimiento",
+    "quirofano",
     "procedimiento",
     "recuperacion",
     "egreso",

@@ -569,6 +569,7 @@ def _resolve_intervencion(row, db: Session) -> dict:
     return {
         "intervencion_id": interv.intervencion_id,
         "paciente_id": interv.paciente_id,
+        "consulta_id": interv.consulta_id,
         "paciente_nombre": paciente_nombre,
         "expediente": interv.expediente,
         "personal_atencion_id": interv.personal_atencion_id,
@@ -659,6 +660,8 @@ def listar_intervenciones(
     skip: int = 0,
     limit: int = 50,
     expediente: str | None = None,
+    consulta_id: int | None = None,
+    consulta_ids: str | None = None,
     fecha_desde: str | None = None,
     fecha_hasta: str | None = None,
     activo: bool | None = True,
@@ -674,6 +677,12 @@ def listar_intervenciones(
         q_base = q_base.filter(
             func.lower(IntervencionQuirurgicaModel.expediente).like(f"%{expediente.lower()}%")
         )
+    if consulta_id is not None:
+        q_base = q_base.filter(IntervencionQuirurgicaModel.consulta_id == consulta_id)
+    if consulta_ids:
+        ids = [int(x) for x in consulta_ids.split(",") if x.strip().isdigit()]
+        if ids:
+            q_base = q_base.filter(IntervencionQuirurgicaModel.consulta_id.in_(ids))
     if fecha_desde:
         q_base = q_base.filter(IntervencionQuirurgicaModel.fecha >= fecha_desde)
     if fecha_hasta:
@@ -732,6 +741,46 @@ def _validar_especialidad(db: Session, especialidad_id: int | None) -> None:
         raise HTTPException(status_code=404, detail="Especialidad no encontrada")
 
 
+def _validar_consulta(db: Session, consulta_id: int | None) -> None:
+    """Valida la FK de la consulta de hospitalización si viene informada."""
+    if not consulta_id:
+        return
+    from modules.consultas.models import ConsultaModel
+
+    if not db.query(ConsultaModel).filter(ConsultaModel.id == consulta_id).first():
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+
+
+# Estados de los que se permite pasar a quirófano al registrar una intervención.
+# Las consultas ya quirófano/sala o en estados terminales no se retroceden.
+_ESTADOS_DESDE_QUIROFANO = {
+    None, "iniciado", "pendiente", "admision", "triage", "signos", "consulta",
+    "estudios", "tratamiento", "observacion", "evolucion", "seguimiento",
+}
+
+
+def _avanzar_consulta_a_quirofano(db: Session, consulta_id: int | None, usuario: str | None = None) -> None:
+    """Avanza el ciclo de la consulta a `quirofano` y registra el historial clínico."""
+    if not consulta_id:
+        return
+    from modules.consultas.models import ConsultaModel
+    from modules.consultas.service import avanzar_estado_consulta
+
+    consulta = db.query(ConsultaModel).filter(ConsultaModel.id == consulta_id).first()
+    if not consulta:
+        return
+    avanzar_estado_consulta(
+        db,
+        consulta_id,
+        "quirofano",
+        usuario=usuario,
+        especialidad=consulta.especialidad,
+        servicio=consulta.servicio,
+        comentario="Intervención quirúrgica registrada",
+        desde=_ESTADOS_DESDE_QUIROFANO,
+    )
+
+
 def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_by: str | None = None) -> dict:
     """Verifica paciente y referencias opcionales, y hereda expediente si no se envía."""
     # Validar paciente existe
@@ -756,9 +805,11 @@ def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_
 
     area_nombre = _area_cuerpo_nombre(db, data.id_area_cuerpo_intervenida)
     _validar_especialidad(db, data.especialidad_id)
+    _validar_consulta(db, data.consulta_id)
 
     reg = IntervencionQuirurgicaModel(
         paciente_id=data.paciente_id,
+        consulta_id=data.consulta_id,
         expediente=data.expediente or paciente.expediente,
         procedimiento_principal=data.procedimiento_principal,
         procedimiento_2=data.procedimiento_2,
@@ -788,12 +839,13 @@ def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_
         activo=True,
     )
     db.add(reg)
+    _avanzar_consulta_a_quirofano(db, data.consulta_id, usuario=created_by)
     db.commit()
     db.refresh(reg)
     return obtener_intervencion(reg.intervencion_id, db)
 
 
-def actualizar_intervencion(intervencion_id: int, data: IntervencionQuirurgicaUpdate, db: Session) -> dict:
+def actualizar_intervencion(intervencion_id: int, data: IntervencionQuirurgicaUpdate, db: Session, created_by: str | None = None) -> dict:
     reg = db.query(IntervencionQuirurgicaModel).filter(
         IntervencionQuirurgicaModel.intervencion_id == intervencion_id
     ).first()
@@ -803,12 +855,15 @@ def actualizar_intervencion(intervencion_id: int, data: IntervencionQuirurgicaUp
     campos = data.model_dump(exclude_unset=True)
     if "especialidad_id" in campos:
         _validar_especialidad(db, campos["especialidad_id"])
+    if "consulta_id" in campos:
+        _validar_consulta(db, campos["consulta_id"])
     if "id_area_cuerpo_intervenida" in campos:
         nombre = _area_cuerpo_nombre(db, campos["id_area_cuerpo_intervenida"])
         if nombre and not campos.get("area_cuerpo_intervenida"):
             campos["area_cuerpo_intervenida"] = nombre
     for campo, valor in campos.items():
         setattr(reg, campo, valor)
+    _avanzar_consulta_a_quirofano(db, campos.get("consulta_id"), usuario=created_by)
     db.commit()
     db.refresh(reg)
     return obtener_intervencion(reg.intervencion_id, db)

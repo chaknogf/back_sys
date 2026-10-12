@@ -11,6 +11,7 @@ from modules.quirofano.models import (
     QuirofanoNumeroModel,
     ProcedimientoQuirofanoModel,
 )
+from modules.consultas.models import ConsultaModel, ConsultaHistorialModel
 from modules.procedimientos.models import CatalogoProcedimiento, AreaCuerpoIntervenida
 from sqlalchemy import text
 
@@ -18,6 +19,7 @@ from sqlalchemy import text
 created_ids = {
     "medicos": [],
     "pacientes": [],
+    "consultas": [],
     "intervenciones": [],
     "quirofanos_numero": [],
     "procedimientos_quirofano": [],
@@ -31,6 +33,8 @@ def cleanup():
             db.query(IntervencionQuirurgicaModel).filter(
                 IntervencionQuirurgicaModel.intervencion_id == iid
             ).delete()
+        for cid in created_ids["consultas"]:
+            db.query(ConsultaModel).filter(ConsultaModel.id == cid).delete()
         for pid in created_ids["pacientes"]:
             db.query(PacienteModel).filter(PacienteModel.id == pid).delete()
         for mid in created_ids["medicos"]:
@@ -104,6 +108,32 @@ class TestIntervencionesQuirurgicas:
         data = r.json()
         created_ids["quirofanos_numero"].append(data["quirofano_numero_id"])
         return data
+
+    def _crear_consulta(self, client, auth_headers, paciente_id: int, tipo_consulta: int = 2, ultimo_estado: str = None):
+        """Inserta una consulta directamente en DB (evita el flujo completo de admisión)."""
+        from datetime import time as _time
+
+        db = SessionLocal()
+        try:
+            consulta = ConsultaModel(
+                paciente_id=paciente_id,
+                tipo_consulta=tipo_consulta,
+                ultimo_estado=ultimo_estado,
+                especialidad="Cirugía",
+                servicio="Hospitalización",
+                documento=f"DOC-{_sufijo()}",
+                fecha_consulta=date.today(),
+                hora_consulta=_time(8, 0),
+                activo=True,
+            )
+            db.add(consulta)
+            db.commit()
+            db.refresh(consulta)
+            cid = consulta.id
+        finally:
+            db.close()
+        created_ids["consultas"].append(cid)
+        return cid
 
     def test_listar_quirofanos_numero(self, client, auth_headers):
         r = client.get("/quirofano/quirofanos-numero/", headers=auth_headers)
@@ -485,6 +515,121 @@ class TestIntervencionesQuirurgicas:
             json={
                 "paciente_id": paciente["id"],
                 "especialidad_id": 999999999,
+            },
+        )
+        assert r.status_code == 404
+
+    def test_crear_intervencion_con_consulta(self, client, auth_headers):
+        """Guarda `consulta_id` y lo devuelve al crear/leer."""
+        paciente = self._crear_paciente(client, auth_headers)
+        consulta_id = self._crear_consulta(client, auth_headers, paciente["id"])
+
+        r = client.post(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            json={
+                "paciente_id": paciente["id"],
+                "consulta_id": consulta_id,
+                "fecha": date.today().isoformat(),
+                "procedimiento_principal": "Apendicectomía",
+            },
+        )
+        assert r.status_code == 201, r.text
+        data = r.json()
+        created_ids["intervenciones"].append(data["intervencion_id"])
+        assert data["consulta_id"] == consulta_id
+
+        # La consulta avanza su ciclo a quirófano con historial clínico
+        db = SessionLocal()
+        try:
+            c = db.query(ConsultaModel).filter(ConsultaModel.id == consulta_id).first()
+            assert c.ultimo_estado == "quirofano"
+            hist = db.query(ConsultaHistorialModel).filter(
+                ConsultaHistorialModel.consulta_id == consulta_id
+            ).all()
+            assert any(h.estado == "quirofano" for h in hist)
+        finally:
+            db.close()
+
+        r = client.get(
+            f"/quirofano/intervenciones/{data['intervencion_id']}", headers=auth_headers
+        )
+        assert r.status_code == 200
+        assert r.json()["consulta_id"] == consulta_id
+
+    def test_registro_intervencion_no_retrocede_consulta_cerrada(self, client, auth_headers):
+        """Una intervención no retrocede consultas ya egresadas/cerradas."""
+        paciente = self._crear_paciente(client, auth_headers)
+        egresada = self._crear_consulta(client, auth_headers, paciente["id"], ultimo_estado="egreso")
+
+        r = client.post(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            json={"paciente_id": paciente["id"], "consulta_id": egresada},
+        )
+        assert r.status_code == 201
+        created_ids["intervenciones"].append(r.json()["intervencion_id"])
+
+        db = SessionLocal()
+        try:
+            c = db.query(ConsultaModel).filter(ConsultaModel.id == egresada).first()
+            assert c.ultimo_estado == "egreso"
+        finally:
+            db.close()
+
+    def test_filtrar_intervenciones_por_consulta(self, client, auth_headers):
+        """Filtra por consulta_id individual y por lista separada por comas."""
+        paciente = self._crear_paciente(client, auth_headers)
+        consulta_a = self._crear_consulta(client, auth_headers, paciente["id"])
+        consulta_b = self._crear_consulta(client, auth_headers, paciente["id"])
+
+        r = client.post(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            json={"paciente_id": paciente["id"], "consulta_id": consulta_a},
+        )
+        assert r.status_code == 201
+        iv_a = r.json()["intervencion_id"]
+        created_ids["intervenciones"].append(iv_a)
+        r = client.post(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            json={"paciente_id": paciente["id"], "consulta_id": consulta_b},
+        )
+        assert r.status_code == 201
+        iv_b = r.json()["intervencion_id"]
+        created_ids["intervenciones"].append(iv_b)
+
+        # Individual
+        r = client.get(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            params={"consulta_id": consulta_a},
+        )
+        assert r.status_code == 200
+        res = r.json()
+        assert [i["intervencion_id"] for i in res["intervenciones"]] == [iv_a]
+
+        # Lista (separada por comas)
+        r = client.get(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            params={"consulta_ids": f"{consulta_a},{consulta_b}"},
+        )
+        assert r.status_code == 200
+        res = r.json()
+        ids = {i["intervencion_id"] for i in res["intervenciones"]}
+        assert {iv_a, iv_b} <= ids
+
+    def test_consulta_id_inexistente(self, client, auth_headers):
+        paciente = self._crear_paciente(client, auth_headers)
+        r = client.post(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            json={
+                "paciente_id": paciente["id"],
+                "consulta_id": 999999999,
+                "fecha": date.today().isoformat(),
             },
         )
         assert r.status_code == 404

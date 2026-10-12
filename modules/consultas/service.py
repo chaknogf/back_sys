@@ -48,6 +48,47 @@ def _agregar_ciclo(db, consulta, nuevo_ciclo, current_user):
     consulta.ultimo_estado = nuevo_ciclo["estado"]
 
 
+def avanzar_estado_consulta(
+    db: Session,
+    consulta_id: int,
+    estado: str,
+    usuario: str | None = None,
+    especialidad: str | None = None,
+    servicio: str | None = None,
+    comentario: str | None = None,
+    desde: Optional[set] = None,
+) -> bool:
+    """Registra un avance de ciclo en el historial y actualiza `ultimo_estado`.
+
+    Devuelve `True` si aplicó el cambio. No retrocede: solo aplica cuando el
+    estado actual pertenece al conjunto `desde` (o cuando `desde` es `None`)
+    y es distinto del estado destino. No sobrescribe estados terminales.
+    """
+    consulta = db.query(ConsultaModel).filter(ConsultaModel.id == consulta_id).first()
+    if not consulta:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+
+    if consulta.ultimo_estado == estado:
+        return False
+    if consulta.ultimo_estado in ("archivo", "descartado", "egreso", "borrado"):
+        return False
+    if desde is not None and consulta.ultimo_estado not in desde:
+        return False
+
+    registro = datetime.now(APP_TIMEZONE).isoformat()
+    db.add(ConsultaHistorialModel(
+        consulta_id=consulta_id,
+        estado=estado,
+        registro=registro,
+        usuario=usuario or "",
+        especialidad=especialidad,
+        servicio=servicio,
+        comentario=comentario,
+    ))
+    consulta.ultimo_estado = estado
+    return True
+
+
 def buscar_consultas_activas(
     db: Session,
     paciente_id: Optional[int] = None,

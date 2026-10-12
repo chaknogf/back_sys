@@ -1,3 +1,4 @@
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import (
     Column, Integer, String, Boolean, ForeignKey, UniqueConstraint, Date, Time, Text, TIMESTAMP
 )
@@ -11,6 +12,7 @@ class IntervencionQuirurgicaModel(Base):
 
     intervencion_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     paciente_id = Column(Integer, ForeignKey("pacientes.id", ondelete="SET NULL"), nullable=False, index=True)
+    consulta_id = Column(Integer, ForeignKey("consultas.id", ondelete="SET NULL"), nullable=True, index=True)
     expediente = Column(String(20), index=True)
     procedimiento_principal = Column(String(200), nullable=True)
     procedimiento_2 = Column(String(200), nullable=True)
@@ -37,6 +39,7 @@ class IntervencionQuirurgicaModel(Base):
     hora_finaliza_intervencion = Column(Time, nullable=True)
     hora_finaliza_limpieza_prepara_quirofano = Column(Time, nullable=True)
     observaciones = Column(Text, nullable=True)
+    datos_extra = Column(JSONB, nullable=True)
     activo = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -4,7 +4,7 @@ Mapeo de las modificaciones SQL del proyecto y comandos para aplicarlas.
 
 - **Motor**: PostgreSQL, base `hospital` en `localhost`.
 - **Conexión usada**: `psql -h localhost -U admin -d hospital` (password `secreto123`).
-- **Estado actual**: `002` → `030` aplicadas, más `032_procedimientos_unificado.sql` y `074_quirofano_intervencion_especialidad.sql`.
+- **Estado actual**: `002` → `030` aplicadas, más `032_procedimientos_unificado.sql`, `074_quirofano_intervencion_especialidad.sql` y `075_quirofano_intervencion_consulta.sql`.
   El rango `031` → `073` (parches one-off con IDs hardcodeados del dump de
   producción) fue **consolidado y eliminado**; no existe `001` (el esquema base de
   `medicos`, `pacientes`, `personal_salud`, etc. se crea aparte:
@@ -64,6 +64,7 @@ Todas (en orden, deteniéndose al primer error):
 | 030 | `030_censo_camas_unificar_sexos.sql` | Migra `censo_camas` a una fila por fecha/servicio; conserva movimientos por sexo, recalcula las columnas agregadas y reemplaza la unicidad por `(fecha, servicio_id)`. |
 | 032 | `032_procedimientos_unificado.sql` | **Consolida** el antiguo rango `031`→`073` en un único archivo idempotente y *name-based* (sin IDs hardcodeados). Ver detalle abajo. |
 | 074 | `074_quirofano_intervencion_especialidad.sql` | Agrega `intervenciones_quirurgicas.especialidad_id` (FK `especialidades.id`, `ON DELETE SET NULL`) + índice. El form de Quirófano exigía la especialidad pero no se persistía. Aditiva e idempotente. |
+| 075 | `075_quirofano_intervencion_consulta.sql` | Agrega `intervenciones_quirurgicas.consulta_id` (FK `consultas.id`, `ON DELETE SET NULL`) + índice. Liga cada intervención a la consulta de hospitalización que la originó (indicador del listado de quirófano). Aditiva e idempotente. |
 
 > El rango `031` → `073` ya **no existe** como archivos separados: era un conjunto
 > de parches one-off atados a los IDs de un dump de producción. Toda su lógica

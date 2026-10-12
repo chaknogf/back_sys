@@ -36,6 +36,8 @@ def listar_intervenciones(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
     expediente: Optional[str] = Query(None),
+    consulta_id: Optional[int] = Query(None, description="Filtrar por consulta de hospitalización"),
+    consulta_ids: Optional[str] = Query(None, description="IDs de consulta separados por coma"),
     fecha_desde: Optional[date] = Query(None, alias="fecha_desde"),
     fecha_hasta: Optional[date] = Query(None, alias="fecha_hasta"),
     activos: Optional[bool] = Query(True),
@@ -48,6 +50,8 @@ def listar_intervenciones(
         skip=skip,
         limit=limit,
         expediente=expediente,
+        consulta_id=consulta_id,
+        consulta_ids=consulta_ids,
         fecha_desde=fecha_desde.isoformat() if fecha_desde else None,
         fecha_hasta=fecha_hasta.isoformat() if fecha_hasta else None,
         activo=activos,
@@ -81,7 +85,7 @@ def actualizar_intervencion(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return svc.actualizar_intervencion(intervencion_id, data, db)
+    return svc.actualizar_intervencion(intervencion_id, data, db, created_by=current_user.username)
 
 
 @router.delete("/intervenciones/{intervencion_id}", tags=[TAG_INTERVENCIONES])

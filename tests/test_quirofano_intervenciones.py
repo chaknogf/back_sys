@@ -11,6 +11,7 @@ from modules.quirofano.models import (
     QuirofanoNumeroModel,
     ProcedimientoQuirofanoModel,
 )
+from modules.procedimientos.models import CatalogoProcedimiento, AreaCuerpoIntervenida
 from sqlalchemy import text
 
 
@@ -275,6 +276,216 @@ class TestIntervencionesQuirurgicas:
             "/quirofano/intervenciones/",
             headers=auth_headers,
             json={"paciente_id": 999999999, "fecha": date.today().isoformat()},
+        )
+        assert r.status_code == 404
+
+    def test_crear_intervencion_todos_los_campos(self, client, auth_headers):
+        """Llena absolutamente todos los campos: médico, FKs de catálogos, 5 procedimientos y tiempos."""
+        from modules.quirofano.models import (
+            EstadoCirugiaModel,
+            FormatoProcedimientoModel,
+            ProcedenciaProcedimientoModel,
+            RangoEspecialistaModel,
+        )
+
+        db = SessionLocal()
+        try:
+            cats = (
+                db.query(CatalogoProcedimiento)
+                .order_by(CatalogoProcedimiento.id)
+                .limit(5)
+                .all()
+            )
+            area = db.query(AreaCuerpoIntervenida).order_by(AreaCuerpoIntervenida.id).first()
+            especialidad = db.query(EspecialidadModel).order_by(EspecialidadModel.id).first()
+            estado = db.query(EstadoCirugiaModel).first()
+            formato = db.query(FormatoProcedimientoModel).first()
+            procedencia = db.query(ProcedenciaProcedimientoModel).first()
+            rango = db.query(RangoEspecialistaModel).first()
+            assert len(cats) == 5
+            assert all([area, especialidad, estado, formato, procedencia, rango])
+            cat_ids = [c.id for c in cats]
+            cat_nombres = {c.id: c.nombre for c in cats}
+            estado_id, estado_nombre = estado.estado_cirugia_id, estado.nombre
+            formato_id, formato_nombre = formato.formato_procedimiento_id, formato.nombre
+            proc_id, proc_nombre = procedencia.procedencia_procedimiento_id, procedencia.nombre
+            rango_id, rango_nombre = rango.rango_especialista_id, rango.nombre
+            area_id, area_nombre = area.id, area.nombre
+            esp_id, esp_nombre = especialidad.id, especialidad.nombre
+        finally:
+            db.close()
+
+        paciente = self._crear_paciente(client, auth_headers)
+        medico = self._crear_medico(client)
+        quirofano = self._crear_quirofano(client, auth_headers)
+
+        r = client.post(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            json={
+                "paciente_id": paciente["id"],
+                "personal_atencion_id": medico["id"],
+                "estado_cirugia_id": estado_id,
+                "formato_procedimiento_id": formato_id,
+                "procedencia_procedimiento_id": proc_id,
+                "rango_especialista_id": rango_id,
+                "especialidad_id": esp_id,
+                "quirofano_numero_id": quirofano["quirofano_numero_id"],
+                "procedimiento_principal": "Apendicectomía",
+                "procedimiento_2": "Lavado de cavidad",
+                "procedimiento_3": "Drenaje",
+                "procedimiento_4": "Sutura",
+                "procedimiento_5": "Cierre",
+                "procedimiento_principal_id": cat_ids[0],
+                "procedimiento_2_id": cat_ids[1],
+                "procedimiento_3_id": cat_ids[2],
+                "procedimiento_4_id": cat_ids[3],
+                "procedimiento_5_id": cat_ids[4],
+                "area_cuerpo_intervenida": area_nombre,
+                "id_area_cuerpo_intervenida": area_id,
+                "hora_inicio_anestesia": "07:30",
+                "hora_inicio_intervencion": "08:00",
+                "hora_finaliza_intervencion": "09:30",
+                "hora_finaliza_limpieza_prepara_quirofano": "10:00",
+                "observaciones": "Prueba integral de todos los campos",
+            },
+        )
+        assert r.status_code == 201, r.text
+        d = r.json()
+        created_ids["intervenciones"].append(d["intervencion_id"])
+
+        # Médico: se guarda el id y se devuelve el nombre
+        assert d["personal_atencion_id"] == medico["id"]
+        assert d["personal_atencion_nombre"] == medico["nombre"]
+        # FKs de catálogos con sus nombres resueltos
+        assert d["estado_cirugia_id"] == estado_id
+        assert d["estado_cirugia_nombre"] == estado_nombre
+        assert d["formato_procedimiento_id"] == formato_id
+        assert d["formato_procedimiento_nombre"] == formato_nombre
+        assert d["procedencia_procedimiento_id"] == proc_id
+        assert d["procedencia_procedimiento_nombre"] == proc_nombre
+        assert d["rango_especialista_id"] == rango_id
+        assert d["rango_especialista_nombre"] == rango_nombre
+        assert d["especialidad_id"] == esp_id
+        assert d["especialidad_nombre"] == esp_nombre
+        assert d["quirofano_numero_id"] == quirofano["quirofano_numero_id"]
+        assert d["quirofano_numero_nombre"] == quirofano["nombre"]
+        # Los 5 procedimientos: id + nombre del catálogo
+        claves = [
+            "procedimiento_principal",
+            "procedimiento_2",
+            "procedimiento_3",
+            "procedimiento_4",
+            "procedimiento_5",
+        ]
+        for clave, cid in zip(claves, cat_ids):
+            assert d[f"{clave}_id"] == cid
+            assert d[f"{clave}_catalogo_nombre"] == cat_nombres[cid]
+        # Área, tiempos y observaciones
+        assert d["area_cuerpo_intervenida"] == area_nombre
+        assert d["id_area_cuerpo_intervenida"] == area_id
+        assert d["area_cuerpo_intervenida_nombre"] == area_nombre
+        assert d["hora_inicio_anestesia"] == "07:30:00"
+        assert d["hora_inicio_intervencion"] == "08:00:00"
+        assert d["hora_finaliza_intervencion"] == "09:30:00"
+        assert d["hora_finaliza_limpieza_prepara_quirofano"] == "10:00:00"
+        assert d["observaciones"] == "Prueba integral de todos los campos"
+
+        # Relectura (GET) idéntica
+        r = client.get(
+            f"/quirofano/intervenciones/{d['intervencion_id']}", headers=auth_headers
+        )
+        assert r.status_code == 200
+        g = r.json()
+        assert g["personal_atencion_nombre"] == medico["nombre"]
+        assert g["procedimiento_5_catalogo_nombre"] == cat_nombres[cat_ids[4]]
+        assert g["estado_cirugia_nombre"] == estado_nombre
+
+    def test_crear_intervencion_con_catalogo(self, client, auth_headers):
+        """Llena los FKs al catálogo maestro y verifica que los nombres se resuelvan."""
+        db = SessionLocal()
+        try:
+            cat = (
+                db.query(CatalogoProcedimiento)
+                .filter(CatalogoProcedimiento.activo == True)
+                .order_by(CatalogoProcedimiento.id)
+                .first()
+            )
+            cat2 = (
+                db.query(CatalogoProcedimiento)
+                .filter(CatalogoProcedimiento.id != cat.id)
+                .order_by(CatalogoProcedimiento.id)
+                .first()
+            )
+            area = db.query(AreaCuerpoIntervenida).order_by(AreaCuerpoIntervenida.id).first()
+            assert cat is not None and cat2 is not None and area is not None
+            cat_id, cat_nombre, cat2_id, area_nombre = cat.id, cat.nombre, cat2.id, area.nombre
+        finally:
+            db.close()
+
+        paciente = self._crear_paciente(client, auth_headers)
+        r = client.post(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            json={
+                "paciente_id": paciente["id"],
+                "procedimiento_principal_id": cat_id,
+                "procedimiento_2_id": cat2_id,
+                "area_cuerpo_intervenida": area_nombre,
+                "hora_inicio_intervencion": "09:00",
+                "hora_finaliza_intervencion": "10:00",
+            },
+        )
+        assert r.status_code == 201, r.text
+        data = r.json()
+        created_ids["intervenciones"].append(data["intervencion_id"])
+        assert data["procedimiento_principal_id"] == cat_id
+        assert data["procedimiento_2_id"] == cat2_id
+        assert data["procedimiento_principal_catalogo_nombre"] == cat_nombre
+        # sin texto enviado, el nombre se resuelve desde el catálogo
+        assert data["procedimiento_principal"] == cat_nombre
+        assert data["area_cuerpo_intervenida"] == area_nombre
+
+        r = client.get(
+            f"/quirofano/intervenciones/{data['intervencion_id']}", headers=auth_headers
+        )
+        assert r.status_code == 200
+        assert r.json()["procedimiento_principal_catalogo_nombre"] == cat_nombre
+
+    def test_catalogo_procedimiento_id_inexistente(self, client, auth_headers):
+        paciente = self._crear_paciente(client, auth_headers)
+        r = client.post(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            json={
+                "paciente_id": paciente["id"],
+                "procedimiento_principal_id": 999999999,
+            },
+        )
+        # FK inexistente: la DB lo rechaza (IntegrityError -> 409/500) pero nunca debe crear
+        assert r.status_code != 201
+
+    def test_area_cuerpo_id_inexistente(self, client, auth_headers):
+        paciente = self._crear_paciente(client, auth_headers)
+        r = client.post(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            json={
+                "paciente_id": paciente["id"],
+                "id_area_cuerpo_intervenida": 999999999,
+            },
+        )
+        assert r.status_code == 404
+
+    def test_especialidad_id_inexistente(self, client, auth_headers):
+        paciente = self._crear_paciente(client, auth_headers)
+        r = client.post(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            json={
+                "paciente_id": paciente["id"],
+                "especialidad_id": 999999999,
+            },
         )
         assert r.status_code == 404
 

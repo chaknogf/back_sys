@@ -536,11 +536,11 @@ def eliminar_quirofano_numero(qn_id: int, db: Session) -> dict:
 # Intervención Quirúrgica
 # ========================
 
-def _resolve_intervencion(row) -> dict:
+def _resolve_intervencion(row, db: Session) -> dict:
     """Convierte una fila con joins en dict serializable."""
     from modules.catalogo_procedimientos.models import CatalogoProcedimiento
 
-    interv, paciente, medico, estado, formato, procedencia, rango, quirofano = row
+    interv, paciente, medico, estado, formato, procedencia, rango, quirofano, especialidad, area = row
     paciente_nombre = getattr(paciente, "nombre_completo", None) if paciente else None
     personal_atencion_nombre = getattr(medico, "nombre", None) if medico else None
     estado_nombre = getattr(estado, "nombre", None) if estado else None
@@ -548,6 +548,8 @@ def _resolve_intervencion(row) -> dict:
     procedencia_nombre = getattr(procedencia, "nombre", None) if procedencia else None
     rango_nombre = getattr(rango, "nombre", None) if rango else None
     quirofano_nombre = getattr(quirofano, "nombre", None) if quirofano else None
+    especialidad_nombre = getattr(especialidad, "nombre", None) if especialidad else None
+    area_nombre = getattr(area, "nombre", None) if area else None
 
     # Resolver procedimientos desde el catálogo maestro
     proc_ids = [
@@ -586,7 +588,9 @@ def _resolve_intervencion(row) -> dict:
         "procedimiento_5": interv.procedimiento_5 or proc_nombres.get(interv.procedimiento_5_id),
         "procedimiento_5_id": interv.procedimiento_5_id,
         "procedimiento_5_catalogo_nombre": proc_nombres.get(interv.procedimiento_5_id),
-        "area_cuerpo_intervenida": interv.area_cuerpo_intervenida,
+        "area_cuerpo_intervenida": interv.area_cuerpo_intervenida or area_nombre,
+        "id_area_cuerpo_intervenida": interv.id_area_cuerpo_intervenida,
+        "area_cuerpo_intervenida_nombre": area_nombre,
         "estado_cirugia_id": interv.estado_cirugia_id,
         "estado_cirugia_nombre": estado_nombre,
         "formato_procedimiento_id": interv.formato_procedimiento_id,
@@ -595,6 +599,8 @@ def _resolve_intervencion(row) -> dict:
         "procedencia_procedimiento_nombre": procedencia_nombre,
         "rango_especialista_id": interv.rango_especialista_id,
         "rango_especialista_nombre": rango_nombre,
+        "especialidad_id": interv.especialidad_id,
+        "especialidad_nombre": especialidad_nombre,
         "quirofano_numero_id": interv.quirofano_numero_id,
         "quirofano_numero_nombre": quirofano_nombre,
         "fecha": interv.fecha.isoformat() if interv.fecha else None,
@@ -612,6 +618,8 @@ def _resolve_intervencion(row) -> dict:
 def _base_query_intervenciones(db: Session):
     from modules.pacientes.models import PacienteModel
     from modules.medicos.models import MedicoModel
+    from modules.especialidades.models import EspecialidadModel
+    from modules.procedimientos.models import AreaCuerpoIntervenida
 
     return db.query(
         IntervencionQuirurgicaModel,
@@ -622,6 +630,8 @@ def _base_query_intervenciones(db: Session):
         ProcedenciaProcedimientoModel,
         RangoEspecialistaModel,
         QuirofanoNumeroModel,
+        EspecialidadModel,
+        AreaCuerpoIntervenida,
     ).select_from(IntervencionQuirurgicaModel).outerjoin(
         PacienteModel, PacienteModel.id == IntervencionQuirurgicaModel.paciente_id
     ).outerjoin(
@@ -636,6 +646,10 @@ def _base_query_intervenciones(db: Session):
         RangoEspecialistaModel, RangoEspecialistaModel.rango_especialista_id == IntervencionQuirurgicaModel.rango_especialista_id
     ).outerjoin(
         QuirofanoNumeroModel, QuirofanoNumeroModel.quirofano_numero_id == IntervencionQuirurgicaModel.quirofano_numero_id
+    ).outerjoin(
+        EspecialidadModel, EspecialidadModel.id == IntervencionQuirurgicaModel.especialidad_id
+    ).outerjoin(
+        AreaCuerpoIntervenida, AreaCuerpoIntervenida.id == IntervencionQuirurgicaModel.id_area_cuerpo_intervenida
     )
 
 
@@ -682,7 +696,7 @@ def listar_intervenciones(
 
     return {
         "total": total,
-        "intervenciones": [_resolve_intervencion(row) for row in rows],
+        "intervenciones": [_resolve_intervencion(row, db) for row in rows],
     }
 
 
@@ -693,7 +707,29 @@ def obtener_intervencion(intervencion_id: int, db: Session) -> dict:
     ).first()
     if not row:
         raise HTTPException(status_code=404, detail="Intervención no encontrada")
-    return _resolve_intervencion(row)
+    return _resolve_intervencion(row, db)
+
+
+def _area_cuerpo_nombre(db: Session, area_id: int | None) -> str | None:
+    """Valida la FK del área del cuerpo y devuelve su nombre de catálogo."""
+    if not area_id:
+        return None
+    from modules.procedimientos.models import AreaCuerpoIntervenida
+
+    area = db.query(AreaCuerpoIntervenida).filter(AreaCuerpoIntervenida.id == area_id).first()
+    if not area:
+        raise HTTPException(status_code=404, detail="Área del cuerpo no encontrada")
+    return area.nombre
+
+
+def _validar_especialidad(db: Session, especialidad_id: int | None) -> None:
+    """Valida la FK de especialidad si viene informada."""
+    if not especialidad_id:
+        return
+    from modules.especialidades.models import EspecialidadModel
+
+    if not db.query(EspecialidadModel).filter(EspecialidadModel.id == especialidad_id).first():
+        raise HTTPException(status_code=404, detail="Especialidad no encontrada")
 
 
 def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_by: str | None = None) -> dict:
@@ -718,6 +754,9 @@ def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_
         if not db.query(MedicoModel).filter(MedicoModel.id == data.personal_atencion_id).first():
             raise HTTPException(status_code=404, detail="Médico no encontrado")
 
+    area_nombre = _area_cuerpo_nombre(db, data.id_area_cuerpo_intervenida)
+    _validar_especialidad(db, data.especialidad_id)
+
     reg = IntervencionQuirurgicaModel(
         paciente_id=data.paciente_id,
         expediente=data.expediente or paciente.expediente,
@@ -731,11 +770,13 @@ def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_
         procedimiento_3_id=data.procedimiento_3_id,
         procedimiento_4_id=data.procedimiento_4_id,
         procedimiento_5_id=data.procedimiento_5_id,
-        area_cuerpo_intervenida=data.area_cuerpo_intervenida,
+        area_cuerpo_intervenida=data.area_cuerpo_intervenida or area_nombre,
+        id_area_cuerpo_intervenida=data.id_area_cuerpo_intervenida,
         estado_cirugia_id=data.estado_cirugia_id,
         formato_procedimiento_id=data.formato_procedimiento_id,
         procedencia_procedimiento_id=data.procedencia_procedimiento_id,
         rango_especialista_id=data.rango_especialista_id,
+        especialidad_id=data.especialidad_id,
         quirofano_numero_id=data.quirofano_numero_id,
         personal_atencion_id=data.personal_atencion_id,
         fecha=data.fecha,
@@ -760,6 +801,12 @@ def actualizar_intervencion(intervencion_id: int, data: IntervencionQuirurgicaUp
         raise HTTPException(status_code=404, detail="Intervención no encontrada")
 
     campos = data.model_dump(exclude_unset=True)
+    if "especialidad_id" in campos:
+        _validar_especialidad(db, campos["especialidad_id"])
+    if "id_area_cuerpo_intervenida" in campos:
+        nombre = _area_cuerpo_nombre(db, campos["id_area_cuerpo_intervenida"])
+        if nombre and not campos.get("area_cuerpo_intervenida"):
+            campos["area_cuerpo_intervenida"] = nombre
     for campo, valor in campos.items():
         setattr(reg, campo, valor)
     db.commit()

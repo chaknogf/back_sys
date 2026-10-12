@@ -164,6 +164,7 @@ class IntervencionQuirurgicaCreate(BaseModel):
     formato_procedimiento_id: int | None = None
     procedencia_procedimiento_id: int | None = None
     rango_especialista_id: int | None = None
+    especialidad_id: int | None = Field(None, description="Especialidad de la intervención")
     quirofano_numero_id: int | None = None
     procedimiento_principal: str | None = Field(None, max_length=200)
     procedimiento_2: str | None = Field(None, max_length=200)
@@ -176,6 +177,7 @@ class IntervencionQuirurgicaCreate(BaseModel):
     procedimiento_4_id: int | None = None
     procedimiento_5_id: int | None = None
     area_cuerpo_intervenida: str | None = Field(None, max_length=100)
+    id_area_cuerpo_intervenida: int | None = Field(None, description="FK al catálogo de áreas del cuerpo")
     fecha: date = Field(default_factory=date.today, description="Fecha de la cirugía (automática)")
     hora_inicio_anestesia: time | None = None
     hora_inicio_intervencion: time | None = None
@@ -190,6 +192,7 @@ class IntervencionQuirurgicaUpdate(BaseModel):
     formato_procedimiento_id: int | None = None
     procedencia_procedimiento_id: int | None = None
     rango_especialista_id: int | None = None
+    especialidad_id: int | None = None
     quirofano_numero_id: int | None = None
     procedimiento_principal: str | None = Field(None, max_length=200)
     procedimiento_2: str | None = Field(None, max_length=200)
@@ -202,6 +205,7 @@ class IntervencionQuirurgicaUpdate(BaseModel):
     procedimiento_4_id: int | None = None
     procedimiento_5_id: int | None = None
     area_cuerpo_intervenida: str | None = Field(None, max_length=100)
+    id_area_cuerpo_intervenida: int | None = None
     fecha: date | None = None
     hora_inicio_anestesia: time | None = None
     hora_inicio_intervencion: time | None = None
@@ -217,7 +221,7 @@ class IntervencionQuirurgicaOut(BaseModel):
     paciente_nombre: str | None = None
     expediente: str | None = None
     personal_atencion_id: int | None = None
-    medico_nombre: str | None = None
+    personal_atencion_nombre: str | None = None
     procedimiento_principal: str | None = None
     procedimiento_principal_id: int | None = None
     procedimiento_principal_catalogo_nombre: str | None = None
@@ -234,6 +238,8 @@ class IntervencionQuirurgicaOut(BaseModel):
     procedimiento_5_id: int | None = None
     procedimiento_5_catalogo_nombre: str | None = None
     area_cuerpo_intervenida: str | None = None
+    id_area_cuerpo_intervenida: int | None = None
+    area_cuerpo_intervenida_nombre: str | None = None
     estado_cirugia_id: int | None = None
     estado_cirugia_nombre: str | None = None
     formato_procedimiento_id: int | None = None
@@ -242,6 +248,8 @@ class IntervencionQuirurgicaOut(BaseModel):
     procedencia_procedimiento_nombre: str | None = None
     rango_especialista_id: int | None = None
     rango_especialista_nombre: str | None = None
+    especialidad_id: int | None = None
+    especialidad_nombre: str | None = None
     quirofano_numero_id: int | None = None
     quirofano_numero_nombre: str | None = None
     fecha: date

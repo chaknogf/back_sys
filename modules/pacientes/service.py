@@ -505,3 +505,14 @@ def buscar_pacientes_sin_consultas_recientes(
 ):
     ultima_consulta = _build_ultima_consulta_subquery(db)
     return _exec_expedientes_query(db, ultima_consulta, "outer", "no_reciente", q, skip, limit, expediente_desde, expediente_hasta)
+
+
+def obtener_ultimos_pacientes(db: Session, limit: int = 500):
+    """Obtiene los últimos N pacientes ordenados por fecha de creación."""
+    query = (
+        db.query(PacienteModel)
+        .order_by(PacienteModel.id.desc())
+        .limit(limit)
+    )
+    pacientes = query.all()
+    return PacienteListResponse(total=len(pacientes), pacientes=pacientes)

@@ -256,6 +256,15 @@ def eliminar_consulta(
     return service_eliminar_consulta(consulta_id, db)
 
 
+@router.get("/ultimos", response_model=ConsultaListResponse)
+def ultimas_consultas(
+    limit: int = Query(500, ge=1, le=1000),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return obtener_ultimas_consultas(db, limit)
+
+
 @router.post("/recalcular-orden", response_model=dict)
 def recalcular_orden(
     fecha: str = Query(..., description="Fecha (YYYY-MM-DD)"),

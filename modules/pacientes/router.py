@@ -18,7 +18,7 @@ from .schemas import (
     PacienteCreate, PacienteOut, PacienteUpdate, PacienteContacto,
     PacienteListResponse
 )
-from .service import buscar_pacientes, buscar_neonatales, buscar_personal_hospital, buscar_pacientes_con_consultas_recientes, buscar_pacientes_sin_consultas_recientes, obtener_paciente, crear_paciente, agregar_evento, normalizar_metadatos
+from .service import buscar_pacientes, buscar_neonatales, buscar_personal_hospital, buscar_pacientes_con_consultas_recientes, buscar_pacientes_sin_consultas_recientes, obtener_paciente, crear_paciente, agregar_evento, normalizar_metadatos, obtener_ultimos_pacientes
 from modules.defunciones.service import actualizar_estado_por_paciente
 
 
@@ -305,6 +305,15 @@ def eliminar_paciente_permanente(
     db.delete(paciente)
     db.commit()
     return None
+
+
+@router.get("/ultimos", response_model=PacienteListResponse)
+def ultimos_pacientes(
+    limit: int = Query(500, ge=1, le=1000),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return obtener_ultimos_pacientes(db, limit)
 
 
 @router.get("/debug/count")

@@ -93,6 +93,47 @@ def crear_ciclo(data: CicloConsultaBase, db: Session, current_user):
     return nuevo
 
 
+def obtener_ultimo_odontograma(paciente_id: int, db: Session):
+    """Odontograma más reciente con piezas registradas para un paciente.
+
+    Permite que una nueva nota odontológica continúe el registro anterior
+    sin volver a capturarlo desde cero."""
+    from modules.pacientes.models import PacienteModel
+
+    paciente = db.get(PacienteModel, paciente_id)
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+    consulta_ids = [
+        fila[0]
+        for fila in db.query(ConsultaModel.id)
+        .filter(ConsultaModel.paciente_id == paciente_id)
+        .all()
+    ]
+    if not consulta_ids:
+        return None
+
+    ciclos = (
+        db.query(CiclosConsulta)
+        .filter(CiclosConsulta.consulta_id.in_(consulta_ids))
+        .order_by(CiclosConsulta.registro.desc().nullslast(), CiclosConsulta.id.desc())
+        .all()
+    )
+
+    for ciclo in ciclos:
+        datos_medicos = ciclo.datos_medicos
+        if not isinstance(datos_medicos, dict):
+            continue
+        odontologia = datos_medicos.get('odontologia')
+        if not isinstance(odontologia, dict):
+            continue
+        odontograma = odontologia.get('odontograma')
+        if isinstance(odontograma, dict) and odontograma.get('dientes'):
+            return odontograma
+
+    return None
+
+
 def _extraer_resumen(datos_medicos: dict | None) -> str | None:
     """Extrae un resumen legible de datos_medicos."""
     if not datos_medicos:

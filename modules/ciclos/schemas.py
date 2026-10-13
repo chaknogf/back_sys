@@ -56,6 +56,12 @@ class CicloOutList(CicloConsultaBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UltimoOdontogramaOut(BaseModel):
+    """Odontograma más reciente registrado a un paciente (None si no existe)."""
+    odontograma: Optional[Dict[str, Any]] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ===================================================================
 # Historia clínica agrupada por consulta
 # ===================================================================

@@ -243,12 +243,28 @@ def _sigsa3_por_grupo(
           {where_extra}
     """), {"desde": f_desde, "hasta": f_hasta, "valor_filtro": valor_filtro}).scalar()
 
+    sexo_rows = db.execute(text(f"""
+        SELECT COALESCE(NULLIF(UPPER(BTRIM(p.sexo)), ''), 'N/D') AS sexo, COUNT(*) AS total
+        FROM sigsa3_registros r
+        JOIN pacientes p ON p.id = r.paciente_id
+        WHERE r.fecha_consulta BETWEEN :desde AND :hasta
+          {where_extra}
+        GROUP BY 1
+        ORDER BY 1
+    """), {"desde": f_desde, "hasta": f_hasta, "valor_filtro": valor_filtro}).fetchall()
+
+    por_sexo = [
+        {"sexo": str(m["sexo"]), "total": int(m["total"])}
+        for m in (r._mapping for r in sexo_rows)
+    ]
+
     return {
         "titulo": titulo,
         "desde": f_desde,
         "hasta": f_hasta,
         "datos": datos,
         "total_general": int(total) if total else 0,
+        "por_sexo": por_sexo,
         "skip": skip,
         "limit": limit,
         "generado_en": datetime.now(APP_TIMEZONE).isoformat(),

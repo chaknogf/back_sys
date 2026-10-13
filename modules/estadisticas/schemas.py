@@ -134,12 +134,18 @@ class EstudiantePublicoItem(BaseModel):
     paciente_id: Optional[int] = None
 
 
+class SexoConteo(BaseModel):
+    sexo: str = Field(..., description="Sexo (M/F) o N/D si no está registrado")
+    total: int = Field(..., ge=0, description="Cantidad de consultas")
+
+
 class EstudiantePublicoResponse(BaseModel):
     titulo: str = "Consultas de Estudiantes Públicos"
     desde: date
     hasta: date
     datos: List[EstudiantePublicoItem]
     total_general: int = Field(..., ge=0)
+    por_sexo: List[SexoConteo] = Field(default_factory=list, description="Cantidad de consultas por sexo")
     generado_en: str
 
 

@@ -63,6 +63,13 @@ def _escribir_hoja(ws, group: dict) -> int:
     total_filas = max(MAX_FILAS_HOJA, len(filas))
     ultima = _FILA_ENCABEZADO + total_filas
 
+    # Si hay desbordamiento, la fila de total se pierde: quitar su combinación
+    # ANTES de escribir (la fila 614 pasa a ser datos y no admite celdas combinadas).
+    if total_filas > MAX_FILAS_HOJA:
+        for rng in list(ws.merged_cells.ranges):
+            if str(rng) == "B614:T614":
+                ws.unmerge_cells("B614:T614")
+
     ws["B6"] = kpi["nombre"].upper()
     ws["D9"] = _parse_hora(kpi["hora_apertura"])
     ws["D10"] = _parse_hora(kpi["hora_cierre"])
@@ -108,10 +115,6 @@ def _escribir_hoja(ws, group: dict) -> int:
     # Fila de total (solo cuando no hay desbordamiento de filas de datos).
     if total_filas == MAX_FILAS_HOJA:
         ws["B614"] = "Total"
-    else:
-        for rng in list(ws.merged_cells.ranges):
-            if str(rng) == "B614:T614":
-                ws.unmerge_cells("B614:T614")
 
     # Panel de KPIs (referencias ajustadas al rango real).
     ws["Z15"] = "=D10-D9"
@@ -178,8 +181,8 @@ def _escribir_resumen(wb, hojas: list[tuple[str, int]], procedimientos: list[dic
         f"(({count_por_hoja('Finalizada')})+({count_por_hoja('Cancelada')})"
         f"+({count_por_hoja('Reprogramada')})),0)"
     )
-    ws["E11"] = "+".join(f"'{n}'!Z22" for n, _ in hojas)
-    ws["G11"] = "+".join(f"'{n}'!AB22" for n, _ in hojas)
+    ws["E11"] = "=" + "+".join(f"'{n}'!Z22" for n, _ in hojas)
+    ws["G11"] = "=" + "+".join(f"'{n}'!AB22" for n, _ in hojas)
     ws["I10"] = "Reprogramadas"
     ws["I11"] = kpi_global.get("reprogramadas", 0)
     ws["E14"] = "=E11+G11+I11"

@@ -24,9 +24,8 @@ echo "[3/9] Actualizando pip..."
 pip install --upgrade pip
 
 echo ""
-echo "[4/9] Instalando dependencias..."
+echo "[4/9] Instalando dependencias (versiones fijadas en requirements.txt)..."
 pip install -r requirements.txt
-pip install --upgrade authlib fastapi starlette sqlalchemy idna slowapi gunicorn
 
 echo ""
 echo "[5/9] Ejecutando migraciones de seguridad..."
@@ -80,10 +79,9 @@ sudo systemctl restart backsyshospital
 echo ""
 echo "====================================="
 echo "  Comando manual de inicio:"
-echo "  gunicorn main:app \\"
-echo "    -c gunicorn.conf.py \\"
-echo "    --access-logfile /var/log/back_sys/access.log \\"
-echo "    --error-logfile /var/log/back_sys/error.log"
+echo "  /opt/back_sys/env/bin/python -m gunicorn main:app \\"
+echo "    -k uvicorn.workers.UvicornWorker -w 4 \\"
+echo "    -b 127.0.0.1:8015"
 echo "====================================="
 
 echo ""

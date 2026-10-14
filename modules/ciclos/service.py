@@ -75,7 +75,8 @@ def crear_ciclo(data: CicloConsultaBase, db: Session, current_user):
         especialidad_id=data.especialidad_id,
         servicio=data.servicio,
         contenido=data.contenido,
-        datos_medicos=data.datos_medicos
+        datos_medicos=data.datos_medicos,
+        uisau=data.uisau
     )
 
     db.add(nuevo)
@@ -274,6 +275,7 @@ def obtener_historia_clinica(paciente_id: int, db: Session):
                 "impresion_clinica": dm.get("impresion_clinica"),
                 "egreso": dm.get("egreso"),
                 "odontologia": _extraer_odontologia(dm, c.especialidad or consulta.especialidad),
+                "uisau": c.uisau if isinstance(c.uisau, dict) else None,
             })
 
         consultas_agrupadas.append({

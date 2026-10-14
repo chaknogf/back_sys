@@ -23,6 +23,7 @@ class CiclosConsulta(Base):
     servicio = Column(Text)
     contenido = Column(Text)
     datos_medicos = Column(JSONB)
+    uisau = Column(JSONB)
 
     created_at = Column(TIMESTAMP, server_default=func.now())
 

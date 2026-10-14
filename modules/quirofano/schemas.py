@@ -185,6 +185,10 @@ class IntervencionQuirurgicaCreate(BaseModel):
     hora_finaliza_intervencion: time | None = None
     hora_finaliza_limpieza_prepara_quirofano: time | None = None
     observaciones: str | None = None
+    datos_extra: dict | None = Field(
+        None,
+        description="Datos adicionales (JSONB): equipo quirúrgico (circulante, instrumentista, pediatra, médico de apoyo), etc.",
+    )
 
 
 class IntervencionQuirurgicaUpdate(BaseModel):
@@ -215,6 +219,7 @@ class IntervencionQuirurgicaUpdate(BaseModel):
     hora_finaliza_limpieza_prepara_quirofano: time | None = None
     observaciones: str | None = None
     activo: bool | None = None
+    datos_extra: dict | None = None
 
 
 class IntervencionQuirurgicaOut(BaseModel):
@@ -262,6 +267,7 @@ class IntervencionQuirurgicaOut(BaseModel):
     hora_finaliza_limpieza_prepara_quirofano: time | None = None
     observaciones: str | None = None
     activo: bool
+    datos_extra: dict | None = None
     created_at: str | None = None
     updated_at: str | None = None
 

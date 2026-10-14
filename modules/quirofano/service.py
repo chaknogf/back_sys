@@ -610,6 +610,7 @@ def _resolve_intervencion(row, db: Session) -> dict:
         "hora_finaliza_intervencion": interv.hora_finaliza_intervencion.strftime("%H:%M") if interv.hora_finaliza_intervencion else None,
         "hora_finaliza_limpieza_prepara_quirofano": interv.hora_finaliza_limpieza_prepara_quirofano.strftime("%H:%M") if interv.hora_finaliza_limpieza_prepara_quirofano else None,
         "observaciones": interv.observaciones,
+        "datos_extra": interv.datos_extra,
         "activo": interv.activo,
         "created_at": interv.created_at.isoformat() if interv.created_at else None,
         "updated_at": interv.updated_at.isoformat() if interv.updated_at else None,
@@ -836,6 +837,7 @@ def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_
         hora_finaliza_intervencion=data.hora_finaliza_intervencion,
         hora_finaliza_limpieza_prepara_quirofano=data.hora_finaliza_limpieza_prepara_quirofano,
         observaciones=data.observaciones,
+        datos_extra=data.datos_extra,
         activo=True,
     )
     db.add(reg)

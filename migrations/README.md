@@ -4,7 +4,7 @@ Mapeo de las modificaciones SQL del proyecto y comandos para aplicarlas.
 
 - **Motor**: PostgreSQL, base `hospital` en `localhost`.
 - **Conexión usada**: `psql -h localhost -U admin -d hospital` (password `secreto123`).
-- **Estado actual**: `002` → `030` aplicadas, más `032_procedimientos_unificado.sql`, `074_quirofano_intervencion_especialidad.sql` y `075_quirofano_intervencion_consulta.sql`.
+- **Estado actual**: `002` → `030` aplicadas, más `032_procedimientos_unificado.sql`, `074_quirofano_intervencion_especialidad.sql`, `075_quirofano_intervencion_consulta.sql` y `078_quirofano_config_periodo.sql`.
   El rango `031` → `073` (parches one-off con IDs hardcodeados del dump de
   producción) fue **consolidado y eliminado**; no existe `001` (el esquema base de
   `medicos`, `pacientes`, `personal_salud`, etc. se crea aparte:
@@ -65,6 +65,7 @@ Todas (en orden, deteniéndose al primer error):
 | 032 | `032_procedimientos_unificado.sql` | **Consolida** el antiguo rango `031`→`073` en un único archivo idempotente y *name-based* (sin IDs hardcodeados). Ver detalle abajo. |
 | 074 | `074_quirofano_intervencion_especialidad.sql` | Agrega `intervenciones_quirurgicas.especialidad_id` (FK `especialidades.id`, `ON DELETE SET NULL`) + índice. El form de Quirófano exigía la especialidad pero no se persistía. Aditiva e idempotente. |
 | 075 | `075_quirofano_intervencion_consulta.sql` | Agrega `intervenciones_quirurgicas.consulta_id` (FK `consultas.id`, `ON DELETE SET NULL`) + índice. Liga cada intervención a la consulta de hospitalización que la originó (indicador del listado de quirófano). Aditiva e idempotente. |
+| 078 | `078_quirofano_config_periodo.sql` | Crea `quirofano_config_periodo` (jornada por quirófano: `hora_apertura`, `hora_cierre`, `dias_habiles`, `activo`; `UNIQUE`/FK a `quirofano_numero` `ON DELETE CASCADE`) + seeds 07:00–16:00 por quirófano. Es el *fallback* del reporte/Excel cuando el período no aporta horarios. Aditiva e idempotente. |
 
 > El rango `031` → `073` ya **no existe** como archivos separados: era un conjunto
 > de parches one-off atados a los IDs de un dump de producción. Toda su lógica

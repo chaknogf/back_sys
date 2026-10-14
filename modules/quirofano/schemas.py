@@ -277,3 +277,107 @@ class IntervencionQuirurgicaOut(BaseModel):
 class IntervencionQuirurgicaListResponse(BaseModel):
     total: int
     intervenciones: List[IntervencionQuirurgicaOut]
+
+
+# ========================
+# Configuración de jornada por quirófano
+# ========================
+class QuirofanoConfigPeriodoOut(BaseModel):
+    config_periodo_id: int
+    quirofano_numero_id: int
+    quirofano_numero_nombre: str | None = None
+    hora_apertura: time
+    hora_cierre: time
+    dias_habiles: int
+    activo: bool
+
+    model_config = ConfigDict(from_attributes=False)
+
+
+class QuirofanoConfigPeriodoUpdate(BaseModel):
+    hora_apertura: Optional[time] = None
+    hora_cierre: Optional[time] = None
+    dias_habiles: Optional[int] = Field(None, ge=0)
+    activo: Optional[bool] = None
+
+
+# ========================
+# Reporte / Resumen de quirófanos
+# ========================
+class IntervencionReporteFila(BaseModel):
+    """Fila del detalle tipo hoja Q (columnas A..W + ayudantes)."""
+
+    no: int
+    intervencion_id: int
+    quirofano_numero_id: int | None = None
+    fecha: date
+    paciente_nombre: str | None = None
+    rango_medico: str | None = None
+    especialidad: str | None = None
+    medico: str | None = None
+    procedencia: str | None = None
+    formato: str | None = None
+    procedimiento_1: str | None = None
+    procedimiento_2: str | None = None
+    procedimiento_3: str | None = None
+    procedimiento_4: str | None = None
+    procedimiento_5: str | None = None
+    procedimientos: str | None = None
+    area_cuerpo: str | None = None
+    observaciones: str | None = None
+    hora_inicio_anestesia: str | None = None
+    hora_inicio_intervencion: str | None = None
+    hora_finaliza_intervencion: str | None = None
+    hora_finaliza_limpieza: str | None = None
+    tiempo_intervencion_seg: int | None = None
+    tiempo_uso_quirofano_seg: int | None = None
+    tiempo_limpieza_seg: int | None = None
+    estado: str | None = None
+
+
+class KpiQuirofano(BaseModel):
+    quirofano_numero_id: int | None = None
+    numero: int | None = None
+    nombre: str
+    hora_apertura: str | None = None
+    hora_cierre: str | None = None
+    es_fallback: bool = False
+    dias_abiertos: int = 0
+    tiempo_disponible_seg: int = 0
+    horas_activo_seg: int = 0
+    total_intervenciones: int = 0
+    finalizadas: int = 0
+    canceladas: int = 0
+    reprogramadas: int = 0
+    procedimientos_total: int = 0
+    intervalos_dias_promedio: float | None = None
+    tiempo_promedio_intervencion_seg: int | None = None
+    tiempo_promedio_uso_quirofano_seg: int | None = None
+    tiempo_promedio_limpieza_seg: int | None = None
+    porcentaje_uso: float = 0.0
+    tasa_cancelacion: float = 0.0
+    tasa_cancelacion_con_reprogramadas: float = 0.0
+
+
+class ProcedimientoResumenFila(BaseModel):
+    procedimiento: str
+    cantidad: int
+    tiempo_promedio_seg: int | None = None
+    porcentaje_uso: float = 0.0
+    intervalo_dias_promedio: float | None = None
+
+
+class QuirofanoReporteDetalle(BaseModel):
+    kpi: KpiQuirofano
+    intervenciones: List[IntervencionReporteFila]
+
+
+class ResumenReporteResponse(BaseModel):
+    fecha_desde: date
+    fecha_hasta: date
+    generado_en: str
+    filtros: dict
+    kpi_global: KpiQuirofano
+    por_quirofano: List[QuirofanoReporteDetalle]
+    procedimientos: List[ProcedimientoResumenFila]
+    advertencias: List[str] = []

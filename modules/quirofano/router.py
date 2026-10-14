@@ -1,15 +1,18 @@
 """Rutas autenticadas de intervenciones y catálogos quirúrgicos; cambios de catálogo son administrativos."""
 
 from fastapi import APIRouter, Depends, Query, status, UploadFile, File, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import date
+from datetime import date, time
 
 from core.dependencies import get_db, get_current_admin_user, get_current_user
 from modules.users.models import UserModel
 
 from . import schemas as sch
 from . import service as svc
+from . import reportes_service as rsvc
+from . import reportes_excel as rxl
 
 # Tags por recurso: al ser tags distintos, Swagger los agrupa y los ordena
 # según el orden de definición de las rutas de este router.
@@ -20,6 +23,7 @@ TAG_FORMATOS = "Quirófano · Formatos"
 TAG_PROCEDENCIAS = "Quirófano · Procedencias"
 TAG_RANGOS = "Quirófano · Rangos de Especialista"
 TAG_QUIROFANOS = "Quirófano · Números de Quirófano"
+TAG_REPORTES = "Quirófano · Reportes"
 
 # Los decoradores con barra final son alias de compatibilidad (el frontend los
 # usa): siguen activos en runtime pero se ocultan del OpenAPI para no duplicar
@@ -395,3 +399,72 @@ def eliminar_quirofano_numero(
     current_user: UserModel = Depends(get_current_admin_user),
 ):
     return svc.eliminar_quirofano_numero(qn_id, db)
+
+
+# ========================
+# Configuración de jornada por quirófano
+# ========================
+@router.get("/config-periodo", response_model=List[sch.QuirofanoConfigPeriodoOut], tags=[TAG_REPORTES])
+def listar_config_periodo(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return rsvc.listar_config_periodo(db)
+
+
+@router.put("/config-periodo/{quirofano_numero_id}", response_model=sch.QuirofanoConfigPeriodoOut, tags=[TAG_REPORTES])
+def actualizar_config_periodo(
+    quirofano_numero_id: int,
+    data: sch.QuirofanoConfigPeriodoUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_admin_user),
+):
+    return rsvc.actualizar_config_periodo(db, quirofano_numero_id, data)
+
+
+# ========================
+# Reportes (resumen + Excel)
+# ========================
+def _params_reporte(
+    fecha_desde: date,
+    fecha_hasta: date,
+    especialidad_id: Optional[int] = Query(None, description="Filtrar por especialidad"),
+    quirofano_numero_id: Optional[int] = Query(None, description="Filtrar por quirófano"),
+    hora_apertura: Optional[time] = Query(None, description="Hora de apertura (HH:MM)"),
+    hora_cierre: Optional[time] = Query(None, description="Hora de cierre (HH:MM)"),
+    dias_abiertos: Optional[int] = Query(None, ge=0, description="Días abiertos del período"),
+) -> dict:
+    return {
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+        "especialidad_id": especialidad_id,
+        "quirofano_numero_id": quirofano_numero_id,
+        "hora_apertura": hora_apertura,
+        "hora_cierre": hora_cierre,
+        "dias_abiertos": dias_abiertos,
+    }
+
+
+@router.get("/reportes/resumen", response_model=sch.ResumenReporteResponse, tags=[TAG_REPORTES])
+def reporte_resumen(
+    params: dict = Depends(_params_reporte),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return rsvc.generar_reporte(db, **params)
+
+
+@router.get("/reportes/excel", tags=[TAG_REPORTES])
+def reporte_excel(
+    params: dict = Depends(_params_reporte),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    reporte = rsvc.generar_reporte(db, **params)
+    contenido = rxl.construir_excel_bytes(reporte)
+    nombre = f"Control_Quirofanos_{params['fecha_desde']}_{params['fecha_hasta']}.xlsx"
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )

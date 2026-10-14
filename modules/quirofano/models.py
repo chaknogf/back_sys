@@ -63,6 +63,31 @@ class QuirofanoNumeroModel(Base):
     activo = Column(Boolean, default=True)
 
 
+class QuirofanoConfigPeriodoModel(Base):
+    """Jornada configurable por quirófano (fallback del reporte/Excel)."""
+
+    __tablename__ = "quirofano_config_periodo"
+
+    config_periodo_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    quirofano_numero_id = Column(
+        Integer,
+        ForeignKey("quirofano_numero.quirofano_numero_id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    hora_apertura = Column(Time, nullable=False)
+    hora_cierre = Column(Time, nullable=False)
+    dias_habiles = Column(Integer, nullable=False, default=0)
+    activo = Column(Boolean, nullable=False, default=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(
+        TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    quirofano_numero = relationship("QuirofanoNumeroModel")
+
+
 class FormatoProcedimientoModel(Base):
     __tablename__ = "formato_procedimiento"
 

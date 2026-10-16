@@ -19,9 +19,17 @@ def obtener_ciclos_por_consulta(
     activo: Optional[bool] = True,
     db: Session = None,
 ):
-    """Ordena por número y aplica el filtro de actividad cuando se especifica."""
-    query = db.query(CiclosConsulta).filter(
-        CiclosConsulta.consulta_id == consulta_id
+    """Ordena por número y aplica el filtro de actividad cuando se especifica.
+
+    Incluye la consulta (con su paciente) para que la vista de historia clínica
+    pueda cargarse directamente desde el id de consulta, y resuelve el nombre
+    legible de los autores en una sola query adicional."""
+    query = (
+        db.query(CiclosConsulta)
+        .options(
+            joinedload(CiclosConsulta.consulta).joinedload(ConsultaModel.paciente)
+        )
+        .filter(CiclosConsulta.consulta_id == consulta_id)
     )
 
     if activo is not None:
@@ -29,7 +37,26 @@ def obtener_ciclos_por_consulta(
 
     ciclos = query.order_by(CiclosConsulta.numero.asc()).all()
 
+    usuarios = {c.usuario for c in ciclos if c.usuario}
+    if usuarios:
+        nombres = dict(
+            db.query(UserModel.username, UserModel.nombre)
+            .filter(UserModel.username.in_(usuarios))
+            .all()
+        )
+        for ciclo in ciclos:
+            ciclo.usuario_nombre = nombres.get(ciclo.usuario)
+
     return ciclos
+
+
+def _adjuntar_usuario_nombre(ciclo, db: Session):
+    """Nombre legible de quien registró la nota (el campo usuario guarda el username)."""
+    if ciclo is not None:
+        ciclo.usuario_nombre = db.query(UserModel.nombre).filter(
+            UserModel.username == ciclo.usuario
+        ).scalar()
+    return ciclo
 
 
 def obtener_ciclo(ciclo_id: int, db: Session):
@@ -43,12 +70,38 @@ def obtener_ciclo(ciclo_id: int, db: Session):
     if not ciclo:
         raise HTTPException(status_code=404, detail="Ciclo no encontrado")
 
-    # Nombre legible de quien registró la nota (el campo usuario guarda el username).
-    ciclo.usuario_nombre = db.query(UserModel.nombre).filter(
-        UserModel.username == ciclo.usuario
-    ).scalar()
+    return _adjuntar_usuario_nombre(ciclo, db)
 
-    return ciclo
+
+def obtener_ultimo_ciclo_por_consulta(
+    consulta_id: int,
+    activo: Optional[bool] = True,
+    db: Session = None,
+):
+    """Nota más reciente de una consulta, resuelta en una sola query.
+
+    Ordena por fecha de registro (más reciente primero) con el id como
+    desempate y limita a una fila; devuelve ``None`` si no hay notas activas."""
+    query = (
+        db.query(CiclosConsulta)
+        .options(
+            joinedload(CiclosConsulta.consulta).joinedload(ConsultaModel.paciente)
+        )
+        .filter(CiclosConsulta.consulta_id == consulta_id)
+    )
+
+    if activo is not None:
+        query = query.filter(CiclosConsulta.activo.is_(activo))
+
+    ciclo = (
+        query.order_by(
+            CiclosConsulta.registro.desc().nullslast(),
+            CiclosConsulta.id.desc(),
+        )
+        .first()
+    )
+
+    return _adjuntar_usuario_nombre(ciclo, db)
 
 
 def crear_ciclo(data: CicloConsultaBase, db: Session, current_user):
@@ -76,7 +129,8 @@ def crear_ciclo(data: CicloConsultaBase, db: Session, current_user):
         servicio=data.servicio,
         contenido=data.contenido,
         datos_medicos=data.datos_medicos,
-        uisau=data.uisau
+        uisau=data.uisau,
+        quirofano=data.quirofano
     )
 
     db.add(nuevo)
@@ -276,6 +330,7 @@ def obtener_historia_clinica(paciente_id: int, db: Session):
                 "egreso": dm.get("egreso"),
                 "odontologia": _extraer_odontologia(dm, c.especialidad or consulta.especialidad),
                 "uisau": c.uisau if isinstance(c.uisau, dict) else None,
+                "quirofano": c.quirofano if isinstance(c.quirofano, dict) else None,
             })
 
         consultas_agrupadas.append({

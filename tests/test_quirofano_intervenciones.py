@@ -12,6 +12,7 @@ from modules.quirofano.models import (
     ProcedimientoQuirofanoModel,
 )
 from modules.consultas.models import ConsultaModel, ConsultaHistorialModel
+from modules.ciclos.models import CiclosConsulta
 from modules.procedimientos.models import CatalogoProcedimiento, AreaCuerpoIntervenida
 from sqlalchemy import text
 
@@ -23,6 +24,7 @@ created_ids = {
     "intervenciones": [],
     "quirofanos_numero": [],
     "procedimientos_quirofano": [],
+    "ciclos": [],
 }
 
 
@@ -33,6 +35,14 @@ def cleanup():
             db.query(IntervencionQuirurgicaModel).filter(
                 IntervencionQuirurgicaModel.intervencion_id == iid
             ).delete()
+        # Las intervenciones con consulta generan notas (ciclos) que restringen el borrado
+        if created_ids["consultas"]:
+            db.query(CiclosConsulta).filter(
+                CiclosConsulta.consulta_id.in_(created_ids["consultas"]),
+                CiclosConsulta.quirofano.isnot(None),
+            ).delete(synchronize_session=False)
+        for kid in created_ids["ciclos"]:
+            db.query(CiclosConsulta).filter(CiclosConsulta.id == kid).delete()
         for cid in created_ids["consultas"]:
             db.query(ConsultaModel).filter(ConsultaModel.id == cid).delete()
         for pid in created_ids["pacientes"]:
@@ -556,6 +566,64 @@ class TestIntervencionesQuirurgicas:
         )
         assert r.status_code == 200
         assert r.json()["consulta_id"] == consulta_id
+
+    def test_crear_intervencion_genera_nota_quirofano(self, client, auth_headers):
+        """Al registrar la intervención se crea una nota médica (ciclo) con el JSONB `quirofano`."""
+        paciente = self._crear_paciente(client, auth_headers)
+        consulta_id = self._crear_consulta(client, auth_headers, paciente["id"])
+        quirofano = self._crear_quirofano(client, auth_headers)
+
+        r = client.post(
+            "/quirofano/intervenciones/",
+            headers=auth_headers,
+            json={
+                "paciente_id": paciente["id"],
+                "consulta_id": consulta_id,
+                "fecha": date.today().isoformat(),
+                "quirofano_numero_id": quirofano["quirofano_numero_id"],
+                "procedimiento_principal": "Apendicectomía",
+                "procedimiento_2": "Lavado de cavidad",
+                "area_cuerpo_intervenida": "Abdomen",
+                "hora_inicio_anestesia": "07:45",
+                "hora_inicio_intervencion": "08:10",
+                "hora_finaliza_intervencion": "09:25",
+                "observaciones": "Urgencia",
+            },
+        )
+        assert r.status_code == 201, r.text
+        data = r.json()
+        created_ids["intervenciones"].append(data["intervencion_id"])
+        iid = data["intervencion_id"]
+
+        db = SessionLocal()
+        try:
+            ciclo = (
+                db.query(CiclosConsulta)
+                .filter(
+                    CiclosConsulta.consulta_id == consulta_id,
+                    CiclosConsulta.quirofano.isnot(None),
+                )
+                .first()
+            )
+            assert ciclo is not None
+            created_ids["ciclos"].append(ciclo.id)
+            assert ciclo.numero == 1
+            assert "Apendicectomía" in ciclo.contenido
+            q = ciclo.quirofano
+            assert q["intervencion_id"] == iid
+            assert q["procedimientos"] == ["Apendicectomía", "Lavado de cavidad"]
+            assert q["area_cuerpo_intervenida"] == "Abdomen"
+            assert q["quirofano_numero"]["nombre"] == quirofano["nombre"]
+            assert q["horas"]["inicio_anestesia"].startswith("07:45")
+            assert q["observaciones"] == "Urgencia"
+        finally:
+            db.close()
+
+        # La historia clínica resumida expone el JSONB de quirófano
+        r = client.get(f"/ciclos/consulta/{consulta_id}", headers=auth_headers)
+        assert r.status_code == 200
+        ciclos = r.json()
+        assert any(c.get("quirofano", {}).get("intervencion_id") == iid for c in ciclos)
 
     def test_registro_intervencion_no_retrocede_consulta_cerrada(self, client, auth_headers):
         """Una intervención no retrocede consultas ya egresadas/cerradas."""

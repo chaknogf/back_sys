@@ -15,6 +15,7 @@ from .schemas import CicloConsulta, CicloConsultaBase, CicloOut, HistoriaClinica
 from .service import (
     obtener_ciclos_por_consulta as service_obtener_ciclos_por_consulta,
     obtener_ciclo as service_obtener_ciclo,
+    obtener_ultimo_ciclo_por_consulta as service_obtener_ultimo_ciclo_por_consulta,
     crear_ciclo as service_crear_ciclo,
     obtener_historia_clinica as service_obtener_historia_clinica,
     obtener_ultimo_odontograma as service_obtener_ultimo_odontograma,
@@ -44,15 +45,29 @@ def obtener_ultimo_odontograma(
     return {"odontograma": service_obtener_ultimo_odontograma(paciente_id, db)}
 
 
-@router.get("/consulta/{consulta_id}", response_model=List[CicloConsulta])
+@router.get("/consulta/{consulta_id}", response_model=List[CicloOut])
 def obtener_ciclos_por_consulta(
     consulta_id: int,
     activo: Optional[bool] = Query(True),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    """Lista los ciclos de una consulta, activos por defecto."""
+    """Lista los ciclos de una consulta, activos por defecto.
+
+    Incluye la consulta y su paciente para permitir cargar la historia clínica
+    directamente desde el id de consulta."""
     return service_obtener_ciclos_por_consulta(consulta_id, activo, db)
+
+
+@router.get("/consulta/{consulta_id}/ultimo", response_model=Optional[CicloOut])
+def obtener_ultimo_ciclo_por_consulta(
+    consulta_id: int,
+    activo: Optional[bool] = Query(True),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Nota (ciclo) más reciente de una consulta; null si no tiene notas activas."""
+    return service_obtener_ultimo_ciclo_por_consulta(consulta_id, activo, db)
 
 
 @router.get("/{ciclo_id}", response_model=CicloOut)

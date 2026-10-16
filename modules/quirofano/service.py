@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from datetime import date
 
 from modules.especialidades.models import EspecialidadModel
+from modules.ciclos.models import CiclosConsulta
 
 from .models import (
     FormatoProcedimientoModel,
@@ -782,6 +783,80 @@ def _avanzar_consulta_a_quirofano(db: Session, consulta_id: int | None, usuario:
     )
 
 
+def _nombre_catalogo(db: Session, model, pk: int | None, campo: str = "nombre") -> str | None:
+    """Lee un nombre legible de un catálogo; devuelve None si no hay id o no existe."""
+    if not pk:
+        return None
+    fila = db.query(getattr(model, campo)).filter(getattr(model, model.__table__.primary_key.columns.keys()[0]) == pk).first()
+    return fila[0] if fila else None
+
+
+def _crear_nota_quirofano(db: Session, reg: IntervencionQuirurgicaModel, usuario: str | None = None) -> None:
+    """Crea la nota médica (ciclo) de la consulta con los datos de la intervención en JSONB.
+
+    El payload vive en `ciclos_consulta.quirofano` (JSONB flexible, mismo patrón
+    que `uisau`) para no acoplar la nota a la forma tabular de la intervención.
+    """
+    if not reg.consulta_id:
+        return
+    from modules.consultas.models import ConsultaModel
+
+    consulta = db.query(ConsultaModel).filter(ConsultaModel.id == reg.consulta_id).first()
+    if not consulta:
+        return
+
+    procedimientos = [
+        p for p in (reg.procedimiento_principal, reg.procedimiento_2, reg.procedimiento_3,
+                    reg.procedimiento_4, reg.procedimiento_5) if p
+    ]
+
+    def _hora(valor):
+        return valor.isoformat() if valor else None
+
+    payload = {
+        "intervencion_id": reg.intervencion_id,
+        "fecha": reg.fecha.isoformat() if reg.fecha else None,
+        "expediente": reg.expediente,
+        "procedimientos": procedimientos,
+        "area_cuerpo_intervenida": reg.area_cuerpo_intervenida,
+        "estado_cirugia": {
+            "id": reg.estado_cirugia_id,
+            "nombre": _nombre_catalogo(db, EstadoCirugiaModel, reg.estado_cirugia_id),
+        },
+        "quirofano_numero": {
+            "id": reg.quirofano_numero_id,
+            "nombre": _nombre_catalogo(db, QuirofanoNumeroModel, reg.quirofano_numero_id),
+        },
+        "especialidad_id": reg.especialidad_id,
+        "personal_atencion_id": reg.personal_atencion_id,
+        "horas": {
+            "inicio_anestesia": _hora(reg.hora_inicio_anestesia),
+            "inicio_intervencion": _hora(reg.hora_inicio_intervencion),
+            "finaliza_intervencion": _hora(reg.hora_finaliza_intervencion),
+            "finaliza_limpieza_prepara_quirofano": _hora(reg.hora_finaliza_limpieza_prepara_quirofano),
+        },
+        "observaciones": reg.observaciones,
+        "datos_extra": reg.datos_extra,
+    }
+
+    ultimo_numero = (
+        db.query(func.coalesce(func.max(CiclosConsulta.numero), 0))
+        .filter(CiclosConsulta.consulta_id == reg.consulta_id)
+        .scalar()
+    ) or 0
+
+    db.add(CiclosConsulta(
+        consulta_id=reg.consulta_id,
+        numero=ultimo_numero + 1,
+        activo=True,
+        usuario=usuario or "",
+        especialidad=consulta.especialidad,
+        servicio=consulta.servicio,
+        contenido=f"Nota quirúrgica: {procedimientos[0] if procedimientos else 'intervención registrada'}",
+        quirofano=payload,
+    ))
+
+
 def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_by: str | None = None) -> dict:
     """Verifica paciente y referencias opcionales, y hereda expediente si no se envía."""
     # Validar paciente existe
@@ -841,7 +916,9 @@ def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_
         activo=True,
     )
     db.add(reg)
+    db.flush()
     _avanzar_consulta_a_quirofano(db, data.consulta_id, usuario=created_by)
+    _crear_nota_quirofano(db, reg, usuario=created_by)
     db.commit()
     db.refresh(reg)
     return obtener_intervencion(reg.intervencion_id, db)

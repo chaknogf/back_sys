@@ -17,7 +17,7 @@ from modules.laboratorios.models import Laboratorios
 from modules.rayos_x.models import RayosX
 from modules.consultas.schemas import (
     ConsultaOut, ConsultaUpdate, RegistroConsultaCreate, RegistroConsultaOut,
-    Indicador, CicloClinico, Egreso, ConsultaListResponse
+    Indicador, CicloClinico, Egreso, ConsultaListResponse, ServicioConteo
 )
 from modules.expediente.service import generar_expediente, generar_emergencia
 
@@ -89,6 +89,45 @@ def avanzar_estado_consulta(
     return True
 
 
+def marcar_tiene_uisau(db: Session, consultas) -> None:
+    """Marca tiene_uisau en cada consulta si algún ciclo tiene datos UISAU."""
+    ids = [c.id for c in consultas]
+    if not ids:
+        return
+    con_uisau = {
+        fila[0]
+        for fila in db.query(CiclosConsulta.consulta_id)
+        .filter(
+            CiclosConsulta.consulta_id.in_(ids),
+            CiclosConsulta.uisau.isnot(None),
+        )
+        .distinct()
+        .all()
+    }
+    for consulta in consultas:
+        consulta.tiene_uisau = consulta.id in con_uisau
+
+
+def _aplicar_exclusion_estados(query, excluir_estados: Optional[str]):
+    """Excluye consultas cuyo `ultimo_estado` esté en la lista (CSV).
+
+    Se usa para listar solo pacientes aún encamados: se descartan los estados de
+    salida (egreso, archivo, referido, fallecido). Las consultas sin estado de
+    ciclo (`ultimo_estado` nulo) se conservan.
+    """
+    if not excluir_estados:
+        return query
+    estados = [e.strip().lower() for e in excluir_estados.split(",") if e.strip()]
+    if not estados:
+        return query
+    return query.filter(
+        or_(
+            ConsultaModel.ultimo_estado.is_(None),
+            func.lower(ConsultaModel.ultimo_estado).notin_(estados),
+        )
+    )
+
+
 def buscar_consultas_activas(
     db: Session,
     paciente_id: Optional[int] = None,
@@ -105,6 +144,7 @@ def buscar_consultas_activas(
     servicio: Optional[str] = None,
     fecha: Optional[date] = None,
     ultimo_estado: Optional[str] = None,
+    excluir_estados: Optional[str] = None,
     activo: bool = True,
     archivo: bool = True,
     skip: int = 0,
@@ -125,6 +165,8 @@ def buscar_consultas_activas(
                 ConsultaModel.ultimo_estado != "archivo"
             )
         )
+
+    query = _aplicar_exclusion_estados(query, excluir_estados)
 
     if ultimo_estado is not None:
         query = query.filter(ConsultaModel.ultimo_estado == ultimo_estado)
@@ -184,11 +226,53 @@ def buscar_consultas_activas(
         .limit(limit).offset(skip)
         .all()
     )
+    marcar_tiene_uisau(db, resultados)
 
     return ConsultaListResponse(
         total=total,
         consultas=resultados
     )
+
+
+def contar_consultas_por_servicio(
+    db: Session,
+    tipo_consulta: Optional[int] = None,
+    excluir_estados: Optional[str] = None,
+    activo: bool = True,
+    archivo: bool = True,
+) -> List[ServicioConteo]:
+    """Cuenta consultas agrupadas por `servicio` (una fila por servicio distinto).
+
+    Alimenta las pestañas por servicio de las listas (p. ej. `/encamamiento`),
+    que necesitan el catálogo real de servicios presentes y su total.
+    """
+    query = (
+        db.query(
+            ConsultaModel.servicio,
+            func.count(ConsultaModel.id).label("total"),
+        )
+        .filter(ConsultaModel.activo.is_(activo))
+    )
+
+    if not archivo:
+        query = query.filter(
+            or_(
+                ConsultaModel.ultimo_estado.is_(None),
+                ConsultaModel.ultimo_estado != "archivo",
+            )
+        )
+
+    query = _aplicar_exclusion_estados(query, excluir_estados)
+
+    if tipo_consulta is not None:
+        query = query.filter(ConsultaModel.tipo_consulta == tipo_consulta)
+
+    filas = (
+        query.group_by(ConsultaModel.servicio)
+        .order_by(func.count(ConsultaModel.id).desc())
+        .all()
+    )
+    return [ServicioConteo(servicio=s, total=int(t)) for s, t in filas]
 
 
 def obtener_consulta(consulta_id: int, db: Session):

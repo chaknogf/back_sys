@@ -769,6 +769,23 @@ class TestCiclos:
         )
         assert r.status_code == 200
 
+    def test_get_ultimo_ciclo_by_consulta(self, client, auth_headers):
+        if not created_ids["consultas"]:
+            pytest.skip("No consulta created")
+        r = client.get(
+            f"/ciclos/consulta/{created_ids['consultas'][0]}/ultimo",
+            headers=auth_headers,
+        )
+        assert r.status_code == 200
+        data = r.json()
+        # Devuelve el ciclo más reciente o null si la consulta no tiene notas.
+        assert data is None or data.get("consulta_id") == created_ids["consultas"][0]
+
+    def test_get_ultimo_ciclo_consulta_sin_notas(self, client, auth_headers):
+        r = client.get("/ciclos/consulta/999999/ultimo", headers=auth_headers)
+        assert r.status_code == 200
+        assert r.json() is None
+
     def test_get_ciclo(self, client, auth_headers):
         if not created_ids["ciclos"]:
             pytest.skip("No ciclo created")

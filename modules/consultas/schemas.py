@@ -197,6 +197,7 @@ class ConsultaOut(ConsultaBase):
     id: int 
     ultimo_estado: Optional[str] = None 
     paciente: Optional[PacienteConsultaBase] = None
+    tiene_uisau: Optional[bool] = Field(None, description="True si la consulta tiene al menos un ciclo con datos UISAU")
 
     @model_validator(mode="before")
     @classmethod
@@ -303,6 +304,18 @@ class ConsultaListResponse(BaseModel):
 
 
 # ===================================================================
+# Conteo por servicio (pestañas de encamamiento/listas por servicio)
+# ===================================================================
+class ServicioConteo(BaseModel):
+    """Servicio de consulta y número de consultas que lo tienen asignado."""
+
+    servicio: Optional[str] = None
+    total: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ===================================================================
 # Schema específico para registro de consultas
 # ===================================================================
 class RegistroConsultaCreate(BaseModel):
@@ -338,5 +351,6 @@ class ConsultaHistoriaResumidaOut(ConsultaBaseOut):
     fecha_consulta: Optional[date] = None
     hora_consulta: Optional[time] = None
     ultimo_estado: Optional[str] = None
+    tiene_uisau: Optional[bool] = Field(None, description="True si la consulta tiene al menos un ciclo con datos UISAU")
     
     model_config = ConfigDict(from_attributes=True)

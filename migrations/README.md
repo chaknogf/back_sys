@@ -4,7 +4,7 @@ Mapeo de las modificaciones SQL del proyecto y comandos para aplicarlas.
 
 - **Motor**: PostgreSQL, base `hospital` en `localhost`.
 - **Conexión usada**: `psql -h localhost -U admin -d hospital` (password `secreto123`).
-- **Estado actual**: `002` → `030` aplicadas, más `032_procedimientos_unificado.sql`, `074_quirofano_intervencion_especialidad.sql`, `075_quirofano_intervencion_consulta.sql`, `078_quirofano_config_periodo.sql` y `080_catalogo_procedimientos_nuevos.sql`.
+- **Estado actual**: `002` → `030` aplicadas, más `032_procedimientos_unificado.sql`, `074_quirofano_intervencion_especialidad.sql`, `075_quirofano_intervencion_consulta.sql`, `078_quirofano_config_periodo.sql`, `080_catalogo_procedimientos_nuevos.sql`, `081_ciclos_consulta_quirofano.sql` y `082_ciclos_consulta_indice_ultima_nota.sql`.
   El rango `031` → `073` (parches one-off con IDs hardcodeados del dump de
   producción) fue **consolidado y eliminado**; no existe `001` (el esquema base de
   `medicos`, `pacientes`, `personal_salud`, etc. se crea aparte:
@@ -67,6 +67,8 @@ Todas (en orden, deteniéndose al primer error):
 | 075 | `075_quirofano_intervencion_consulta.sql` | Agrega `intervenciones_quirurgicas.consulta_id` (FK `consultas.id`, `ON DELETE SET NULL`) + índice. Liga cada intervención a la consulta de hospitalización que la originó (indicador del listado de quirófano). Aditiva e idempotente. |
 | 078 | `078_quirofano_config_periodo.sql` | Crea `quirofano_config_periodo` (jornada por quirófano: `hora_apertura`, `hora_cierre`, `dias_habiles`, `activo`; `UNIQUE`/FK a `quirofano_numero` `ON DELETE CASCADE`) + seeds 07:00–16:00 por quirófano. Es el *fallback* del reporte/Excel cuando el período no aporta horarios. Aditiva e idempotente. |
 | 080 | `080_catalogo_procedimientos_nuevos.sql` | Agrega 15 procedimientos faltantes a `catalogo_procedimientos` (`especialidad_ref`/`abreviatura` NULL). Idempotente: `ON CONFLICT DO NOTHING` sobre los UNIQUE de `nombre`/`abreviatura`. |
+| 081 | `081_ciclos_consulta_quirofano.sql` | Agrega `ciclos_consulta.quirofano` (JSONB). Al registrar una intervención quirúrgica con consulta ligada se crea automáticamente la nota médica (ciclo) de la intervención en este JSONB (mismo patrón que `uisau`). Aditiva e idempotente. |
+| 082 | `082_ciclos_consulta_indice_ultima_nota.sql` | Índice parcial `idx_ciclos_consulta_registro (consulta_id, registro DESC, id DESC) WHERE activo` para resolver la última nota de una consulta con un *index scan* (endpoint `GET /ciclos/consulta/{id}/ultimo`). Aditiva e idempotente. |
 
 > El rango `031` → `073` ya **no existe** como archivos separados: era un conjunto
 > de parches one-off atados a los IDs de un dump de producción. Toda su lógica

@@ -35,6 +35,7 @@ class CicloConsultaBase(BaseModel):
     contenido: Optional[str] = None
     datos_medicos: Optional[Dict[str, Any]] = None
     uisau: Optional[Dict[str, Any]] = None
+    quirofano: Optional[Dict[str, Any]] = None
     model_config = ConfigDict(from_attributes=True)
 
 class CicloConsulta (CicloConsultaBase):
@@ -81,6 +82,7 @@ class CicloResumen(BaseModel):
     egreso: Optional[Dict[str, Any]] = None
     odontologia: Optional[Dict[str, Any]] = None
     uisau: Optional[Dict[str, Any]] = None
+    quirofano: Optional[Dict[str, Any]] = None
     model_config = ConfigDict(from_attributes=True)
 
 

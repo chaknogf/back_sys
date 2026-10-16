@@ -16,7 +16,7 @@ from modules.consultas.models import ConsultaModel
 from modules.pacientes.schemas import PacienteSimple
 from .schemas import (
     ConsultaOut, ConsultaUpdate, RegistroConsultaCreate, RegistroConsultaOut,
-    ConsultaHistoriaResumidaOut, ConsultaListResponse
+    ConsultaHistoriaResumidaOut, ConsultaListResponse, ServicioConteo
 )
 from .service import (
     _agregar_ciclo, buscar_consultas_activas as service_buscar_consultas,
@@ -26,6 +26,8 @@ from .service import (
     desactivar_consulta as service_desactivar_consulta,
     eliminar_consulta as service_eliminar_consulta,
     sincronizar_indicadores as service_sincronizar_indicadores,
+    contar_consultas_por_servicio as service_contar_por_servicio,
+    marcar_tiene_uisau,
 )
 
 router = APIRouter(prefix="/consultas", tags=["Consultas Médicas"])
@@ -47,6 +49,10 @@ def buscar_consultas_activas(
     servicio: Optional[str] = None,
     fecha: Optional[date] = None,
     ultimo_estado: Optional[str] = None,
+    excluir_estados: Optional[str] = Query(
+        None,
+        description="Lista CSV de estados de ciclo a excluir (p. ej. 'egreso,archivo,referido,fallecido,recepcion')",
+    ),
     activo: bool = Query(True, description="Filtrar solo consultas activas"),
     archivo: bool = Query(True, description="Excluye consultas cuyo último estado de ciclo sea 'archivo'"),
     db: Session = Depends(get_db),
@@ -70,6 +76,7 @@ def buscar_consultas_activas(
         servicio=servicio,
         fecha=fecha,
         ultimo_estado=ultimo_estado,
+        excluir_estados=excluir_estados,
         activo=activo,
         archivo=archivo,
         skip=skip,
@@ -127,6 +134,28 @@ def buscar_pacientes(
 
     resultado = [PacienteSimple.from_orm(p) for p in pacientes]
     return resultado
+
+
+@router.get("/servicios", response_model=List[ServicioConteo])
+def contar_por_servicio(
+    tipo_consulta: Optional[int] = None,
+    excluir_estados: Optional[str] = Query(
+        None,
+        description="Lista CSV de estados de ciclo a excluir (p. ej. 'egreso,archivo,referido,fallecido,recepcion')",
+    ),
+    activo: bool = Query(True, description="Filtrar solo consultas activas"),
+    archivo: bool = Query(True, description="Excluye consultas cuyo último estado de ciclo sea 'archivo'"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Servicios distintos de las consultas con su total (para pestañas por servicio)."""
+    return service_contar_por_servicio(
+        db=db,
+        tipo_consulta=tipo_consulta,
+        excluir_estados=excluir_estados,
+        activo=activo,
+        archivo=archivo,
+    )
 
 
 @router.get("/{consulta_id}", response_model=ConsultaOut)
@@ -232,6 +261,7 @@ def buscar_consultas_por_paciente(
         .limit(limit)
         .all()
     )
+    marcar_tiene_uisau(db, resultados)
 
     registrar_acceso(db, current_user.username, "consultas", f"/consultas/pacienteId/{paciente_id}", registro_id=paciente_id)
     return resultados

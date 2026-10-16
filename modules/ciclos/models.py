@@ -1,7 +1,7 @@
 # modules/ciclos/models.py
 """Persistencia de notas clínicas secuenciales asociadas a una consulta."""
 
-from sqlalchemy import Column, Integer, Text, Boolean, TIMESTAMP, ForeignKey, UniqueConstraint, CheckConstraint, Index
+from sqlalchemy import Column, Integer, Text, Boolean, TIMESTAMP, ForeignKey, UniqueConstraint, CheckConstraint, Index, text
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -24,6 +24,7 @@ class CiclosConsulta(Base):
     contenido = Column(Text)
     datos_medicos = Column(JSONB)
     uisau = Column(JSONB)
+    quirofano = Column(JSONB)
 
     created_at = Column(TIMESTAMP, server_default=func.now())
 
@@ -33,6 +34,13 @@ class CiclosConsulta(Base):
         Index("idx_ciclos_consulta_id", "consulta_id"),
         Index("idx_ciclos_registro", "registro"),
         Index("idx_ciclos_activo", "activo"),
+        Index(
+            "idx_ciclos_consulta_registro",
+            "consulta_id",
+            text("registro DESC"),
+            text("id DESC"),
+            postgresql_where=text("activo"),
+        ),
     )
 
     consulta = relationship("ConsultaModel", back_populates="ciclos")

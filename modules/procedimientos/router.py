@@ -423,6 +423,7 @@ def listar_mas_usados(
                 SUM(pm.cantidad) AS total_cantidad,
                 COUNT(*) AS total_registros,
                 SUM(pm.anestesia) AS total_anestesia,
+                MAX(pm.lugar_servicio) AS lugar_servicio,
                 ROW_NUMBER() OVER (
                     PARTITION BY pm.especialidad_id
                     ORDER BY SUM(pm.cantidad) DESC, COUNT(*) DESC, cat.nombre
@@ -455,6 +456,7 @@ def listar_mas_usados(
             "total_registros": int(m["total_registros"] or 0),
             "total_anestesia": int(m["total_anestesia"] or 0),
             "posicion": int(m["posicion"]),
+            "lugar_servicio": m["lugar_servicio"] if m["lugar_servicio"] else "",
         })
 
     return {

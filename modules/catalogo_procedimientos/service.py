@@ -8,9 +8,42 @@ from modules.catalogo_procedimientos.models import (
     CatalogoProcedimiento,
     AreaCuerpoIntervenida,
 )
+from modules.procedimientos.models import CatalogoProcedimientoEspecialidad
 
 
 # ────────────────────────── CATÁLOGO ──────────────────────────
+
+def _adjuntar_especialidades(db: Session, regs: List[CatalogoProcedimiento]) -> List[CatalogoProcedimiento]:
+    """Carga `especialidades_ids` en cada procedimiento con una sola consulta."""
+    mapa: dict = {}
+    ids = [r.id for r in regs if r is not None]
+    if ids:
+        filas = db.query(CatalogoProcedimientoEspecialidad).filter(
+            CatalogoProcedimientoEspecialidad.id_catalogo_procedimiento.in_(ids)
+        ).all()
+        for fila in filas:
+            mapa.setdefault(fila.id_catalogo_procedimiento, []).append(fila.id_especialidad)
+    for r in regs:
+        if r is not None:
+            r.especialidades_ids = sorted(mapa.get(r.id, []))
+    return regs
+
+
+def _sincronizar_especialidades(db: Session, cat_id: int, especialidades: Optional[List[int]]) -> None:
+    """Reemplaza las especialidades habilitadas de un procedimiento."""
+    db.query(CatalogoProcedimientoEspecialidad).filter(
+        CatalogoProcedimientoEspecialidad.id_catalogo_procedimiento == cat_id
+    ).delete(synchronize_session=False)
+    vistos = set()
+    for esp_id in especialidades or []:
+        if esp_id is None or esp_id in vistos:
+            continue
+        vistos.add(esp_id)
+        db.add(CatalogoProcedimientoEspecialidad(
+            id_catalogo_procedimiento=cat_id,
+            id_especialidad=esp_id,
+        ))
+
 
 def listar_catalogo(
     db: Session,
@@ -30,8 +63,12 @@ def listar_catalogo(
             CatalogoProcedimiento.abreviatura.ilike(like),
         ))
     if especialidad_ref is not None:
-        query = query.filter(CatalogoProcedimiento.especialidad_ref == especialidad_ref)
-    return query.order_by(CatalogoProcedimiento.nombre).offset(skip).limit(limit).all()
+        sub = db.query(CatalogoProcedimientoEspecialidad.id_catalogo_procedimiento).filter(
+            CatalogoProcedimientoEspecialidad.id_especialidad == especialidad_ref
+        )
+        query = query.filter(CatalogoProcedimiento.id.in_(sub))
+    regs = query.order_by(CatalogoProcedimiento.nombre).offset(skip).limit(limit).all()
+    return _adjuntar_especialidades(db, regs)
 
 
 def obtener_catalogo(cat_id: int, db: Session) -> CatalogoProcedimiento:
@@ -39,6 +76,7 @@ def obtener_catalogo(cat_id: int, db: Session) -> CatalogoProcedimiento:
     reg = db.query(CatalogoProcedimiento).filter(CatalogoProcedimiento.id == cat_id).first()
     if not reg:
         raise HTTPException(status_code=404, detail="Procedimiento de catálogo no encontrado")
+    _adjuntar_especialidades(db, [reg])
     return reg
 
 
@@ -49,20 +87,36 @@ def crear_catalogo(data, db: Session) -> CatalogoProcedimiento:
     ).first()
     if existente:
         raise HTTPException(status_code=409, detail="Ya existe un procedimiento con ese nombre")
-    reg = CatalogoProcedimiento(**data.model_dump())
+    payload = data.model_dump()
+    especialidades = payload.pop("especialidades_ids", None)
+    if especialidades is not None:
+        payload["especialidad_ref"] = especialidades[0] if especialidades else None
+    reg = CatalogoProcedimiento(**payload)
     db.add(reg)
+    db.flush()
+    if especialidades is None:
+        especialidades = [reg.especialidad_ref] if reg.especialidad_ref is not None else []
+    _sincronizar_especialidades(db, reg.id, especialidades)
     db.commit()
     db.refresh(reg)
-    return reg
+    return _adjuntar_especialidades(db, [reg])[0]
 
 
 def actualizar_catalogo(cat_id: int, data, db: Session) -> CatalogoProcedimiento:
     reg = obtener_catalogo(cat_id, db)
-    for k, v in data.model_dump(exclude_unset=True).items():
+    cambios = data.model_dump(exclude_unset=True)
+    especialidades = cambios.pop("especialidades_ids", None)
+    for k, v in cambios.items():
         setattr(reg, k, v)
+    if especialidades is not None:
+        reg.especialidad_ref = especialidades[0] if especialidades else None
+        _sincronizar_especialidades(db, reg.id, especialidades)
+    elif "especialidad_ref" in cambios:
+        lista = [cambios["especialidad_ref"]] if cambios["especialidad_ref"] is not None else []
+        _sincronizar_especialidades(db, reg.id, lista)
     db.commit()
     db.refresh(reg)
-    return reg
+    return _adjuntar_especialidades(db, [reg])[0]
 
 
 def eliminar_catalogo(cat_id: int, db: Session) -> dict:

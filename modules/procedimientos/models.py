@@ -1,6 +1,6 @@
 """Modelos del catálogo de procedimientos y sus realizaciones clínicas."""
 
-from sqlalchemy import Boolean, Column, Integer, String, Text, Date, TIMESTAMP, CheckConstraint, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, Text, Date, TIMESTAMP, CheckConstraint, ForeignKey, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from core.database import Base
@@ -60,6 +60,35 @@ class CatalogoProcedimiento(Base):
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
 
     proce_medicos = relationship("ProceMedico", back_populates="catalogo")
+
+
+class CatalogoProcedimientoEspecialidad(Base):
+    """Tabla puente: especialidades habilitadas para un procedimiento del catálogo.
+
+    Un procedimiento puede quedar habilitado para varias especialidades; la
+    columna `especialidad_ref` de `CatalogoProcedimiento` se conserva como
+    referencia principal (la primera de la lista) por compatibilidad.
+    """
+    __tablename__ = "catalogo_procedimientos_especialidades"
+    __table_args__ = (
+        UniqueConstraint("id_catalogo_procedimiento", "id_especialidad", name="uq_cat_proc_esp"),
+        {"schema": "public"},
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    id_catalogo_procedimiento = Column(
+        Integer,
+        ForeignKey("public.catalogo_procedimientos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    id_especialidad = Column(
+        Integer,
+        ForeignKey("especialidades.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
 
 
 class AreaCuerpoIntervenida(Base):

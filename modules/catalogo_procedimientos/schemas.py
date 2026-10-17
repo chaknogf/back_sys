@@ -1,7 +1,7 @@
 """Esquemas Pydantic para el catálogo maestro de procedimientos."""
 
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
+from typing import List, Optional
 
 
 class CatalogoProcedimientoBase(BaseModel):
@@ -14,7 +14,9 @@ class CatalogoProcedimientoBase(BaseModel):
 
 
 class CatalogoProcedimientoCreate(CatalogoProcedimientoBase):
-    pass
+    # Lista completa de especialidades habilitadas. Si se envía, `especialidad_ref`
+    # se deriva del primer elemento de la lista.
+    especialidades_ids: Optional[List[int]] = None
 
 
 class CatalogoProcedimientoUpdate(BaseModel):
@@ -24,11 +26,13 @@ class CatalogoProcedimientoUpdate(BaseModel):
     anestesia: Optional[int] = Field(None, ge=0)
     especialidad_ref: Optional[int] = None
     activo: Optional[bool] = None
+    especialidades_ids: Optional[List[int]] = None
 
 
 class CatalogoProcedimientoOut(CatalogoProcedimientoBase):
     id: int
     especialidad_nombre: Optional[str] = None
+    especialidades_ids: List[int] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 

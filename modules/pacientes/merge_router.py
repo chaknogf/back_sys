@@ -117,6 +117,22 @@ def merge_campos_unicos(principal, duplicado, db: Session):
     return campos_alternativos
 
 
+def merge_nombre(principal, duplicado):
+    """Rellena componentes del nombre del principal que estén vacíos con los del duplicado."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    p_nom = principal.nombre or {}
+    d_nom = duplicado.nombre or {}
+    cambiado = False
+    for key, value in (d_nom or {}).items():
+        if (p_nom.get(key) is None or str(p_nom.get(key)).strip() == "") and value not in (None, ""):
+            p_nom[key] = value
+            cambiado = True
+    if cambiado:
+        principal.nombre = p_nom
+        flag_modified(principal, "nombre")
+
+
 def merge_contacto(principal, duplicado):
     """Fusiona el contacto: combina teléfonos y rellena los demás campos vacíos."""
     merge_telefonos(principal, duplicado)
@@ -145,12 +161,25 @@ def _fill_campos_vacios(principal, duplicado):
         "sexo", "fecha_nacimiento", "idioma_id", "pueblo_id", "nacionalidad",
         "lugar_nacimiento", "discapacidad", "educacion", "estado_civil",
         "es_estudiante_publico", "ocupacion", "es_personal_hospital",
+        "pasaporte",
     ]
     for campo in campos:
         valor_pri = getattr(principal, campo, None)
         valor_dup = getattr(duplicado, campo, None)
         if (valor_pri is None or valor_pri == "") and valor_dup not in (None, ""):
             setattr(principal, campo, valor_dup)
+
+    # Metadatos: conservar auditoría del duplicado también
+    if duplicado.metadatos:
+        if principal.metadatos is None:
+            principal.metadatos = []
+        existentes = {m.get("registro") for m in principal.metadatos if isinstance(m, dict)}
+        for m in duplicado.metadatos:
+            if isinstance(m, dict) and m.get("registro") not in existentes:
+                principal.metadatos.append(m)
+                existentes.add(m.get("registro"))
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(principal, "metadatos")
 
 
 def _deep_fill(dest: dict, fuente: dict) -> bool:
@@ -197,6 +226,29 @@ def merge_datos_extra(principal, duplicado):
     if cambiado:
         principal.datos_extra = p_extra
         flag_modified(principal, "datos_extra")
+
+
+def merge_expedientes_anteriores(principal, duplicado):
+    """Conserva los expedientes de los duplicados en el principal como lista
+    de expedientes anteriores (sin duplicados)."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    exp_dup = duplicado.expediente
+    if not exp_dup:
+        return
+    exp_pri = principal.expediente
+    if exp_dup == exp_pri:
+        return
+
+    if principal.datos_extra is None:
+        principal.datos_extra = {}
+    lista = principal.datos_extra.get("expedientes_anteriores")
+    if not isinstance(lista, list):
+        lista = []
+    if exp_dup not in lista:
+        lista.append(exp_dup)
+    principal.datos_extra["expedientes_anteriores"] = lista
+    flag_modified(principal, "datos_extra")
 
 
 def merge_referencias(principal, duplicado):
@@ -287,6 +339,7 @@ def merge_pacientes(
                 dup.cui = None
                 flag_modified(dup, "datos_extra")
 
+            merge_nombre(principal, dup)
             merge_contacto(principal, dup)
 
             campos_alt = merge_campos_unicos(principal, dup, db)
@@ -296,6 +349,7 @@ def merge_pacientes(
             merge_datos_extra(principal, dup)
 
             merge_referencias(principal, dup)
+            merge_expedientes_anteriores(principal, dup)
 
             if hasattr(dup, 'consultas'):
                 for consulta in dup.consultas:

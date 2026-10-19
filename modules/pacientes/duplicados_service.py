@@ -171,6 +171,42 @@ def _iterar_pares(db: Session, incluir_fecha: bool):
             yield fila.id_a, fila.id_b
 
 
+def buscar_pares_duplicados(
+    db: Session,
+    incluir_fecha: bool,
+    similitud_minima: float,
+) -> List[Tuple[int, int]]:
+    pacientes = db.execute(text("""
+        SELECT id, nombre_completo
+        FROM pacientes
+        WHERE estado != 'I' AND nombre_completo IS NOT NULL
+    """)).fetchall()
+    ids_orden = [p[0] for p in pacientes]
+    nombres = [p[1] for p in pacientes]
+    tokens_por_id: Dict[int, List[str]] = dict(zip(
+        ids_orden, _tokenizar_masivo(nombres)
+    ))
+    perfiles_por_id: Dict[int, dict] = dict(zip(
+        ids_orden, _perfiles_masivo(nombres)
+    ))
+
+    resultado: List[Tuple[int, int]] = []
+    for id_a, id_b in _iterar_pares(db, incluir_fecha):
+        ta = tokens_por_id.get(id_a)
+        tb = tokens_por_id.get(id_b)
+        if ta is None or tb is None:
+            continue
+        if not _prefiltrar_par(ta, tb):
+            continue
+        if _tokens_equivalentes(ta, tb):
+            resultado.append((id_a, id_b))
+            continue
+        score = _similitud(perfiles_por_id[id_a], perfiles_por_id[id_b])
+        if score >= similitud_minima:
+            resultado.append((id_a, id_b))
+    return resultado
+
+
 def ids_pares_duplicados(
     pares: Iterable[dict],
     similitud_minima: float,

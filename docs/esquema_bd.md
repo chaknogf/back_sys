@@ -2,7 +2,7 @@
 
 Base de datos de un hospital de la red pública de Guatemala (HOSP TECPÁN). Modelo relacional normalizado (3FN en el núcleo clínico) con tablas de catálogo, de control de correlativos y de datos históricos/legacy.
 
-**Resumen:** 37 tablas · 47 foreign keys · extensiones `pg_trgm` + `unaccent`
+**Resumen:** 50 tablas · 83 foreign keys · extensiones `pg_trgm` + `unaccent`
 
 ---
 
@@ -19,6 +19,7 @@ Base de datos de un hospital de la red pública de Guatemala (HOSP TECPÁN). Mod
 | **SIGSA-3** | `sigsa3`, `sigsa3_registros`, `tipos_consulta`, `cie10_catalogo` | Consultas normalizadas SIGSA |
 | **Administrativo** | `citas`, `prestamos`, `users`, `municipios`, `paises_iso`, `audit_log` | Citas, préstamos, usuarios, catálogos |
 | **Control de correlativos** | `expediente_control`, `emergencia_control`, `correlativos_control`, `defuncion_control`, `constancia_nacimiento_control`, `constancia_medica_control` | Contadores por año |
+| **Almacén / insumos** (084) | `insumos`, `presentaciones`, `almacenes`, `lotes`, `kardex_movimientos`, `requisiciones`, `requisiciones_detalles`, `despachos`, `despachos_detalles`, `atenciones`, `atenciones_insumos`, `unidosis`, `unidosis_detalles` | Catálogo de insumos (espejo CSV), kardex, despachos y consumo en atención |
 
 ---
 
@@ -353,3 +354,34 @@ RETURNING ultimo_correlativo;
 - **Soft delete:** columnas `activo`/`estado` en lugar de borrado físico (consultas, citas, prestamos, procedimientos, encamamiento).
 - **JSONB:** `pacientes.datos_extra`/`metadatos`, `consultas.indicadores`, `citas.datos_extra`, `ciclos_consulta.datos_medicos`, `eventos_consulta.datos`.
 - **Trigger:** `trg_set_nombre_completo` regenera `pacientes.nombre_completo` desde `nombre` JSONB.
+
+---
+
+## 9. Módulo de almacén de insumos (migración `084_almacen_insumos.sql`)
+
+Flujo general soportado:
+
+```
+insumo → bodega (ingreso/egreso) → kardex → farmacia / productos afines
+        → kardex → servicios y pacientes → unidosis / requisición
+```
+
+| Tabla | Función | Relaciones clave |
+|-------|---------|------------------|
+| `insumos` | Catálogo **espejo CSV** (1 fila por CÓDIGO DE INSUMO): `renglon VARCHAR(3)` (`261`/`011`/`031`, sin tabla de renglones — inmutables), `codigo_insumo` UNIQUE, `nombre`, `caracteristicas` **crudas** (`Estado: X;  Grado: Y;  Uso: Z;`; JSONB pendiente tras revisar datos) | — |
+| `presentaciones` | 1 fila por CÓDIGO DE PRESENTACIÓN: `nombre` (`Envase`), `cantidad_unidad` **crudo** (`250 Mililitro`; el stock es de bodegas, no del catálogo), `codigo_presentacion` UNIQUE | `insumo_id`→`insumos` CASCADE |
+| `almacenes` | Bodega / farmacia / productos afines / servicio (`tipo` CHECK) | — |
+| `lotes` | Stock por lote y almacén (`cantidad_actual` ≥ 0, vencimiento) | `presentacion_id`, `almacen_id`; UNIQUE(presentación, almacén, lote) |
+| `kardex_movimientos` | Libro mayor: `entrada`/`salida`/`traslado`/`consumo`/`ajuste`; `saldo_resultante` por lote | `lote_id`, `almacen_id`; `referencia_tipo`+`referencia_id` → requisición/despacho/unidosis/atención |
+| `requisiciones` | Servicio pide → aprueba → despacha (`estado`) | `servicio_solicitante_id`→`encamamiento` |
+| `requisiciones_detalles` | Líneas: cantidad solicitada vs despachada | `requisicion_id` CASCADE |
+| `despachos` | `tipo`: `servicio` \| `paciente` \| `traslado` (bodega↔farmacia) | `almacen_origen_id`, `requisicion_id` nullable, `chk_despachos_destino` |
+| `despachos_detalles` | Líneas con `lote_id` y cantidad | `despacho_id` CASCADE |
+| `atenciones` | Atención con consumo de insumos | `paciente_id`, `consulta_id`→`consultas` |
+| `atenciones_insumos` | Insumos consumidos (`origen`: despacho o directo) | `atencion_id` CASCADE, `lote_id` |
+| `unidosis` | Dosis unitaria preparada por paciente desde farmacia | `paciente_id`, `atencion_id`, `almacen_origen_id` |
+| `unidosis_detalles` | Líneas con `dosis` (p. ej. "1 cada 8 horas") | `unidosis_id` CASCADE, `lote_id` |
+
+**Reglas de movimiento:** un traslado entre almacenes genera **dos** filas de kardex (`salida` en el origen + `entrada` en el destino) con el mismo `referencia_tipo='traslado'`; los consumos en atención/unidosis restan del lote y registran `consumo`.
+
+**Importación CSV (mapeo):** columnas 1-4 (`renglon`, `codigo_insumo`, `nombre`, `caracteristicas`) distintas → upsert en `insumos` por `codigo_insumo`; columnas 5-7 por fila (`nombre`, `cantidad_unidad`, `codigo_presentacion`) → upsert en `presentaciones` por `codigo_presentacion`. Textos crudos tal cual el CSV; parseo a JSONB/unidades pendiente tras revisar el universo de datos.

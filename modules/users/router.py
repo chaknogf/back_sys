@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Request, status, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -28,8 +28,8 @@ def listar_usuarios(
     id: Optional[int] = None,
     email: Optional[str] = None,
     rol: Optional[str] = None,
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):

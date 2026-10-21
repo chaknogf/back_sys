@@ -645,15 +645,17 @@ def _personal_hospital_del_paciente(paciente) -> Optional[str]:
     return _normalizar_si_no(origen)
 
 
-def obtener_ultimas_consultas(db: Session, limit: int = 500):
-    """Obtiene las últimas N consultas ordenadas por fecha de consulta descendente."""
-    query = (
+def obtener_ultimas_consultas(db: Session, limit: int = 100, skip: int = 0):
+    """Obtiene una página de consultas recientes y el total disponible."""
+    total = db.query(func.count(ConsultaModel.id)).scalar() or 0
+    consultas = (
         db.query(ConsultaModel)
-        .order_by(ConsultaModel.fecha_consulta.desc())
+        .order_by(ConsultaModel.fecha_consulta.desc(), ConsultaModel.id.desc())
+        .offset(skip)
         .limit(limit)
+        .all()
     )
-    consultas = query.all()
-    return ConsultaListResponse(total=len(consultas), consultas=consultas)
+    return ConsultaListResponse(total=total, consultas=consultas)
 
 
 def sincronizar_indicadores(db: Session, desde: date, hasta: date, current_user):

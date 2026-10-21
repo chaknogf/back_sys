@@ -39,7 +39,7 @@ back_sys/
 │   ├── exceptions.py                # Global handlers: 422, 409, 500
 │   ├── limiter.py                   # SlowAPI limiter instance
 │   └── mail.py                      # FastAPI-Mail ConnectionConfig
-├── modules/                         # 34 módulos de dominio
+├── modules/                         # 36 paquetes (34 con router, 2 modelos solamente)
 │   ├── auth/                        # Login JWT
 │   ├── users/                       # CRUD usuarios + email bienvenida
 │   ├── pacientes/                   # Pacientes (4 sub-routers)
@@ -260,7 +260,7 @@ back_sys/
 
 | Método | Ruta | Auth | Descripción |
 |--------|------|------|-------------|
-| GET | `/pacientes/` | auth | Búsqueda (15+ filtros) |
+| GET | `/pacientes/buscar` | auth | Búsqueda paginada compartida con recepción y consultas |
 | GET | `/pacientes/neonatales` | auth | Neonatales |
 | GET | `/pacientes/personal-hospital` | auth | Personal hospital |
 | GET | `/pacientes/{id}` | auth | Por ID |
@@ -351,7 +351,7 @@ back_sys/
 | POST | `/censo-camas/bulk` | auth | Bulk create |
 | POST | `/censo-camas/importar-csv` | auth | Importar CSV |
 | GET | `/censo-camas/resumen/{fecha}` | auth | Resumen diario |
-| GET | `/procedimientos/catalogo` | auth | Catálogo (filtros) |
+| GET | `/catalogo-procedimientos/` | auth | Catálogo maestro paginado |
 | POST | `/procedimientos/` | auth | Crear realizado |
 | GET | `/procedimientos/reporte` | auth | Reporte agregado |
 | POST | `/prestamos/` | auth | Crear préstamo |

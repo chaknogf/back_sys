@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from typing import Optional
 from modules.pacientes.models import PacienteModel
 from modules.expediente.service import generar_constancia_nacimiento as generar_cn
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import inspect, desc, func, or_
 from sqlalchemy.orm import Session, joinedload, attributes
 from decimal import Decimal
@@ -149,10 +149,19 @@ def listar_constancias(
             response_model=list[ConstanciaNacimientoHistorialResponse])
 def obtener_historial_constancia(
     constancia_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    historial = db.query(ConstanciaNacimientoHistorialModel).filter_by(constancia_id=constancia_id).all()
+    historial = (
+        db.query(ConstanciaNacimientoHistorialModel)
+        .filter_by(constancia_id=constancia_id)
+        .order_by(ConstanciaNacimientoHistorialModel.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     return historial
 
 @router.get("/{constancia_id}", response_model=ConstanciaNacimientoResponse)

@@ -42,7 +42,7 @@ def listar(
     no_historia_clinica: Optional[str] = Query(None, max_length=150, description="Filtrar por historia clínica / expediente"),
     q: Optional[str] = Query(None, max_length=200, description="Búsqueda general (paciente, expediente, médico, CIE-10, especialidad)"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=5000),
+    limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):

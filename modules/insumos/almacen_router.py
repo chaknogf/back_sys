@@ -151,7 +151,9 @@ def listar_kardex(
 @router.get("/kardex/lote/{lote_id}", response_model=KardexListResponse)
 def obtener_kardex_lote(
     lote_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     _: UserModel = Depends(get_current_user),
 ):
-    return service_almacen.obtener_kardex_lote(lote_id, db)
+    return service_almacen.obtener_kardex_lote(lote_id, db, skip, limit)

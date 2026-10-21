@@ -8,7 +8,7 @@ from typing import Optional
 from datetime import datetime, timezone
 
 from core.database import get_db
-from core.security import get_current_user
+from core.security import get_current_user, get_current_admin_user
 from modules.users.models import UserModel
 from modules.audit_log.service import registrar_acceso
 from modules.expediente.service import generar_expediente
@@ -25,12 +25,13 @@ from modules.defunciones.service import actualizar_estado_por_paciente
 router = APIRouter(prefix="/pacientes", tags=["Pacientes"])
 
 
-@router.get("/", response_model=PacienteListResponse)
-def buscar_pacientes_endpoint(
-    q: Optional[str] = Query(None, description="Búsqueda libre"),
+@router.get("/buscar", response_model=PacienteListResponse)
+def buscar_pacientes_compartido(
+    q: Optional[str] = Query(None, description="Búsqueda por nombre, CUI, pasaporte o expediente"),
     id: Optional[int] = Query(None),
     cui: Optional[str] = Query(None),
     expediente: Optional[str] = Query(None),
+    documento: Optional[str] = Query(None, description="Documento registrado en una consulta"),
     nombre: Optional[str] = Query(None),
     primer_nombre: Optional[str] = Query(None),
     segundo_nombre: Optional[str] = Query(None),
@@ -42,18 +43,17 @@ def buscar_pacientes_endpoint(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
+    current_user: UserModel = Depends(get_current_user),
 ):
-    """Combina solo los filtros enviados y delega la búsqueda paginada al servicio."""
+    """Búsqueda paginada compartida por Pacientes y Recepción/Consultas."""
     filters = {k: v for k, v in {
         "q": q, "id": id, "cui": cui, "expediente": expediente,
-        "nombre": nombre, "primer_nombre": primer_nombre,
-        "segundo_nombre": segundo_nombre, "primer_apellido": primer_apellido,
-        "segundo_apellido": segundo_apellido, "sexo": sexo, "estado": estado,
-        "fecha_nac": fecha_nac
+        "documento": documento, "nombre": nombre,
+        "primer_nombre": primer_nombre, "segundo_nombre": segundo_nombre,
+        "primer_apellido": primer_apellido, "segundo_apellido": segundo_apellido,
+        "sexo": sexo, "estado": estado, "fecha_nac": fecha_nac,
     }.items() if v is not None}
-    resultado = buscar_pacientes(db, filters, skip, limit)
-    return resultado
+    return buscar_pacientes(db, filters, skip, limit)
 
 
 @router.get("/neonatales", response_model=PacienteListResponse)
@@ -83,7 +83,7 @@ def listar_neonatales(
 @router.get("/personal-hospital", response_model=PacienteListResponse)
 def listar_personal_hospital(
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=1000),
+    limit: int = Query(50, ge=1, le=200),
     expediente: Optional[str] = Query(None, description="Filtrar por expediente"),
     cui: Optional[str] = Query(None, description="Filtrar por CUI"),
     primer_nombre: Optional[str] = Query(None, description="Filtrar por primer nombre"),
@@ -108,7 +108,7 @@ def pacientes_con_consultas_recientes(
     expediente_desde: Optional[str] = Query(None, description="Inicio de rango de expediente"),
     expediente_hasta: Optional[str] = Query(None, description="Fin de rango de expediente"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(500, ge=1, le=5000),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
@@ -121,22 +121,11 @@ def pacientes_sin_consultas_recientes(
     expediente_desde: Optional[str] = Query(None, description="Inicio de rango de expediente"),
     expediente_hasta: Optional[str] = Query(None, description="Fin de rango de expediente"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(500, ge=1, le=5000),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
     return buscar_pacientes_sin_consultas_recientes(db, q, skip, limit, expediente_desde, expediente_hasta)
-
-
-@router.get("/{paciente_id}", response_model=PacienteOut)
-def obtener_paciente_endpoint(
-    paciente_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
-):
-    resultado = obtener_paciente(db, paciente_id)
-    registrar_acceso(db, current_user.username, "pacientes", f"/pacientes/{paciente_id}", registro_id=paciente_id)
-    return resultado
 
 
 @router.post("/", response_model=PacienteOut, status_code=201)
@@ -149,7 +138,7 @@ def crear_paciente_endpoint(
     return crear_paciente(db, paciente_in, auto_expediente, current_user.username)
 
 
-@router.patch("/{paciente_id}", response_model=PacienteOut | dict)
+@router.patch("/{paciente_id:int}", response_model=PacienteOut | dict)
 def gestionar_paciente(
     paciente_id: int,
     paciente_update: Optional[PacienteUpdate] = None,
@@ -269,7 +258,7 @@ def gestionar_paciente(
             raise HTTPException(status_code=400, detail="Datos duplicados o inválidos")
 
 
-@router.patch("/{paciente_id}/limpiar-cui", response_model=PacienteOut)
+@router.patch("/{paciente_id:int}/limpiar-cui", response_model=PacienteOut)
 def limpiar_cui(
     paciente_id: int,
     db: Session = Depends(get_db),
@@ -285,7 +274,7 @@ def limpiar_cui(
     return paciente
 
 
-@router.delete("/{paciente_id}/eliminar-permanente", status_code=204)
+@router.delete("/{paciente_id:int}/eliminar-permanente", status_code=204)
 def eliminar_paciente_permanente(
     paciente_id: int,
     confirmacion: str = Query(..., description="Escribe 'CONFIRMAR' para eliminar permanentemente"),
@@ -309,17 +298,18 @@ def eliminar_paciente_permanente(
 
 @router.get("/ultimos", response_model=PacienteListResponse)
 def ultimos_pacientes(
-    limit: int = Query(500, ge=1, le=1000),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return obtener_ultimos_pacientes(db, limit)
+    return obtener_ultimos_pacientes(db, limit, skip)
 
 
 @router.get("/debug/count")
 def debug_count(
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
+    current_user: UserModel = Depends(get_current_admin_user)
 ):
     total = db.query(PacienteModel).count()
     activos = db.query(PacienteModel).filter(PacienteModel.estado == "A").count()
@@ -357,3 +347,15 @@ def expediente_endpoint(
 
     registrar_acceso(db, current_user.username, "pacientes", f"/pacientes/expediente/{expediente}", registro_id=paciente.id)
     return paciente
+
+
+@router.get("/{paciente_id:int}", response_model=PacienteOut)
+def obtener_paciente_endpoint(
+    paciente_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Detalle por ID; se registra después de todas las rutas estáticas."""
+    resultado = obtener_paciente(db, paciente_id)
+    registrar_acceso(db, current_user.username, "pacientes", f"/pacientes/{paciente_id}", registro_id=paciente_id)
+    return resultado

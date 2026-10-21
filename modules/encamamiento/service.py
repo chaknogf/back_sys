@@ -31,14 +31,14 @@ def crear_servicio(data: EncamamientoCreate, db: Session) -> EncamamientoModel:
 def listar_servicios(
     db: Session,
     activo: bool | None = None,
-    limit: int = 100
+    skip: int = 0,
+    limit: int = 100,
 ) -> List[EncamamientoModel]:
-    """Filtra opcionalmente por actividad y limita el resultado a 500 filas."""
+    """Filtra actividad y devuelve una página ordenada de servicios."""
     query = db.query(EncamamientoModel)
     if activo is not None:
         query = query.filter(EncamamientoModel.activo == activo)
-    limit = min(limit, 500)
-    return query.order_by(EncamamientoModel.nombre_servicio).limit(limit).all()
+    return query.order_by(EncamamientoModel.nombre_servicio).offset(skip).limit(min(limit, 500)).all()
 
 
 def obtener_servicio(servicio_id: int, db: Session) -> EncamamientoModel:

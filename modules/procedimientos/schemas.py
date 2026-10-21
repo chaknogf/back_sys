@@ -51,8 +51,10 @@ class ProceMedicoCreate(ProceMedicoBase):
 
     @model_validator(mode="after")
     def _validar_cantidad(self) -> Self:
-        if self.nino_m + self.nino_f + self.adulto_m + self.adulto_f <= 0:
-            raise ValueError("debe registrar al menos un niño o adulto (M o F)")
+        if self.total_cantidad <= 0:
+            raise ValueError(
+                "debe registrar al menos una persona (niño, adulto o no especificado)"
+            )
         return self
 
 
@@ -70,6 +72,8 @@ class ProceMedicoUpdate(BaseModel):
     nino_f: Optional[int] = Field(None, ge=0)
     adulto_m: Optional[int] = Field(None, ge=0)
     adulto_f: Optional[int] = Field(None, ge=0)
+    sin_edad_m: Optional[int] = Field(None, ge=0)
+    sin_edad_f: Optional[int] = Field(None, ge=0)
 
 
 class ProceMedicoOut(ProceMedicoBase):

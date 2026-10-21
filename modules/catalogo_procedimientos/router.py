@@ -1,11 +1,11 @@
 """Router FastAPI para el catálogo maestro y áreas del cuerpo."""
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from core.dependencies import get_current_user
+from core.dependencies import get_current_user, get_current_admin_user
 from modules.users.models import UserModel
 from modules.catalogo_procedimientos import schemas, service
 
@@ -17,7 +17,7 @@ router = APIRouter(
 )
 
 
-@router.get("/", response_model=List[schemas.CatalogoProcedimientoOut])
+@router.get("/", response_model=schemas.CatalogoProcedimientoListResponse)
 def listar(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
@@ -25,7 +25,7 @@ def listar(
     especialidad_ref: Optional[int] = Query(None),
     activo: Optional[bool] = Query(True),
     skip: int = Query(0, ge=0),
-    limit: int = Query(5000, ge=1, le=20000),
+    limit: int = Query(50, ge=1, le=500),
 ):
     return service.listar_catalogo(db, q, especialidad_ref, activo, skip, limit)
 
@@ -43,7 +43,7 @@ def detalle(
 def crear(
     data: schemas.CatalogoProcedimientoCreate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service.crear_catalogo(data, db)
 
@@ -53,7 +53,7 @@ def actualizar(
     cat_id: int,
     data: schemas.CatalogoProcedimientoUpdate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service.actualizar_catalogo(cat_id, data, db)
 
@@ -62,7 +62,7 @@ def actualizar(
 def eliminar(
     cat_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service.eliminar_catalogo(cat_id, db)
 
@@ -74,13 +74,15 @@ router_areas = APIRouter(
 )
 
 
-@router_areas.get("/", response_model=List[schemas.AreaCuerpoOut])
+@router_areas.get("/", response_model=schemas.AreaCuerpoListResponse)
 def listar_areas(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
     activo: Optional[bool] = Query(True),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
 ):
-    return service.listar_areas(db, activo)
+    return service.listar_areas(db, activo, skip, limit)
 
 
 @router_areas.get("/{area_id}", response_model=schemas.AreaCuerpoOut)
@@ -96,7 +98,7 @@ def detalle_area(
 def crear_area(
     data: schemas.AreaCuerpoCreate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service.crear_area(data, db)
 
@@ -106,7 +108,7 @@ def actualizar_area(
     area_id: int,
     data: schemas.AreaCuerpoUpdate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service.actualizar_area(area_id, data, db)
 
@@ -115,6 +117,6 @@ def actualizar_area(
 def eliminar_area(
     area_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service.eliminar_area(area_id, db)

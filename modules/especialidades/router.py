@@ -15,16 +15,17 @@ router = APIRouter(
 )
 
 
-@router.get("", response_model=List[EspecialidadOut])
 @router.get("/", response_model=List[EspecialidadOut])
 def listar(
     estado: Optional[bool] = Query(None, description="Filtrar por estado (activa/inactiva)"),
     sop: Optional[bool] = Query(None, description="Filtrar por disponibilidad en quirófano"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
     """Lista especialidades filtradas por estado y disponibilidad quirúrgica."""
-    return svc.listar(db, estado=estado, sop=sop)
+    return svc.listar(db, estado=estado, sop=sop, skip=skip, limit=limit)
 
 
 @router.get("/{esp_id}", response_model=EspecialidadOut)
@@ -36,7 +37,6 @@ def obtener(
     return svc.obtener(esp_id, db)
 
 
-@router.post("", response_model=EspecialidadOut, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=EspecialidadOut, status_code=status.HTTP_201_CREATED)
 def crear(
     data: EspecialidadCreate,

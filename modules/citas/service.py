@@ -146,14 +146,21 @@ def obtener_citas_por_paciente(
     return resultado.citas
 
 
-def citas_por_especialidad(especialidad: str, db: Session):
-    fecha_inicio = date.today() + timedelta(days=1)
+def citas_por_especialidad(
+    especialidad: str,
+    db: Session,
+    desde: Optional[date] = None,
+    hasta: Optional[date] = None,
+    skip: int = 0,
+    limit: int = 100,
+):
+    fecha_inicio = desde or (date.today() + timedelta(days=1))
 
     dia_semana = func.trim(
         func.to_char(CitaModel.fecha_cita, 'Day')
     ).label("dia_semana")
 
-    resultados = (
+    query = (
         db.query(
             CitaModel.fecha_cita,
             CitaModel.razon_consulta,
@@ -162,7 +169,7 @@ def citas_por_especialidad(especialidad: str, db: Session):
         )
         .filter(
             CitaModel.especialidad == especialidad,
-            CitaModel.fecha_cita >= fecha_inicio
+            CitaModel.fecha_cita >= fecha_inicio,
         )
         .group_by(
             CitaModel.fecha_cita,
@@ -172,8 +179,10 @@ def citas_por_especialidad(especialidad: str, db: Session):
         .order_by(
             CitaModel.fecha_cita.asc()
         )
-        .all()
     )
+    if hasta is not None:
+        query = query.filter(CitaModel.fecha_cita <= hasta)
+    resultados = query.offset(skip).limit(limit).all()
 
     resultados_formateados = []
 
@@ -252,6 +261,8 @@ def listar_dias_inhabiles(
     activo: Optional[bool] = None,
     desde: Optional[date] = None,
     hasta: Optional[date] = None,
+    skip: int = 0,
+    limit: int = 100,
 ):
     query = db.query(CitaDiaInhabilModel)
     if activo is not None:
@@ -260,7 +271,7 @@ def listar_dias_inhabiles(
         query = query.filter(CitaDiaInhabilModel.fecha >= desde)
     if hasta is not None:
         query = query.filter(CitaDiaInhabilModel.fecha <= hasta)
-    return query.order_by(CitaDiaInhabilModel.fecha.asc()).all()
+    return query.order_by(CitaDiaInhabilModel.fecha.asc()).offset(skip).limit(limit).all()
 
 
 def crear_dia_inhabil(data: DiaInhabilCreate, username: str, db: Session):

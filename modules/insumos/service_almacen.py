@@ -241,9 +241,15 @@ def listar_kardex(
     )
 
 
-def obtener_kardex_lote(lote_id: int, db: Session) -> dict:
-    """Movimientos de un lote con su saldo actual (el último movimiento)."""
+def obtener_kardex_lote(lote_id: int, db: Session, skip: int = 0, limit: int = 50) -> dict:
+    """Página de movimientos del lote ordenados del más reciente al más antiguo."""
     _obtener_lote(db, lote_id)
     query = db.query(KardexMovimiento).filter(KardexMovimiento.lote_id == lote_id)
-    items = query.order_by(KardexMovimiento.fecha.desc(), KardexMovimiento.id.desc()).all()
-    return {"total": len(items), "items": items}
+    total = query.count()
+    items = (
+        query.order_by(KardexMovimiento.fecha.desc(), KardexMovimiento.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return {"total": total, "items": items}

@@ -1,6 +1,6 @@
 # modules/citas/router.py
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
@@ -52,8 +52,8 @@ def listar_citas(
     especialidad_id: Optional[int] = None,
     personal_atencion_id: Optional[int] = None,
     fecha_cita: Optional[date] = None,
-    limit: int = 200,
-    skip: int = 0,
+    limit: int = Query(100, ge=1, le=500),
+    skip: int = Query(0, ge=0),
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -77,8 +77,8 @@ def obtener_citas_por_paciente(
     fecha_desde: Optional[date] = None,
     fecha_hasta: Optional[date] = None,
     especialidad: Optional[str] = None,
-    limit: int = 200,
-    skip: int = 0,
+    limit: int = Query(100, ge=1, le=500),
+    skip: int = Query(0, ge=0),
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -96,10 +96,14 @@ def obtener_citas_por_paciente(
 @router.get("/disponibles", response_model=List[CitasPorFechaRazon])
 def citas_por_especialidad(
     especialidad: str,
+    desde: Optional[date] = None,
+    hasta: Optional[date] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    return service_citas_por_especialidad(especialidad, db)
+    return service_citas_por_especialidad(especialidad, db, desde, hasta, skip, limit)
 
 
 # ── Días inhábiles (feriados / asuetos) — lectura: auth; escritura: admin
@@ -108,10 +112,12 @@ def listar_dias_inhabiles(
     activo: Optional[bool] = None,
     desde: Optional[date] = None,
     hasta: Optional[date] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return service_listar_dias(db=db, activo=activo, desde=desde, hasta=hasta)
+    return service_listar_dias(db=db, activo=activo, desde=desde, hasta=hasta, skip=skip, limit=limit)
 
 
 @router.post("/dias-inhabiles", response_model=DiaInhabilOut, status_code=201)

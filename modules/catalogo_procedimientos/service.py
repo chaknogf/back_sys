@@ -51,8 +51,10 @@ def listar_catalogo(
     especialidad_ref: Optional[int] = None,
     activo: Optional[bool] = True,
     skip: int = 0,
-    limit: int = 5000,
-) -> List[CatalogoProcedimiento]:
+    limit: int = 50,
+    abreviatura: Optional[str] = None,
+    nombre: Optional[str] = None,
+) -> dict:
     query = db.query(CatalogoProcedimiento)
     if activo is not None:
         query = query.filter(CatalogoProcedimiento.activo == activo)
@@ -62,13 +64,18 @@ def listar_catalogo(
             CatalogoProcedimiento.nombre.ilike(like),
             CatalogoProcedimiento.abreviatura.ilike(like),
         ))
+    if abreviatura:
+        query = query.filter(CatalogoProcedimiento.abreviatura == abreviatura)
+    if nombre:
+        query = query.filter(CatalogoProcedimiento.nombre.ilike(f"%{nombre}%"))
     if especialidad_ref is not None:
         sub = db.query(CatalogoProcedimientoEspecialidad.id_catalogo_procedimiento).filter(
             CatalogoProcedimientoEspecialidad.id_especialidad == especialidad_ref
         )
         query = query.filter(CatalogoProcedimiento.id.in_(sub))
-    regs = query.order_by(CatalogoProcedimiento.nombre).offset(skip).limit(limit).all()
-    return _adjuntar_especialidades(db, regs)
+    total = query.count()
+    regs = query.order_by(CatalogoProcedimiento.nombre, CatalogoProcedimiento.id).offset(skip).limit(limit).all()
+    return {"total": total, "items": _adjuntar_especialidades(db, regs)}
 
 
 def obtener_catalogo(cat_id: int, db: Session) -> CatalogoProcedimiento:
@@ -130,11 +137,23 @@ def eliminar_catalogo(cat_id: int, db: Session) -> dict:
 
 # ────────────────────────── ÁREAS ──────────────────────────
 
-def listar_areas(db: Session, activo: Optional[bool] = True) -> List[AreaCuerpoIntervenida]:
+def listar_areas(
+    db: Session,
+    activo: Optional[bool] = True,
+    skip: int = 0,
+    limit: int = 100,
+) -> dict:
     query = db.query(AreaCuerpoIntervenida)
     if activo is not None:
         query = query.filter(AreaCuerpoIntervenida.activo == activo)
-    return query.order_by(AreaCuerpoIntervenida.nombre).all()
+    total = query.count()
+    items = (
+        query.order_by(AreaCuerpoIntervenida.nombre, AreaCuerpoIntervenida.id)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return {"total": total, "items": items}
 
 
 def obtener_area(area_id: int, db: Session) -> AreaCuerpoIntervenida:

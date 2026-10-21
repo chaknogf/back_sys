@@ -83,11 +83,13 @@ def test_filtro_por_especialidad_usa_relacion_n_m(client, auth_headers, dos_espe
 
     r = client.get(
         "/catalogo-procedimientos/",
-        params={"especialidad_ref": ids[1], "limit": 20000},
+        params={"especialidad_ref": ids[1], "limit": 500},
         headers=auth_headers,
     )
     assert r.status_code == 200, r.text
-    encontrados = [c for c in r.json() if c["id"] == creado["id"]]
+    data = r.json()
+    assert "total" in data and "items" in data
+    encontrados = [c for c in data["items"] if c["id"] == creado["id"]]
     assert encontrados, "debe aparecer por su segunda especialidad"
     assert ids[1] in encontrados[0]["especialidades_ids"]
 

@@ -241,6 +241,14 @@ def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50)
                 q = q.filter(PacienteModel.fecha_nacimiento == v)
             except:
                 pass
+        documento = filters.get("documento")
+        if documento is not None:
+            # El número de documento se guarda en consultas; esta unión permite
+            # que recepción y las búsquedas de pacientes usen el mismo caso de uso.
+            from modules.consultas.models import ConsultaModel
+
+            q = q.join(ConsultaModel, ConsultaModel.paciente_id == PacienteModel.id)
+            q = q.filter(ConsultaModel.documento == documento)
         return q
 
     # Query para total (solo pacientes, no duplica por join)
@@ -272,7 +280,7 @@ def buscar_pacientes(db: Session, filters: dict, skip: int = 0, limit: int = 50)
         .order_by(desc(PacienteModel.id))
     )
     data_q = _apply_filters(data_q)
-    rows = data_q.offset(skip).limit(limit).all()
+    rows = data_q.distinct().offset(skip).limit(limit).all()
 
     result_pacientes = []
     for paciente, fecha_prestamo, solicitante in rows:
@@ -507,12 +515,14 @@ def buscar_pacientes_sin_consultas_recientes(
     return _exec_expedientes_query(db, ultima_consulta, "outer", "no_reciente", q, skip, limit, expediente_desde, expediente_hasta)
 
 
-def obtener_ultimos_pacientes(db: Session, limit: int = 500):
-    """Obtiene los últimos N pacientes ordenados por fecha de creación."""
-    query = (
+def obtener_ultimos_pacientes(db: Session, limit: int = 100, skip: int = 0):
+    """Obtiene una página de pacientes recientes y el total de coincidencias."""
+    total = db.query(func.count(PacienteModel.id)).scalar() or 0
+    pacientes = (
         db.query(PacienteModel)
         .order_by(PacienteModel.id.desc())
+        .offset(skip)
         .limit(limit)
+        .all()
     )
-    pacientes = query.all()
-    return PacienteListResponse(total=len(pacientes), pacientes=pacientes)
+    return PacienteListResponse(total=total, pacientes=pacientes)

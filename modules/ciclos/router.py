@@ -27,12 +27,14 @@ router = APIRouter(prefix="/ciclos", tags=["Ciclos Clínicos"])
 @router.get("/paciente/{paciente_id}", response_model=HistoriaClinicaResponse)
 def obtener_historia_clinica(
     paciente_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
     """Historia clínica completa de un paciente, agrupada por consulta.
     Optimizado: una sola query por patient en vez de N+1."""
-    return service_obtener_historia_clinica(paciente_id, db)
+    return service_obtener_historia_clinica(paciente_id, db, skip, limit)
 
 
 @router.get("/paciente/{paciente_id}/ultimo-odontograma", response_model=UltimoOdontogramaOut)
@@ -49,6 +51,8 @@ def obtener_ultimo_odontograma(
 def obtener_ciclos_por_consulta(
     consulta_id: int,
     activo: Optional[bool] = Query(True),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
@@ -56,7 +60,7 @@ def obtener_ciclos_por_consulta(
 
     Incluye la consulta y su paciente para permitir cargar la historia clínica
     directamente desde el id de consulta."""
-    return service_obtener_ciclos_por_consulta(consulta_id, activo, db)
+    return service_obtener_ciclos_por_consulta(consulta_id, activo, db, skip, limit)
 
 
 @router.get("/consulta/{consulta_id}/ultimo", response_model=Optional[CicloOut])

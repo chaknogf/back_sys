@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, Query, UploadFile, File, status, HTTPExc
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from core.security import get_current_admin_user
+from core.security import get_current_user, get_current_admin_user
+from core.uploads import read_upload_limited
 from modules.users.models import UserModel
 from .schemas import (
     CensoCamasCreate,
@@ -38,7 +39,8 @@ from .service import (
 
 router = APIRouter(
     prefix="/censo-camas",
-    tags=["Censo de Camas"]
+    tags=["Censo de Camas"],
+    dependencies=[Depends(get_current_user)],
 )
 
 
@@ -53,24 +55,42 @@ def upsert_registro(data: CensoCamasCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/bulk", status_code=status.HTTP_201_CREATED)
-def bulk_create(registros: list[CensoCamasCreate], db: Session = Depends(get_db)):
+def bulk_create(
+    registros: list[CensoCamasCreate],
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
+    if len(registros) > 1000:
+        raise HTTPException(status_code=413, detail="El lote admite como máximo 1000 registros")
     return service_bulk(registros, db)
 
 
 @router.post("/importar-csv")
-async def importar_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def importar_csv(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="El archivo debe ser un CSV (.csv)")
-    contenido = (await file.read()).decode("utf-8")
+    crudo = await read_upload_limited(file, max_bytes=25 * 1024 * 1024)
+    try:
+        contenido = crudo.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="No se pudo decodificar el CSV como UTF-8")
     return service_importar_csv(contenido, db)
 
 
 @router.post("/importar-csv-transversal")
-async def importar_csv_transversal(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def importar_csv_transversal(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     """Importa la hoja de censo en matriz: dos encabezados y una fila por variable."""
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="El archivo debe ser un CSV (.csv)")
-    crudo = await file.read()
+    crudo = await read_upload_limited(file, max_bytes=25 * 1024 * 1024)
     for encoding in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
         try:
             contenido = crudo.decode(encoding)
@@ -150,5 +170,9 @@ def actualizar_registro(registro_id: int, data: CensoCamasUpdate, db: Session = 
 
 
 @router.delete("/{registro_id}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_registro(registro_id: int, db: Session = Depends(get_db)):
+def eliminar_registro(
+    registro_id: int,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return service_eliminar(registro_id, db)

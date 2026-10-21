@@ -18,6 +18,8 @@ def obtener_ciclos_por_consulta(
     consulta_id: int,
     activo: Optional[bool] = True,
     db: Session = None,
+    skip: int = 0,
+    limit: int = 100,
 ):
     """Ordena por número y aplica el filtro de actividad cuando se especifica.
 
@@ -35,7 +37,7 @@ def obtener_ciclos_por_consulta(
     if activo is not None:
         query = query.filter(CiclosConsulta.activo.is_(activo))
 
-    ciclos = query.order_by(CiclosConsulta.numero.asc()).all()
+    ciclos = query.order_by(CiclosConsulta.numero.asc()).offset(skip).limit(limit).all()
 
     usuarios = {c.usuario for c in ciclos if c.usuario}
     if usuarios:
@@ -257,8 +259,8 @@ def _extraer_signos_vitales(datos_medicos: dict | None) -> dict | None:
     return resultado if resultado else None
 
 
-def obtener_historia_clinica(paciente_id: int, db: Session):
-    """Obtiene la historia clínica completa de un paciente, agrupada por consulta."""
+def obtener_historia_clinica(paciente_id: int, db: Session, skip: int = 0, limit: int = 50):
+    """Obtiene una página de la historia clínica agrupada por consulta."""
     from modules.pacientes.models import PacienteModel
 
     paciente = db.get(PacienteModel, paciente_id)
@@ -266,10 +268,13 @@ def obtener_historia_clinica(paciente_id: int, db: Session):
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
 
     # Obtener todas las consultas del paciente
+    consulta_query = db.query(ConsultaModel).filter(ConsultaModel.paciente_id == paciente_id)
+    total_consultas = consulta_query.count()
     consultas = (
-        db.query(ConsultaModel)
-        .filter(ConsultaModel.paciente_id == paciente_id)
+        consulta_query
         .order_by(ConsultaModel.fecha_consulta.desc())
+        .offset(skip)
+        .limit(limit)
         .all()
     )
 
@@ -279,7 +284,7 @@ def obtener_historia_clinica(paciente_id: int, db: Session):
             "paciente_nombre": paciente.nombre_completo,
             "paciente_expediente": paciente.expediente,
             "consultas": [],
-            "total_consultas": 0,
+            "total_consultas": total_consultas,
             "total_ciclos": 0,
         }
 
@@ -353,6 +358,6 @@ def obtener_historia_clinica(paciente_id: int, db: Session):
         "paciente_nombre": paciente.nombre_completo,
         "paciente_expediente": paciente.expediente,
         "consultas": consultas_agrupadas,
-        "total_consultas": len(consultas_agrupadas),
+        "total_consultas": total_consultas,
         "total_ciclos": total_ciclos,
     }

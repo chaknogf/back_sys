@@ -20,6 +20,10 @@ def _cleanup(paciente_id=None, medico_id=None, registro_id=None):
             db.query(Sigsa3RegistroModel).filter(
                 Sigsa3RegistroModel.id == registro_id
             ).delete(synchronize_session=False)
+        if paciente_id is not None:
+            db.query(Sigsa3RegistroModel).filter(
+                Sigsa3RegistroModel.paciente_id == paciente_id
+            ).delete(synchronize_session=False)
         if medico_id is not None:
             db.query(MedicoModel).filter(MedicoModel.id == medico_id).delete(
                 synchronize_session=False
@@ -78,7 +82,7 @@ class TestSigsa3Registros:
             headers=auth_headers,
             json={
                 "paciente_id": pid,
-                "medico_id": mid,
+                "personal_atencion_id": mid,
                 "fecha_consulta": date.today().isoformat(),
                 "tipo_consulta_id": 1,
                 "control": "SIG-TEST",
@@ -90,12 +94,12 @@ class TestSigsa3Registros:
         data = r.json()
         assert data["id"] > 0
         assert data["paciente_id"] == pid
-        assert data["medico_id"] == mid
+        assert data["personal_atencion_id"] == mid
         assert data["fecha_consulta"] == date.today().isoformat()
         TestSigsa3Registros.REGISTRO_ID = data["id"]
 
     def test_create_sigsa3_registro_sin_medico(self, client, auth_headers):
-        """medico_id es obligatorio: crear sin él debe dar 422."""
+        """El médico es opcional para conservar registros normalizados parciales."""
         pid = TestSigsa3Registros.PACIENTE_ID
         if not pid:
             pytest.skip("No paciente creado")
@@ -108,7 +112,8 @@ class TestSigsa3Registros:
                 "tipo_consulta_id": 1,
             },
         )
-        assert r.status_code == 422
+        assert r.status_code == 201, r.text
+        assert r.json()["personal_atencion_id"] is None
 
     def test_create_sigsa3_registro_fk_invalido(self, client, auth_headers):
         """FK de medico inexistente debe dar 404 (coincidencias garantizadas)."""
@@ -120,7 +125,7 @@ class TestSigsa3Registros:
             headers=auth_headers,
             json={
                 "paciente_id": pid,
-                "medico_id": 999999,
+                "personal_atencion_id": 999999,
                 "fecha_consulta": date.today().isoformat(),
                 "tipo_consulta_id": 1,
             },
@@ -169,7 +174,7 @@ class TestSigsa3Registros:
                 headers=auth_headers,
                 json={
                     "paciente_id": pid,
-                    "medico_id": TestSigsa3Registros.MEDICO_ID,
+                    "personal_atencion_id": TestSigsa3Registros.MEDICO_ID,
                     "consulta_id": con_id,
                     "fecha_consulta": date.today().isoformat(),
                     "tipo_consulta_id": 1,

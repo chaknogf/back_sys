@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from core.database import get_db
+from core.security import get_current_user, get_current_admin_user
 from modules.pacientes.models import PacienteModel
 from modules.pacientes.service import agregar_evento
 from modules.defunciones.schemas import (
@@ -23,6 +24,7 @@ from modules.defunciones.service import (
 router = APIRouter(
     prefix="/defunciones",
     tags=["Defunciones"],
+    dependencies=[Depends(get_current_user)],
 )
 
 
@@ -84,10 +86,13 @@ def listar_defunciones(
 
 @router.post("/sincronizar")
 def sincronizar(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
 ):
     """Recorre pacientes y sincroniza defunciones según estado del paciente."""
-    return sincronizar_defunciones(db)
+    return sincronizar_defunciones(db, skip=skip, limit=limit)
 
 
 @router.get("/pacientes", response_model=PacientesFallecidosResponse)
@@ -127,5 +132,6 @@ def actualizar_defuncion(
 def eliminar_defuncion(
     defuncion_id: int,
     db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
 ):
     return service_eliminar(defuncion_id, db)

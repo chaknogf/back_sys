@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from core.database import get_db
 from core.security import get_current_user, get_current_admin_user
+from core.uploads import read_upload_limited
 from modules.users.models import UserModel
 from modules.insumos.schemas import (
     InsumoCreate,
@@ -67,7 +68,7 @@ async def importar_csv(
     """
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="El archivo debe ser un CSV (.csv)")
-    crudo = await file.read()
+    crudo = await read_upload_limited(file, max_bytes=25 * 1024 * 1024)
     for encoding in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
         try:
             contenido = crudo.decode(encoding)

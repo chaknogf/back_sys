@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from core.database import get_db
+from core.security import get_current_user, get_current_admin_user
 from .schemas import NacimientoCreate, NacimientoUpdate, NeonatalesUpdate, NacimientoOut, NacimientoListResponse, LegacyReferenceResponse
 from .service import (
     crear_nacimiento_desde_paciente as service_desde_paciente,
@@ -20,7 +21,8 @@ from .service import (
 
 router = APIRouter(
     prefix="/nacimientos",
-    tags=["Nacimientos"]
+    tags=["Nacimientos"],
+    dependencies=[Depends(get_current_user)],
 )
 
 
@@ -68,17 +70,23 @@ def listar_nacimientos(
 @router.post("/sincronizar")
 def sincronizar(
     db: Session = Depends(get_db),
+    limit: int = Query(100, ge=1, le=500),
+    legacy_offset: int = Query(0, ge=0),
+    _admin=Depends(get_current_admin_user),
 ):
-    resultado = service_sincronizar(db, registrador_id=None)
+    resultado = service_sincronizar(
+        db, registrador_id=None, limit=limit, legacy_offset=legacy_offset
+    )
     return resultado
 
 
 @router.get("/referenciar-legacy", response_model=LegacyReferenceResponse)
 def referenciar_legacy(
-    limit: int = Query(500, ge=1, le=5000),
+    limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     solo_sin_match: bool = Query(False, description="Solo registros legacy sin match en pacientes"),
     db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
 ):
     return service_referenciar_legacy(
         db=db, limit=limit, offset=offset, solo_sin_match=solo_sin_match
@@ -86,9 +94,14 @@ def referenciar_legacy(
 
 
 @router.post("/recomputar")
-def recomputar(db: Session = Depends(get_db)):
+def recomputar(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     """Recomputa peso_gramos, clasificacion_nacimiento y trabajo_parto para todos los nacimientos."""
-    return service_recomputar(db)
+    return service_recomputar(db, skip=skip, limit=limit)
 
 
 @router.get("/{nacimiento_id}", response_model=NacimientoOut)
@@ -123,5 +136,6 @@ def actualizar_neonatales(
 def eliminar_nacimiento(
     nacimiento_id: int,
     db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
 ):
     return service_eliminar(nacimiento_id, db)

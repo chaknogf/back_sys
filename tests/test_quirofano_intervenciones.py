@@ -74,10 +74,11 @@ class TestIntervencionesQuirurgicas:
         yield
         cleanup()
 
-    def _crear_medico(self, client):
+    def _crear_medico(self, client, auth_headers):
         s = _sufijo()
         r = client.post(
             "/personal-atencion/",
+            headers=auth_headers,
             json={
                 "nombre": f"Dr. Cirujano {s}",
                 "colegiado": str(s),
@@ -183,7 +184,7 @@ class TestIntervencionesQuirurgicas:
 
     def test_crear_intervencion(self, client, auth_headers):
         paciente = self._crear_paciente(client, auth_headers)
-        medico = self._crear_medico(client)
+        medico = self._crear_medico(client, auth_headers)
         quirofano = self._crear_quirofano(client, auth_headers)
 
         r = client.post(
@@ -356,7 +357,7 @@ class TestIntervencionesQuirurgicas:
             db.close()
 
         paciente = self._crear_paciente(client, auth_headers)
-        medico = self._crear_medico(client)
+        medico = self._crear_medico(client, auth_headers)
         quirofano = self._crear_quirofano(client, auth_headers)
 
         r = client.post(
@@ -1103,7 +1104,7 @@ class TestIntervencionesQuirurgicas:
         r = client.get(
             "/quirofano/procedimientos-quirofano/",
             headers=auth_headers,
-            params={"activos": False, "limit": 10000},
+            params={"activos": False, "limit": 500},
         )
         assert r.status_code == 200
         assert r.json() == []

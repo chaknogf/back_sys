@@ -83,10 +83,11 @@ class TestQuirofanoReportes:
         created_ids["pacientes"].append(r.json()["id"])
         return r.json()
 
-    def _crear_medico(self, client):
+    def _crear_medico(self, client, auth_headers):
         s = _sufijo()
         r = client.post(
-            "/personal-atencion/", json={"nombre": f"Dr. Reporte {s}", "colegiado": str(s)}
+            "/personal-atencion/", headers=auth_headers,
+            json={"nombre": f"Dr. Reporte {s}", "colegiado": str(s)}
         )
         assert r.status_code in (200, 201)
         created_ids["medicos"].append(r.json()["id"])
@@ -127,7 +128,7 @@ class TestQuirofanoReportes:
     # -------- reporte --------
     def test_reporte_resumen_kpis(self, client, auth_headers):
         paciente = self._crear_paciente(client, auth_headers)
-        medico = self._crear_medico(client)
+        medico = self._crear_medico(client, auth_headers)
         qf = self._crear_quirofano(client, auth_headers)
         qid = qf["quirofano_numero_id"]
         fin, can = self._estado_id("FIN"), self._estado_id("CAN")
@@ -274,4 +275,3 @@ class TestQuirofanoReportes:
             json={"hora_apertura": "16:00", "hora_cierre": "08:00"},
         )
         assert r.status_code == 422
-

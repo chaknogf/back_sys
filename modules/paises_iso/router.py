@@ -18,8 +18,18 @@ router = APIRouter(prefix="/paises", tags=["Países ISO"])
     summary="Lista completa de países ISO 3166-1",
     description="Devuelve todos los países del mundo. Endpoint público (no requiere token)."
 )
-def listar_paises(db: Session = Depends(get_db)):
-    return db.query(PaisIsoModel).order_by(PaisIsoModel.nombre).all()
+def listar_paises(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(250, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    return (
+        db.query(PaisIsoModel)
+        .order_by(PaisIsoModel.nombre)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 
 @router.get(
@@ -30,6 +40,8 @@ def listar_paises(db: Session = Depends(get_db)):
 )
 def paises_para_select(
     q: Optional[str] = Query(None, min_length=1, description="Buscar por nombre o código"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
     """Normaliza el término y devuelve hasta 50 coincidencias por nombre o código ISO3."""
@@ -42,7 +54,7 @@ def paises_para_select(
             PaisIsoModel.codigo_iso3.ilike(f"%{q}%")
         )
 
-    resultados = query.limit(50).all()
+    resultados = query.offset(skip).limit(limit).all()
     return [PaisSelect.from_orm(p) for p in resultados]
 
 

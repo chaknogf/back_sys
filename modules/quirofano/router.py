@@ -7,6 +7,7 @@ from typing import List, Optional
 from datetime import date, time
 
 from core.dependencies import get_db, get_current_admin_user, get_current_user
+from core.uploads import read_upload_limited
 from modules.users.models import UserModel
 
 from . import schemas as sch
@@ -25,9 +26,7 @@ TAG_RANGOS = "Quirófano · Rangos de Especialista"
 TAG_QUIROFANOS = "Quirófano · Números de Quirófano"
 TAG_REPORTES = "Quirófano · Reportes"
 
-# Los decoradores con barra final son alias de compatibilidad (el frontend los
-# usa): siguen activos en runtime pero se ocultan del OpenAPI para no duplicar
-# la documentación. El endpoint canónico es SIN barra final.
+# Convención canónica: rutas de colección sin slash final.
 router = APIRouter(prefix="/quirofano")
 
 
@@ -35,7 +34,6 @@ router = APIRouter(prefix="/quirofano")
 # Intervención Quirúrgica
 # ========================
 @router.get("/intervenciones", response_model=sch.IntervencionQuirurgicaListResponse, tags=[TAG_INTERVENCIONES])
-@router.get("/intervenciones/", response_model=sch.IntervencionQuirurgicaListResponse, tags=[TAG_INTERVENCIONES], include_in_schema=False)
 def listar_intervenciones(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
@@ -73,7 +71,6 @@ def obtener_intervencion(
 
 
 @router.post("/intervenciones", response_model=sch.IntervencionQuirurgicaOut, status_code=status.HTTP_201_CREATED, tags=[TAG_INTERVENCIONES])
-@router.post("/intervenciones/", response_model=sch.IntervencionQuirurgicaOut, status_code=status.HTTP_201_CREATED, tags=[TAG_INTERVENCIONES], include_in_schema=False)
 def crear_intervencion(
     data: sch.IntervencionQuirurgicaCreate,
     db: Session = Depends(get_db),
@@ -105,10 +102,11 @@ def eliminar_intervencion(
 # Procedimiento Quirófano
 # ========================
 @router.get("/procedimientos-quirofano", response_model=List[sch.ProcedimientoQuirofanoOut], tags=[TAG_PROCEDIMIENTOS])
-@router.get("/procedimientos-quirofano/", response_model=List[sch.ProcedimientoQuirofanoOut], tags=[TAG_PROCEDIMIENTOS], include_in_schema=False)
 def listar_procedimientos_quirofano(
     activos: bool = Query(True, description="Solo activos"),
     especialidad_id: Optional[int] = Query(None, description="Filtrar por especialidad"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     incluir_mixtos: bool = Query(
         False,
         description="Incluir procedimientos de 'Todas (mixta)' al filtrar por especialidad",
@@ -123,6 +121,8 @@ def listar_procedimientos_quirofano(
         especialidad_id=especialidad_id,
         incluir_mixtos=incluir_mixtos,
         q=q,
+        skip=skip,
+        limit=limit,
     )
 
 
@@ -131,13 +131,6 @@ def listar_procedimientos_quirofano(
     response_model=sch.ProcedimientoQuirofanoOut,
     status_code=status.HTTP_201_CREATED,
     tags=[TAG_PROCEDIMIENTOS],
-)
-@router.post(
-    "/procedimientos-quirofano/",
-    response_model=sch.ProcedimientoQuirofanoOut,
-    status_code=status.HTTP_201_CREATED,
-    tags=[TAG_PROCEDIMIENTOS],
-    include_in_schema=False,
 )
 def crear_procedimiento_quirofano(
     data: sch.ProcedimientoQuirofanoCreate,
@@ -174,7 +167,7 @@ async def importar_csv_procedimientos(
     """Importa CSV solo para administradores, con UTF-8 y fallback de decodificación cp1252."""
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="El archivo debe ser un CSV (.csv)")
-    raw = await file.read()
+    raw = await read_upload_limited(file, max_bytes=25 * 1024 * 1024)
     try:
         contenido = raw.decode("utf-8")
     except UnicodeDecodeError:
@@ -195,17 +188,17 @@ def eliminar_procedimiento_quirofano(
 # Estado Cirugía
 # ========================
 @router.get("/estados-cirugia", response_model=List[sch.EstadoCirugiaOut], tags=[TAG_ESTADOS])
-@router.get("/estados-cirugia/", response_model=List[sch.EstadoCirugiaOut], tags=[TAG_ESTADOS], include_in_schema=False)
 def listar_estados_cirugia(
     activos: bool = Query(True, description="Solo activos"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return svc.listar_estados_cirugia(db, solo_activos=activos)
+    return svc.listar_estados_cirugia(db, solo_activos=activos, skip=skip, limit=limit)
 
 
 @router.post("/estados-cirugia", response_model=sch.EstadoCirugiaOut, status_code=status.HTTP_201_CREATED, tags=[TAG_ESTADOS])
-@router.post("/estados-cirugia/", response_model=sch.EstadoCirugiaOut, status_code=status.HTTP_201_CREATED, tags=[TAG_ESTADOS], include_in_schema=False)
 def crear_estado_cirugia(
     data: sch.EstadoCirugiaCreate,
     db: Session = Depends(get_db),
@@ -237,17 +230,17 @@ def eliminar_estado_cirugia(
 # Formato Procedimiento
 # ========================
 @router.get("/formatos", response_model=List[sch.FormatoProcedimientoOut], tags=[TAG_FORMATOS])
-@router.get("/formatos/", response_model=List[sch.FormatoProcedimientoOut], tags=[TAG_FORMATOS], include_in_schema=False)
 def listar_formatos(
     activos: bool = Query(True, description="Solo activos"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return svc.listar_formatos(db, solo_activos=activos)
+    return svc.listar_formatos(db, solo_activos=activos, skip=skip, limit=limit)
 
 
 @router.post("/formatos", response_model=sch.FormatoProcedimientoOut, status_code=status.HTTP_201_CREATED, tags=[TAG_FORMATOS])
-@router.post("/formatos/", response_model=sch.FormatoProcedimientoOut, status_code=status.HTTP_201_CREATED, tags=[TAG_FORMATOS], include_in_schema=False)
 def crear_formato(
     data: sch.FormatoProcedimientoCreate,
     db: Session = Depends(get_db),
@@ -279,17 +272,17 @@ def eliminar_formato(
 # Procedencia Procedimiento
 # ========================
 @router.get("/procedencias", response_model=List[sch.ProcedenciaProcedimientoOut], tags=[TAG_PROCEDENCIAS])
-@router.get("/procedencias/", response_model=List[sch.ProcedenciaProcedimientoOut], tags=[TAG_PROCEDENCIAS], include_in_schema=False)
 def listar_procedencias(
     activos: bool = Query(True, description="Solo activos"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return svc.listar_procedencias(db, solo_activos=activos)
+    return svc.listar_procedencias(db, solo_activos=activos, skip=skip, limit=limit)
 
 
 @router.post("/procedencias", response_model=sch.ProcedenciaProcedimientoOut, status_code=status.HTTP_201_CREATED, tags=[TAG_PROCEDENCIAS])
-@router.post("/procedencias/", response_model=sch.ProcedenciaProcedimientoOut, status_code=status.HTTP_201_CREATED, tags=[TAG_PROCEDENCIAS], include_in_schema=False)
 def crear_procedencia(
     data: sch.ProcedenciaProcedimientoCreate,
     db: Session = Depends(get_db),
@@ -321,17 +314,17 @@ def eliminar_procedencia(
 # Rango Especialista
 # ========================
 @router.get("/rangos-especialista", response_model=List[sch.RangoEspecialistaOut], tags=[TAG_RANGOS])
-@router.get("/rangos-especialista/", response_model=List[sch.RangoEspecialistaOut], tags=[TAG_RANGOS], include_in_schema=False)
 def listar_rangos_especialista(
     activos: bool = Query(True, description="Solo activos"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return svc.listar_rangos_especialista(db, solo_activos=activos)
+    return svc.listar_rangos_especialista(db, solo_activos=activos, skip=skip, limit=limit)
 
 
 @router.post("/rangos-especialista", response_model=sch.RangoEspecialistaOut, status_code=status.HTTP_201_CREATED, tags=[TAG_RANGOS])
-@router.post("/rangos-especialista/", response_model=sch.RangoEspecialistaOut, status_code=status.HTTP_201_CREATED, tags=[TAG_RANGOS], include_in_schema=False)
 def crear_rango_especialista(
     data: sch.RangoEspecialistaCreate,
     db: Session = Depends(get_db),
@@ -363,17 +356,17 @@ def eliminar_rango_especialista(
 # Número de Quirófano
 # ========================
 @router.get("/quirofanos-numero", response_model=List[sch.QuirofanoNumeroOut], tags=[TAG_QUIROFANOS])
-@router.get("/quirofanos-numero/", response_model=List[sch.QuirofanoNumeroOut], tags=[TAG_QUIROFANOS], include_in_schema=False)
 def listar_quirofanos_numero(
     activos: bool = Query(True, description="Solo activos"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return svc.listar_quirofanos_numero(db, solo_activos=activos)
+    return svc.listar_quirofanos_numero(db, solo_activos=activos, skip=skip, limit=limit)
 
 
 @router.post("/quirofanos-numero", response_model=sch.QuirofanoNumeroOut, status_code=status.HTTP_201_CREATED, tags=[TAG_QUIROFANOS])
-@router.post("/quirofanos-numero/", response_model=sch.QuirofanoNumeroOut, status_code=status.HTTP_201_CREATED, tags=[TAG_QUIROFANOS], include_in_schema=False)
 def crear_quirofano_numero(
     data: sch.QuirofanoNumeroCreate,
     db: Session = Depends(get_db),
@@ -406,10 +399,12 @@ def eliminar_quirofano_numero(
 # ========================
 @router.get("/config-periodo", response_model=List[sch.QuirofanoConfigPeriodoOut], tags=[TAG_REPORTES])
 def listar_config_periodo(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return rsvc.listar_config_periodo(db)
+    return rsvc.listar_config_periodo(db, skip=skip, limit=limit)
 
 
 @router.put("/config-periodo/{quirofano_numero_id}", response_model=sch.QuirofanoConfigPeriodoOut, tags=[TAG_REPORTES])

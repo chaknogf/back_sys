@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional as Opt
 from datetime import date, datetime
 from core.config import APP_TIMEZONE
+from core.uploads import read_upload_limited
 
 from modules.sigsa3.models import Sigsa3Model, Sigsa3RegistroModel
 from modules.sigsa3.schemas import Sigsa3Create, Sigsa3Update, Sigsa3RegistroOut
@@ -148,7 +149,7 @@ async def importar_excel_csv(file: UploadFile, db: Session) -> dict:
         )
 
     try:
-        content = await file.read()
+        content = await read_upload_limited(file, max_bytes=50 * 1024 * 1024)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -319,6 +320,7 @@ def listar_registros(
     codigo_cie_10: Opt[str] = None,
     q: Opt[str] = None,
     limit: int = 100,
+    skip: int = 0,
 ) -> List[Sigsa3Model]:
     query = db.query(Sigsa3Model)
 
@@ -352,8 +354,8 @@ def listar_registros(
             )
         )
 
-    limit = min(limit, 500)
-    return query.order_by(Sigsa3Model.fecha_consulta.desc(), Sigsa3Model.id.desc()).limit(limit).all()
+    limit = min(max(limit, 1), 500)
+    return query.order_by(Sigsa3Model.fecha_consulta.desc(), Sigsa3Model.id.desc()).offset(skip).limit(limit).all()
 
 
 def obtener_registro(registro_id: int, db: Session) -> Sigsa3Model:
@@ -1688,14 +1690,17 @@ def truncate_tabla(db: Session) -> dict:
     return {"truncado": True, "tabla": "sigsa3", "tabla_normalizada": "sigsa3_registros"}
 
 
-def exportar_csv(db: Session) -> bytes:
+def exportar_csv(db: Session):
+    """Genera el CSV incrementalmente sin materializar toda la tabla en RAM."""
     import csv
     import io
 
-    registros = db.query(Sigsa3Model).order_by(Sigsa3Model.id).all()
-    if not registros:
-        return b""
-
+    registros = (
+        db.query(Sigsa3Model)
+        .order_by(Sigsa3Model.id)
+        .yield_per(500)
+        .execution_options(stream_results=True)
+    )
     output = io.StringIO()
     writer = csv.writer(output)
     columns = [
@@ -1704,7 +1709,11 @@ def exportar_csv(db: Session) -> bytes:
         "edad_dias", "edad_meses", "edad_anios", "tipo_consulta", "control",
         "semana_gestacional", "codigo_cie_10", "dx", "especialidad_nombre",
     ]
+    output.write("\ufeff")
     writer.writerow(columns)
+    yield output.getvalue().encode("utf-8")
+    output.seek(0)
+    output.truncate(0)
     for r in registros:
         writer.writerow([
             r.id, r.paciente_id, r.personal_atencion_id, r.consulta_id, r.personal_salud,
@@ -1712,20 +1721,23 @@ def exportar_csv(db: Session) -> bytes:
             r.edad_dias, r.edad_meses, r.edad_anios, r.tipo_consulta, r.control,
             r.semana_gestacional, r.codigo_cie_10, r.dx, r.especialidad_nombre,
         ])
-    return ("\ufeff" + output.getvalue()).encode("utf-8")
+        yield output.getvalue().encode("utf-8")
+        output.seek(0)
+        output.truncate(0)
 
 
-def listar_no_asociados(db: Session, limit: int = 100) -> list[Sigsa3Model]:
+def listar_no_asociados(db: Session, limit: int = 100, skip: int = 0) -> list[Sigsa3Model]:
     return (
         db.query(Sigsa3Model)
         .filter(Sigsa3Model.paciente_id.is_(None))
         .order_by(Sigsa3Model.id.desc())
-        .limit(min(limit, 500))
+        .offset(skip)
+        .limit(min(max(limit, 1), 500))
         .all()
     )
 
 
-def listar_pendientes_detalle(db: Session, limit: int = 100) -> list[dict]:
+def listar_pendientes_detalle(db: Session, limit: int = 100, skip: int = 0) -> list[dict]:
     """Devuelve registros sin paciente_id con información contextual para revisión humana."""
     from modules.common.vector_similarity import tokenizar, idf_por_token, pesado_por_idf, similitud_compuesta
     from modules.pacientes.models import PacienteModel
@@ -1734,7 +1746,8 @@ def listar_pendientes_detalle(db: Session, limit: int = 100) -> list[dict]:
         db.query(Sigsa3Model)
         .filter(Sigsa3Model.paciente_id.is_(None))
         .order_by(Sigsa3Model.id)
-        .limit(min(limit, 500))
+        .offset(skip)
+        .limit(min(max(limit, 1), 200))
         .all()
     )
     if not registros:
@@ -1845,7 +1858,7 @@ def resolver_pendiente(db: Session, sigsa3_id: int, paciente_id: int) -> dict:
 # DUPLICADOS: detectar y fusionar pacientes duplicados desde SIGSA-3
 # =====================================================================
 
-def detectar_duplicados(db: Session) -> list[dict]:
+def detectar_duplicados(db: Session, skip: int = 0, limit: int = 100) -> list[dict]:
     """Detecta clusters de pacientes con el mismo nombre normalizado.
     Retorna una lista de clusters, cada uno con los pacientes que comparten
     nombre y no tienen datos diferenciadores (sexo, expediente)."""
@@ -1875,19 +1888,20 @@ def detectar_duplicados(db: Session) -> list[dict]:
             "estado": (est or "").strip().upper(),
         })
 
+    # Cargar los conteos SIGSA-3 de todos los candidatos en una sola consulta,
+    # evitando el query por cluster que degradaba linealmente con los duplicados.
+    todos_ids = [p["pac_id"] for pacs in clusters.values() for p in pacs]
+    filas_count = db.execute(
+        text("SELECT paciente_id, COUNT(*) FROM sigsa3 WHERE paciente_id = ANY(:ids) GROUP BY paciente_id"),
+        {"ids": todos_ids},
+    ).fetchall() if todos_ids else []
+    count_map = {row[0]: row[1] for row in filas_count}
+
     # Filtrar: solo clusters con 2+ pacientes (duplicados)
     resultado = []
     for firma, pacs in clusters.items():
         if len(pacs) < 2:
             continue
-        # Contar cuántos registros SIGSA-3 apuntan a cada paciente en este cluster
-        pac_ids = [p["pac_id"] for p in pacs]
-        sigsa3_counts = db.execute(
-            text("SELECT paciente_id, COUNT(*) FROM sigsa3 WHERE paciente_id = ANY(:ids) GROUP BY paciente_id"),
-            {"ids": pac_ids}
-        ).fetchall()
-        count_map = {row[0]: row[1] for row in sigsa3_counts}
-
         # Ordenar: el que tiene más registros SIGSA-3 es el candidato a principal
         for p in pacs:
             p["sigsa3_count"] = count_map.get(p["pac_id"], 0)
@@ -1911,7 +1925,7 @@ def detectar_duplicados(db: Session) -> list[dict]:
 
     # Ordenar por total de registros SIGSA-3 pendientes (mayor Impacto primero)
     resultado.sort(key=lambda x: -x["total_sigsa3_pendientes"])
-    return resultado
+    return resultado[skip:skip + limit]
 
 
 def merge_duplicados_sigsa3(

@@ -358,8 +358,14 @@ def listar_generos(db: Session) -> list[dict]:
 
 # ── Hospitals & Departments ──
 
-def listar_hospitales(db: Session) -> list[dict]:
-    hosp = db.query(VhHospitalModel).order_by(VhHospitalModel.hospital_name).all()
+def listar_hospitales(db: Session, skip: int = 0, limit: int = 100) -> list[dict]:
+    hosp = (
+        db.query(VhHospitalModel)
+        .order_by(VhHospitalModel.hospital_name)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     return [{"hospital_id": h.hospital_id, "hospital_name": h.hospital_name, "hospital_type": h.hospital_type, "location": h.location} for h in hosp]
 
 
@@ -374,11 +380,16 @@ def crear_hospital(data, db: Session) -> dict:
     return {"hospital_id": h.hospital_id, "hospital_name": h.hospital_name, "hospital_type": h.hospital_type, "location": h.location, "created_at": h.created_at}
 
 
-def listar_departamentos(db: Session, hospital_id: Optional[int] = None) -> list[dict]:
+def listar_departamentos(
+    db: Session,
+    hospital_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 100,
+) -> list[dict]:
     query = db.query(VhDepartmentModel)
     if hospital_id:
         query = query.filter(VhDepartmentModel.hospital_id == hospital_id)
-    depts = query.order_by(VhDepartmentModel.department_name).all()
+    depts = query.order_by(VhDepartmentModel.department_name).offset(skip).limit(limit).all()
     return [{"department_id": d.department_id, "hospital_id": d.hospital_id, "department_name": d.department_name, "subdepartment_name": d.subdepartment_name} for d in depts]
 
 

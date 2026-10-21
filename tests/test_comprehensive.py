@@ -540,7 +540,7 @@ class TestPacientes:
         created_ids["pacientes"].append(r.json()["id"])
 
     def test_list_pacientes(self, client, admin_headers):
-        r = client.get("/pacientes/", headers=admin_headers)
+        r = client.get("/pacientes/buscar", headers=admin_headers)
         assert r.status_code == 200
         data = r.json()
         assert "total" in data
@@ -573,17 +573,17 @@ class TestPacientes:
         assert r.status_code == 200
 
     def test_search_paciente_by_name(self, client, admin_headers):
-        r = client.get("/pacientes/?nombre=TEST", headers=admin_headers)
+        r = client.get("/pacientes/buscar?nombre=TEST", headers=admin_headers)
         assert r.status_code == 200
         data = r.json()
         assert data["total"] >= 1
 
     def test_search_paciente_by_sexo(self, client, admin_headers):
-        r = client.get("/pacientes/?sexo=M", headers=admin_headers)
+        r = client.get("/pacientes/buscar?sexo=M", headers=admin_headers)
         assert r.status_code == 200
 
     def test_search_paciente_by_estado(self, client, admin_headers):
-        r = client.get("/pacientes/?estado=V", headers=admin_headers)
+        r = client.get("/pacientes/buscar?estado=V", headers=admin_headers)
         assert r.status_code == 200
 
     def test_get_paciente_by_expediente(self, client, admin_headers):
@@ -820,10 +820,10 @@ class TestConsultas:
 
     def test_buscar_paciente_via_consultas(self, client, admin_headers):
         r = client.get(
-            "/consultas/buscarpaciente?q=TEST", headers=admin_headers
+            "/pacientes/buscar?q=TEST", headers=admin_headers
         )
         assert r.status_code == 200
-        assert isinstance(r.json(), list)
+        assert isinstance(r.json()["pacientes"], list)
 
     def test_desactivar_consulta(self, client, admin_headers):
         if not created_ids["consultas"]:
@@ -1301,7 +1301,7 @@ class TestProcedimientos:
     def test_create_catalogo(self, client, admin_headers):
         s = _sufijo()
         r = client.post(
-            "/procedimientos/catalogo",
+            "/catalogo-procedimientos/",
             headers=admin_headers,
             json={
                 "nombre": f"TEST-PROC-{s}",
@@ -1313,15 +1313,15 @@ class TestProcedimientos:
         created_ids["procedimientos_catalogo"].append(r.json()["id"])
 
     def test_list_catalogo(self, client, admin_headers):
-        r = client.get("/procedimientos/catalogo", headers=admin_headers)
+        r = client.get("/catalogo-procedimientos/", headers=admin_headers)
         assert r.status_code == 200
-        assert isinstance(r.json(), list)
+        assert isinstance(r.json()["items"], list)
 
     def test_search_catalogo(self, client, admin_headers):
         if not TestProcedimientos.PROC_ID:
             pytest.skip("No proc catalogo")
         r = client.get(
-            f"/procedimientos/catalogo/{TestProcedimientos.PROC_ID}",
+            f"/catalogo-procedimientos/{TestProcedimientos.PROC_ID}",
             headers=admin_headers,
         )
         assert r.status_code == 200
@@ -1393,7 +1393,7 @@ class TestProcedimientos:
         pid = TestProcedimientos.PROC_ID
         if pid in created_ids["procedimientos_catalogo"]:
             r = client.delete(
-                f"/procedimientos/catalogo/{pid}",
+                f"/catalogo-procedimientos/{pid}",
                 headers=admin_headers,
             )
             assert r.status_code in (200, 204)

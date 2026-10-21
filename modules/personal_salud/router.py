@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from core.dependencies import get_db, get_current_user
+from core.dependencies import get_db, get_current_user, get_current_admin_user
 from modules.users.models import UserModel
 from .schemas import PersonalSaludCreate, PersonalSaludUpdate, PersonalSaludOut
 from .service import (
@@ -26,6 +26,8 @@ def listar(
     nombre: Optional[str] = Query(None, max_length=200, description="Filtro por nombre (búsqueda parcial)"),
     especialidad_id: Optional[int] = Query(None, description="Filtro por especialidad"),
     personal_atencion_id: Optional[int] = Query(None, description="Filtro por médico"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
@@ -35,6 +37,8 @@ def listar(
         nombre=nombre,
         especialidad_id=especialidad_id,
         personal_atencion_id=personal_atencion_id,
+        skip=skip,
+        limit=limit,
     )
 
 
@@ -51,7 +55,7 @@ def obtener(
 def crear(
     data: PersonalSaludCreate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service_crear(data.nombre, data.especialidad_id, data.personal_atencion_id, db)
 
@@ -61,7 +65,7 @@ def actualizar(
     ps_id: int,
     data: PersonalSaludUpdate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service_actualizar(ps_id, data.nombre, data.especialidad_id, data.personal_atencion_id, db)
 
@@ -70,6 +74,6 @@ def actualizar(
 def eliminar(
     ps_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service_eliminar(ps_id, db)

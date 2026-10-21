@@ -65,11 +65,11 @@ def _obtener_o_404(db: Session, model, pk_field: str, pk_value: int):
 # ========================
 # Formato Procedimiento
 # ========================
-def listar_formatos(db: Session, solo_activos: bool = True) -> list:
+def listar_formatos(db: Session, solo_activos: bool = True, skip: int = 0, limit: int = 100) -> list:
     query = db.query(FormatoProcedimientoModel)
     if solo_activos:
         query = query.filter(FormatoProcedimientoModel.activo == True)
-    return query.order_by(FormatoProcedimientoModel.codigo).all()
+    return query.order_by(FormatoProcedimientoModel.codigo).offset(skip).limit(limit).all()
 
 
 def obtener_formato(formato_id: int, db: Session) -> FormatoProcedimientoModel:
@@ -109,11 +109,11 @@ def eliminar_formato(formato_id: int, db: Session) -> dict:
 # ========================
 # Estado Cirugía
 # ========================
-def listar_estados_cirugia(db: Session, solo_activos: bool = True) -> list:
+def listar_estados_cirugia(db: Session, solo_activos: bool = True, skip: int = 0, limit: int = 100) -> list:
     query = db.query(EstadoCirugiaModel)
     if solo_activos:
         query = query.filter(EstadoCirugiaModel.activo == True)
-    return query.order_by(EstadoCirugiaModel.codigo).all()
+    return query.order_by(EstadoCirugiaModel.codigo).offset(skip).limit(limit).all()
 
 
 def obtener_estado_cirugia(estado_id: int, db: Session) -> EstadoCirugiaModel:
@@ -153,11 +153,11 @@ def eliminar_estado_cirugia(estado_id: int, db: Session) -> dict:
 # ========================
 # Rango Especialista
 # ========================
-def listar_rangos_especialista(db: Session, solo_activos: bool = True) -> list:
+def listar_rangos_especialista(db: Session, solo_activos: bool = True, skip: int = 0, limit: int = 100) -> list:
     query = db.query(RangoEspecialistaModel)
     if solo_activos:
         query = query.filter(RangoEspecialistaModel.activo == True)
-    return query.order_by(RangoEspecialistaModel.codigo).all()
+    return query.order_by(RangoEspecialistaModel.codigo).offset(skip).limit(limit).all()
 
 
 def obtener_rango_especialista(rango_id: int, db: Session) -> RangoEspecialistaModel:
@@ -197,11 +197,11 @@ def eliminar_rango_especialista(rango_id: int, db: Session) -> dict:
 # ========================
 # Procedencia Procedimiento
 # ========================
-def listar_procedencias(db: Session, solo_activos: bool = True) -> list:
+def listar_procedencias(db: Session, solo_activos: bool = True, skip: int = 0, limit: int = 100) -> list:
     query = db.query(ProcedenciaProcedimientoModel)
     if solo_activos:
         query = query.filter(ProcedenciaProcedimientoModel.activo == True)
-    return query.order_by(ProcedenciaProcedimientoModel.codigo).all()
+    return query.order_by(ProcedenciaProcedimientoModel.codigo).offset(skip).limit(limit).all()
 
 
 def obtener_procedencia(procedencia_id: int, db: Session) -> ProcedenciaProcedimientoModel:
@@ -276,6 +276,8 @@ def listar_procedimientos_quirofano(
     especialidad_id: int = None,
     incluir_mixtos: bool = False,
     q: str = None,
+    skip: int = 0,
+    limit: int = 100,
 ) -> list:
     query = db.query(ProcedimientoQuirofanoModel)
     if solo_activos:
@@ -291,7 +293,7 @@ def listar_procedimientos_quirofano(
             func.lower(ProcedimientoQuirofanoModel.nombre).like(search) |
             func.lower(ProcedimientoQuirofanoModel.codigo).like(search)
         )
-    return query.order_by(ProcedimientoQuirofanoModel.codigo).all()
+    return query.order_by(ProcedimientoQuirofanoModel.codigo).offset(skip).limit(limit).all()
 
 
 def obtener_procedimiento_quirofano(proc_id: int, db: Session) -> ProcedimientoQuirofanoModel:
@@ -489,11 +491,11 @@ def truncar_procedimientos(db: Session) -> dict:
 # ========================
 # Número de Quirófano
 # ========================
-def listar_quirofanos_numero(db: Session, solo_activos: bool = True) -> list:
+def listar_quirofanos_numero(db: Session, solo_activos: bool = True, skip: int = 0, limit: int = 100) -> list:
     query = db.query(QuirofanoNumeroModel)
     if solo_activos:
         query = query.filter(QuirofanoNumeroModel.activo == True)
-    return query.order_by(QuirofanoNumeroModel.numero).all()
+    return query.order_by(QuirofanoNumeroModel.numero).offset(skip).limit(limit).all()
 
 
 def obtener_quirofano_numero(qn_id: int, db: Session) -> QuirofanoNumeroModel:

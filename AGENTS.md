@@ -38,7 +38,7 @@ back_sys/
 │   ├── dependencies.py        # FastAPI DI re-exports
 │   ├── exceptions.py          # Global error handlers (422, 409, 500)
 │   └── mail.py                # FastAPI-Mail config
-├── modules/                   # 29 domain modules
+├── modules/                   # 36 domain packages (34 routers, 2 models-only)
 │   ├── auth/                  # POST /auth/login, GET /auth/me
 │   ├── users/                 # Full user CRUD
 │   ├── pacientes/             # Patient CRUD, duplicates (trigram/soundex), merge, neonates
@@ -95,7 +95,7 @@ All routes under root path `/fah` (e.g., `https://host/fah/auth/login`).
 | Appointments | `/citas` | `GET/POST`, `GET/PUT/DELETE /{id}`, `/disponibles` |
 | Cycles | `/ciclos` | `GET/POST`, `GET /{id}` |
 | Events | `/eventos` | `GET/POST`, `PATCH/DELETE /{id}` |
-| Procedures | `/procedimientos` | `/catalogo` (con filtros `abreviatura`, `nombre`), `/catalogo/*`, `/estadisticas/*`, `GET/POST /{id}` |
+| Procedures | `/procedimientos` | realizaciones/reportes; catálogo canónico en `/catalogo-procedimientos/` |
 | Correlatives | `/correlativos` | `POST /expediente`, `/emergencia`, `/constancia_nacimiento`, `/constancia_defuncion`, `/constancia_medica` |
 | Birth Certs | `/constancias-nacimiento` | `GET/POST`, `GET /{id}`, `/historial/{id}`, `PATCH /{id}/estado-informe` |
 | Deaths | `/defunciones` | `POST/GET`, `GET/PATCH/DELETE /{id}`, `/registrar/{paciente_id}`, `/sincronizar`, `/pacientes` |
@@ -135,7 +135,7 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Users | PUT | `/users/{user_id}` | admin/self | `UserResponse` | Update |
 | Users | PATCH | `/users/recuperar` | public | dict | Reset password |
 | Users | DELETE | `/users/{user_id}` | admin | 204 | Soft delete |
-| Pacientes | GET | `/pacientes/` | auth | `PacienteListResponse` | Search (15+ filtros: q, id, cui, expediente, nombre, sexo, estado, etc.) |
+| Pacientes | GET | `/pacientes/buscar` | auth | `PacienteListResponse` | Búsqueda paginada compartida con recepción; incluye documento de consulta |
 | Pacientes | GET | `/pacientes/neonatales` | auth | `PacienteListResponse` | Neonatales |
 | Pacientes | GET | `/pacientes/personal-hospital` | auth | `PacienteListResponse` | Personal hospital (`datos_extra.socioeconomicos.personal_hospital=S`) |
 | Pacientes | GET | `/pacientes/{paciente_id}` | auth | `PacienteOut` | By ID |
@@ -149,7 +149,7 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Pacientes | POST | `/pacientes/merge` | admin | dict | Merge duplicados |
 | Pacientes | POST | `/pacientes/madre-hijo/{madre_id}` | auth | `PacienteOut` (201) | Crear desde madre |
 | Consultas | GET | `/consultas/` | auth | `ConsultaListResponse` | List (15+ filtros) |
-| Consultas | GET | `/consultas/buscarpaciente` | auth | `List[PacienteSimple]` | Buscar pacientes |
+| Consultas | GET | `/pacientes/buscar` | auth | `PacienteListResponse` | Búsqueda compartida de pacientes para recepción |
 | Consultas | GET | `/consultas/{consulta_id}` | auth | `ConsultaOut` | By ID |
 | Consultas | PATCH | `/consultas/sincronizar-indicadores` | auth | dict | Sync indicadores |
 | Consultas | PATCH | `/consultas/{consulta_id}` | auth | `ConsultaOut` | Update |
@@ -201,11 +201,11 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Prestamos | GET | `/prestamos/{prestamo_id}` | auth | `PrestamoSchema` | By ID |
 | Prestamos | PUT | `/prestamos/{prestamo_id}` | auth | `PrestamoSchema` | Update (devuelve si fecha_devolucion) |
 | Prestamos | DELETE | `/prestamos/{prestamo_id}` | auth | dict | Desactivar |
-| Procedimientos | GET | `/procedimientos/catalogo` | auth | `list[ProcedimientoOut]` | Catálogo (filtros: abreviatura, nombre) |
-| Procedimientos | GET | `/procedimientos/catalogo/{id}` | auth | `ProcedimientoOut` | Catálogo by ID |
-| Procedimientos | POST | `/procedimientos/catalogo` | admin | `ProcedimientoOut` | Crear en catálogo |
-| Procedimientos | PUT | `/procedimientos/catalogo/{id}` | admin | `ProcedimientoOut` | Update catálogo |
-| Procedimientos | DELETE | `/procedimientos/catalogo/{id}` | admin | dict | Delete (si sin registros) |
+| Procedimientos | GET | `/catalogo-procedimientos/` | auth | `CatalogoProcedimientoListResponse` | Catálogo paginado (filtros: q, especialidad_ref, activo) |
+| Procedimientos | GET | `/catalogo-procedimientos/{id}` | auth | `CatalogoProcedimientoOut` | Catálogo by ID |
+| Procedimientos | POST | `/catalogo-procedimientos/` | admin | `CatalogoProcedimientoOut` | Crear en catálogo |
+| Procedimientos | PATCH | `/catalogo-procedimientos/{id}` | admin | `CatalogoProcedimientoOut` | Update catálogo |
+| Procedimientos | DELETE | `/catalogo-procedimientos/{id}` | admin | dict | Desactivar catálogo |
 | Procedimientos | GET | `/procedimientos/` | auth | `ProcedimientosListResponse` | List realizados (5 filtros) |
 | Procedimientos | GET | `/procedimientos/reporte` | auth | dict | Reporte agregado |
 | Procedimientos | GET | `/procedimientos/{id}` | auth | `ProceMedicoResponse` | Realizado by ID |

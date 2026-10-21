@@ -38,7 +38,8 @@ def listar(
     especialidad_id: Optional[int] = Query(None),
     codigo_cie_10: Optional[str] = Query(None, max_length=30),
     q: Optional[str] = Query(None, max_length=200, description="Búsqueda general"),
-    limit: int = Query(100, le=5000),
+    limit: int = Query(100, ge=1, le=500),
+    skip: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
@@ -56,6 +57,7 @@ def listar(
         codigo_cie_10=codigo_cie_10,
         q=q,
         limit=limit,
+        skip=skip,
     )
 
 
@@ -117,14 +119,14 @@ def eliminar(
 
 
 class EliminarPorIdsRequest(BaseModel):
-    ids: List[int] = Field(..., description="Lista de IDs a eliminar")
+    ids: List[int] = Field(..., max_length=5000, description="Lista de IDs a eliminar (máximo 5000)")
 
 
 @router.post("/eliminar-por-ids")
 def eliminar_ids(
     data: EliminarPorIdsRequest,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return eliminar_por_ids(data.ids, db)
 

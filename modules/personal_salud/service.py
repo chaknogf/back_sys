@@ -18,6 +18,8 @@ def listar_personal_salud(
     nombre: str | None = None,
     especialidad_id: int | None = None,
     personal_atencion_id: int | None = None,
+    skip: int = 0,
+    limit: int = 100,
 ) -> list:
     """Filtra el catálogo por nombre, especialidad o vínculo al personal de atención."""
     query = db.query(PersonalSaludModel)
@@ -27,7 +29,7 @@ def listar_personal_salud(
         query = query.filter(PersonalSaludModel.especialidad_id == especialidad_id)
     if personal_atencion_id is not None:
         query = query.filter(PersonalSaludModel.personal_atencion_id == personal_atencion_id)
-    return query.order_by(PersonalSaludModel.nombre).all()
+    return query.order_by(PersonalSaludModel.nombre, PersonalSaludModel.id).offset(skip).limit(limit).all()
 
 
 def crear_personal_salud(nombre: str, especialidad_id: int | None, personal_atencion_id: int | None, db: Session) -> PersonalSaludModel:

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from core.database import get_db
+from core.security import get_current_user, get_current_admin_user
 from .models import MedicoModel
 from .schemas import MedicoCreate, MedicoUpdate, MedicoOut, MedicoListResponse
 from .service import (
@@ -18,12 +19,17 @@ from .service import (
 
 router = APIRouter(
     prefix="/personal-atencion",
-    tags=["Personal de Atencion"]
+    tags=["Personal de Atencion"],
+    dependencies=[Depends(get_current_user)],
 )
 
 
 @router.post("/", response_model=MedicoOut, status_code=status.HTTP_201_CREATED)
-def crear_medico(data: MedicoCreate, db: Session = Depends(get_db)):
+def crear_medico(
+    data: MedicoCreate,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return service_crear_medico(data, db)
 
 
@@ -62,11 +68,16 @@ def obtener_medico(personal_atencion_id: int, db: Session = Depends(get_db)):
 def actualizar_medico(
     personal_atencion_id: int,
     data: MedicoUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
 ):
     return service_actualizar_medico(personal_atencion_id, data, db)
 
 
 @router.delete("/{personal_atencion_id}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_medico(personal_atencion_id: int, db: Session = Depends(get_db)):
+def eliminar_medico(
+    personal_atencion_id: int,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return service_eliminar_medico(personal_atencion_id, db)

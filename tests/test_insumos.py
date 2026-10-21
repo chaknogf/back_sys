@@ -331,6 +331,7 @@ class TestAlmacenFlujos:
     def test_03_requisicion_y_despacho(self, client, auth_headers):
         r = client.post(
             "/encamamiento/",
+            headers=auth_headers,
             json={"nombre_servicio": f"TEST-INSUMOS-{_suf()}", "camas_censables": 5},
         )
         assert r.status_code in (200, 201), r.text

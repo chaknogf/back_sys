@@ -13,7 +13,6 @@ from modules.users.models import UserModel
 from modules.audit_log.service import registrar_acceso
 from modules.pacientes.models import PacienteModel
 from modules.consultas.models import ConsultaModel
-from modules.pacientes.schemas import PacienteSimple
 from .schemas import (
     ConsultaOut, ConsultaUpdate, RegistroConsultaCreate, RegistroConsultaOut,
     ConsultaHistoriaResumidaOut, ConsultaListResponse, ServicioConteo
@@ -27,6 +26,7 @@ from .service import (
     eliminar_consulta as service_eliminar_consulta,
     sincronizar_indicadores as service_sincronizar_indicadores,
     contar_consultas_por_servicio as service_contar_por_servicio,
+    obtener_ultimas_consultas,
     marcar_tiene_uisau,
 )
 
@@ -85,57 +85,6 @@ def buscar_consultas_activas(
     return resultado
 
 
-@router.get("/buscarpaciente", response_model=List[PacienteSimple])
-def buscar_pacientes(
-    paciente_id: Optional[int] = None,
-    expediente: Optional[str] = None,
-    documento: Optional[str] = None,
-    cui: Optional[int] = None,
-    primer_nombre: Optional[str] = None,
-    segundo_nombre: Optional[str] = None,
-    primer_apellido: Optional[str] = None,
-    segundo_apellido: Optional[str] = None,
-    db: Session = Depends(get_db),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
-    current_user: UserModel = Depends(get_current_user)
-):
-    """Busca pacientes con filtros compartidos y deduplica el JOIN por documento."""
-    from modules.pacientes.models import PacienteModel
-    from modules.pacientes.service import apply_paciente_filters
-
-    query = db.query(PacienteModel)
-    query = apply_paciente_filters(
-        query,
-        paciente_id=paciente_id,
-        cui=cui,
-        expediente=expediente,
-        primer_nombre=primer_nombre,
-        segundo_nombre=segundo_nombre,
-        primer_apellido=primer_apellido,
-        segundo_apellido=segundo_apellido,
-    )
-
-    if documento is not None:
-        query = (
-            query
-            .join(ConsultaModel, ConsultaModel.paciente_id == PacienteModel.id)
-            .filter(ConsultaModel.documento == documento)
-        )
-
-    pacientes = (
-        query
-        .distinct()
-        .order_by(PacienteModel.id.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
-    resultado = [PacienteSimple.from_orm(p) for p in pacientes]
-    return resultado
-
-
 @router.get("/servicios", response_model=List[ServicioConteo])
 def contar_por_servicio(
     tipo_consulta: Optional[int] = None,
@@ -158,7 +107,17 @@ def contar_por_servicio(
     )
 
 
-@router.get("/{consulta_id}", response_model=ConsultaOut)
+@router.get("/ultimos", response_model=ConsultaListResponse)
+def ultimas_consultas(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return obtener_ultimas_consultas(db, limit, skip)
+
+
+@router.get("/{consulta_id:int}", response_model=ConsultaOut)
 def obtener_consulta(
     consulta_id: int,
     db: Session = Depends(get_db),
@@ -185,7 +144,7 @@ def sincronizar_indicadores(
     return service_sincronizar_indicadores(db, f_desde, f_hasta, current_user)
 
 
-@router.patch("/{consulta_id}", response_model=ConsultaOut)
+@router.patch("/{consulta_id:int}", response_model=ConsultaOut)
 def actualizar_consulta(
     consulta_id: int,
     update_data: ConsultaUpdate,
@@ -195,7 +154,7 @@ def actualizar_consulta(
     return service_actualizar_consulta(consulta_id, update_data, db, current_user)
 
 
-@router.patch("/{consulta_id}/reasignar-paciente", response_model=ConsultaOut)
+@router.patch("/{consulta_id:int}/reasignar-paciente", response_model=ConsultaOut)
 def reasignar_paciente(
     consulta_id: int,
     nuevo_paciente_id: int = Query(..., gt=0, description="ID del paciente correcto"),
@@ -267,7 +226,7 @@ def buscar_consultas_por_paciente(
     return resultados
 
 
-@router.delete("/{consulta_id}", response_model=ConsultaOut)
+@router.delete("/{consulta_id:int}", response_model=ConsultaOut)
 def desactivar_consulta(
     consulta_id: int,
     db: Session = Depends(get_db),
@@ -276,7 +235,7 @@ def desactivar_consulta(
     return service_desactivar_consulta(consulta_id, db, current_user)
 
 
-@router.delete("/{consulta_id}/eliminar", response_model=dict)
+@router.delete("/{consulta_id:int}/eliminar", response_model=dict)
 def eliminar_consulta(
     consulta_id: int,
     db: Session = Depends(get_db),
@@ -284,15 +243,6 @@ def eliminar_consulta(
 ):
     """Elimina físicamente una consulta mediante el servicio de mantenimiento."""
     return service_eliminar_consulta(consulta_id, db)
-
-
-@router.get("/ultimos", response_model=ConsultaListResponse)
-def ultimas_consultas(
-    limit: int = Query(500, ge=1, le=1000),
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
-):
-    return obtener_ultimas_consultas(db, limit)
 
 
 @router.post("/recalcular-orden", response_model=dict)

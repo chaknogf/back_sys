@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, status, Query, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List
 from datetime import date
 from pydantic import BaseModel, Field
-import io
 import json
 
 from core.dependencies import get_db, get_current_user, get_current_admin_user
@@ -50,7 +49,7 @@ class EliminarPorPeriodoRequest(BaseModel):
 async def importar_excel(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return await importar_excel_csv(file, db)
 
@@ -66,21 +65,23 @@ def asociar(
 
 @router.get("/no-asociados/", response_model=List[Sigsa3Out])
 def no_asociados(
-    limit: int = Query(100, le=500),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    return listar_no_asociados(db, limit)
+    return listar_no_asociados(db, limit, skip)
 
 
 @router.get("/pendientes-detalle", response_model=List[PendienteDetalle])
 def pendientes_detalle(
-    limit: int = Query(50, le=200),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
     """Registros SIGSA-3 sin paciente_id, con top 5 candidatos y scores para revisión humana."""
-    return listar_pendientes_detalle(db, limit)
+    return listar_pendientes_detalle(db, limit, skip)
 
 
 @router.post("/resolver-pendiente", response_model=ResolverPendienteResponse)
@@ -95,19 +96,21 @@ def resolver(
 
 @router.get("/duplicados", response_model=List[ClusterDuplicado])
 def duplicados(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
     """Detecta clusters de pacientes con el mismo nombre (duplicados potenciales).
     Retorna clusters ordenados por impacto (más registros SIGSA-3 pendientes primero)."""
-    return detectar_duplicados(db)
+    return detectar_duplicados(db, skip, limit)
 
 
 @router.post("/merge-duplicados", response_model=MergeDuplicadosResponse)
 def merge_duplicados(
     data: MergeDuplicadosRequest,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     """Fusiona pacientes duplicados, reasignando consultas, SIGSA-3, citas,
     defunciones y nacimientos al paciente principal. Los duplicados se desactivan."""
@@ -126,7 +129,7 @@ def crear_indices(
 
 
 @router.get("/cache-stats")
-def cache_stats():
+def cache_stats(current_user: UserModel = Depends(get_current_user)):
     """Estadísticas del cache vectorial de nombres."""
     from modules.common.vector_cache import get_vector_cache
     return get_vector_cache().stats()
@@ -137,12 +140,7 @@ def exportar_csv_endpoint(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    csv_content = exportar_csv(db)
-    if not csv_content:
-        return StreamingResponse(io.BytesIO(), media_type="text/csv; charset=utf-8", headers={
-            "Content-Disposition": "attachment; filename=sigsa3.csv",
-        })
-    return StreamingResponse(io.BytesIO(csv_content), media_type="text/csv; charset=utf-8", headers={
+    return StreamingResponse(exportar_csv(db), media_type="text/csv; charset=utf-8", headers={
         "Content-Disposition": "attachment; filename=sigsa3.csv",
     })
 
@@ -151,7 +149,7 @@ def exportar_csv_endpoint(
 def eliminar_periodo(
     data: EliminarPorPeriodoRequest,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return eliminar_por_periodo(data.desde, data.hasta, db)
 
@@ -159,7 +157,7 @@ def eliminar_periodo(
 @router.post("/sincronizar-medico-especialidad")
 def sincronizar_medico_especialidad(
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     """Paso 1: asocia personal_atencion_id en SIGSA-3 por nombre (personal_salud → personal_salud.personal_atencion_id).
     Paso 2: actualiza especialidad en SIGSA-3 desde personal_atencion.especialidad según personal_atencion_id."""
@@ -172,7 +170,7 @@ def asociar_pacientes_masivo(
     zona_match: float = Query(None, ge=0.5, le=1.0, description="Score >= este valor → match automático (default 0.85)"),
     zona_revision: float = Query(None, ge=0.5, le=1.0, description="Score >= este valor → zona gris (default 0.70)"),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     try:
         gen = asociar_paciente_y_consulta(db, umbral_submatch=umbral_submatch,
@@ -198,7 +196,7 @@ def asociar_pacientes_masivo_stream(
     zona_match: float = Query(None, ge=0.5, le=1.0, description="Score >= este valor → match automático (default 0.85)"),
     zona_revision: float = Query(None, ge=0.5, le=1.0, description="Score >= este valor → zona gris (default 0.70)"),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     def _eventos():
         for evento in asociar_paciente_y_consulta(db, umbral_submatch=umbral_submatch,
@@ -211,10 +209,10 @@ def asociar_pacientes_masivo_stream(
 @router.post("/normalizar")
 def normalizar_sigsa3(
     dry_run: bool = Query(False, description="Solo simular: cuenta y reporta sin migrar ni borrar"),
-    ids: str = Query(None, description="IDs de staging a migrar (CSV: '1,2,3'). Por defecto migra todos los elegibles"),
-    max_registros: Optional[int] = Query(None, description="Tope máximo de registros a migrar en esta corrida"),
+    ids: str = Query(None, max_length=10000, description="IDs de staging a migrar (CSV: '1,2,3')"),
+    max_registros: int = Query(500, ge=1, le=5000, description="Tope de registros por corrida (default 500)"),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     """Migra registros SIGSA-3 con paciente+medico a sigsa3_registros (normalizado).
     Copia sigsa3_id en el normalizado; al final purga de staging los id migrados.
@@ -238,13 +236,14 @@ def normalizar_sigsa3(
 class SincronizarTodoRequest(BaseModel):
     dry_run: bool = False
     ejecutar_asociacion: bool = True
+    max_registros: int = Field(500, ge=1, le=5000)
 
 
 @router.post("/sincronizar-todo")
 def sincronizar_todo(
     data: SincronizarTodoRequest,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     """Orquesta el flujo completo de sincronización:
 
@@ -256,7 +255,9 @@ def sincronizar_todo(
     Con dry_run=True no se escribe ni borra nada; reporta lo que pasaría."""
     paso1 = sincronizar_sigsa3(db, dry_run=data.dry_run)
     if data.dry_run:
-        resultado_normalizacion = service_normalizar(db, dry_run=True)
+        resultado_normalizacion = service_normalizar(
+            db, dry_run=True, max_registros=data.max_registros
+        )
         return {
             "sincronizar_medico_especialidad": paso1,
             "asociar_pacientes": "omitido (dry_run)",
@@ -272,7 +273,7 @@ def sincronizar_todo(
             if evento.get("step") == "error":
                 paso2 = {"error": evento.get("message", "Error en el pipeline")}
                 break
-    resultado_normalizacion = service_normalizar(db)
+    resultado_normalizacion = service_normalizar(db, max_registros=data.max_registros)
     return {
         "sincronizar_medico_especialidad": paso1,
         "asociar_pacientes": paso2,

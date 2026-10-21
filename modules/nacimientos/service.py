@@ -551,18 +551,20 @@ def actualizar_nacimiento(
     return obtener_nacimiento(nacimiento_id, db)
 
 
-def recomputar_todos(db: Session) -> dict:
+def recomputar_todos(db: Session, skip: int = 0, limit: int = 200) -> dict:
     """Recomputa peso_gramos, clasificacion_nacimiento y trabajo_parto para todos los nacimientos
     usando los datos de pacientes.datos_extra.neonatales.
     
     Solo actualiza si el paciente tiene datos neonatales con edad_gestacional o peso_nacimiento.
     No sobrescribe valores existentes con null.
     """
+    total_disponibles = db.execute(text("SELECT COUNT(*) FROM nacimientos")).scalar() or 0
     rows = _fetchall(db, """
         SELECT n.id, n.paciente_id, n.peso_gramos, n.clasificacion_nacimiento, n.trabajo_parto
         FROM nacimientos n
         ORDER BY n.id
-    """)
+        LIMIT :limit OFFSET :skip
+    """, {"limit": limit, "skip": skip})
 
     paciente_ids = [r["paciente_id"] for r in rows if r["paciente_id"]]
     if not paciente_ids:
@@ -570,6 +572,7 @@ def recomputar_todos(db: Session) -> dict:
             "total_analizados": 0, "actualizados": 0, "sin_cambios": 0,
             "consistentes": 0, "sin_datos_neonatales": 0, "sin_evidencia": 0,
             "detalles": [], "analisis": [],
+            "total_disponibles": total_disponibles, "skip": skip, "limit": limit,
         }
 
     pac_rows = _fetchall(db, """
@@ -589,6 +592,7 @@ def recomputar_todos(db: Session) -> dict:
     sin_evidencia = 0
     detalles = []
     analisis = []
+    updates = []
 
     for row in rows:
         nac_id = row["id"]
@@ -659,11 +663,7 @@ def recomputar_todos(db: Session) -> dict:
             clasif = computado["clasificacion_nacimiento"] if tiene_peso and computado["clasificacion_nacimiento"] is not None else row["clasificacion_nacimiento"]
             tp = computado["trabajo_parto"] if tiene_eg and computado["trabajo_parto"] is not None else row["trabajo_parto"]
 
-            db.execute(text("""
-                UPDATE nacimientos
-                SET peso_gramos = :pg, clasificacion_nacimiento = :clasif, trabajo_parto = :tp, updated_at = NOW()
-                WHERE id = :id
-            """), {
+            updates.append({
                 "id": nac_id,
                 "pg": pg,
                 "clasif": clasif,
@@ -677,9 +677,19 @@ def recomputar_todos(db: Session) -> dict:
 
         analisis.append(analisis_reg)
 
+    if updates:
+        db.execute(text("""
+            UPDATE nacimientos
+            SET peso_gramos = :pg, clasificacion_nacimiento = :clasif,
+                trabajo_parto = :tp, updated_at = NOW()
+            WHERE id = :id
+        """), updates)
     db.commit()
     return {
         "total_analizados": len(rows),
+        "total_disponibles": total_disponibles,
+        "skip": skip,
+        "limit": limit,
         "actualizados": actualizados,
         "sin_cambios": sin_cambios,
         "consistentes": consistentes,
@@ -708,7 +718,9 @@ def eliminar_nacimiento(nacimiento_id: int, db: Session) -> None:
 
 def sincronizar_nacimientos(
     db: Session,
-    registrador_id: int | None = None
+    registrador_id: int | None = None,
+    limit: int = 500,
+    legacy_offset: int = 0,
 ) -> dict:
     pacientes = _fetchall(db, """
         SELECT id FROM pacientes
@@ -718,7 +730,8 @@ def sincronizar_nacimientos(
             SELECT paciente_id FROM nacimientos WHERE paciente_id IS NOT NULL
           )
         ORDER BY id
-    """)
+        LIMIT :limit
+    """, {"limit": limit})
 
     creados = 0
     errores = []
@@ -729,7 +742,9 @@ def sincronizar_nacimientos(
         except HTTPException as e:
             errores.append({"paciente_id": p["id"], "error": e.detail})
 
-    importados = importar_desde_legacy(db, solo_con_madre=True, limit=5000, offset=0)
+    importados = importar_desde_legacy(
+        db, solo_con_madre=True, limit=limit, offset=legacy_offset
+    )
 
     return {
         "madre_hijo_creados": creados,
@@ -737,6 +752,8 @@ def sincronizar_nacimientos(
         "legacy_creados": importados["creados"],
         "legacy_saltados": importados["saltados"],
         "legacy_errores": importados["errores"],
+        "limite_por_origen": limit,
+        "legacy_offset": legacy_offset,
     }
 
 

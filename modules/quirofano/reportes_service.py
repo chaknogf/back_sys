@@ -72,21 +72,27 @@ def _promedio(valores: list[int]) -> int | None:
 # ========================
 # Configuración de jornada
 # ========================
-def _config_por_quirofano(db: Session) -> dict[int, QuirofanoConfigPeriodoModel]:
+def _config_por_quirofano(db: Session, qn_ids: list[int]) -> dict[int, QuirofanoConfigPeriodoModel]:
+    if not qn_ids:
+        return {}
     return {
         c.quirofano_numero_id: c
-        for c in db.query(QuirofanoConfigPeriodoModel).all()
+        for c in db.query(QuirofanoConfigPeriodoModel)
+        .filter(QuirofanoConfigPeriodoModel.quirofano_numero_id.in_(qn_ids))
+        .all()
     }
 
 
-def listar_config_periodo(db: Session) -> list[dict]:
+def listar_config_periodo(db: Session, skip: int = 0, limit: int = 100) -> list[dict]:
     quirofanos = (
         db.query(QuirofanoNumeroModel)
         .filter(QuirofanoNumeroModel.activo == True)  # noqa: E712
         .order_by(QuirofanoNumeroModel.numero)
+        .offset(skip)
+        .limit(limit)
         .all()
     )
-    configs = _config_por_quirofano(db)
+    configs = _config_por_quirofano(db, [q.quirofano_numero_id for q in quirofanos])
     salida = []
     for q in quirofanos:
         c = configs.get(q.quirofano_numero_id)
@@ -453,7 +459,9 @@ def generar_reporte(
         if not quirofanos:
             raise HTTPException(status_code=404, detail="Número de quirófano no encontrado")
 
-    configs = _config_por_quirofano(db)
+    configs = _config_por_quirofano(
+        db, [q.quirofano_numero_id for q in quirofanos]
+    )
     por_quirofano: list[dict] = []
 
     for q in quirofanos:

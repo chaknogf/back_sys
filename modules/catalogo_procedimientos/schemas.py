@@ -37,6 +37,11 @@ class CatalogoProcedimientoOut(CatalogoProcedimientoBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CatalogoProcedimientoListResponse(BaseModel):
+    total: int
+    items: List[CatalogoProcedimientoOut]
+
+
 class AreaCuerpoOut(BaseModel):
     id: int
     codigo: str
@@ -46,6 +51,11 @@ class AreaCuerpoOut(BaseModel):
     activo: Optional[bool] = True
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AreaCuerpoListResponse(BaseModel):
+    total: int
+    items: List[AreaCuerpoOut]
 
 
 class AreaCuerpoCreate(BaseModel):

@@ -226,6 +226,7 @@ class TestMedicos:
         s = _sufijo()
         r = client.post(
             "/personal-atencion/",
+            headers=auth_headers,
             json={
                 "nombre": f"Dr. Test {s}",
                 "colegiado": str(int(s)),
@@ -239,24 +240,27 @@ class TestMedicos:
         created_ids["personal_atencion"].append(data["id"])
 
     def test_list_medicos(self, client, auth_headers):
-        r = client.get("/personal-atencion/")
+        r = client.get("/personal-atencion/", headers=auth_headers)
         assert r.status_code == 200
         data = r.json()
         assert "total" in data
         assert "personal_atencion" in data
 
     def test_list_medicos_with_filter(self, client, auth_headers):
-        r = client.get("/personal-atencion/?especialidad_id=1")
+        r = client.get("/personal-atencion/?especialidad_id=1", headers=auth_headers)
         assert r.status_code == 200
 
     def test_get_medico(self, client, auth_headers):
         if not created_ids["personal_atencion"]:
             pytest.skip("No medico created")
-        r = client.get(f"/personal-atencion/{created_ids['personal_atencion'][0]}")
+        r = client.get(
+            f"/personal-atencion/{created_ids['personal_atencion'][0]}",
+            headers=auth_headers,
+        )
         assert r.status_code == 200
 
     def test_get_medico_not_found(self, client, auth_headers):
-        r = client.get("/personal-atencion/999999")
+        r = client.get("/personal-atencion/999999", headers=auth_headers)
         assert r.status_code == 404
 
     def test_update_medico(self, client, auth_headers):
@@ -268,6 +272,7 @@ class TestMedicos:
         s = _sufijo()
         r = client.put(
             f"/personal-atencion/{mid}",
+            headers=auth_headers,
             json={
                 "nombre": "Dr. Test Updated",
                 "colegiado": f"CU{s}",
@@ -282,7 +287,7 @@ class TestMedicos:
         if not created_ids["personal_atencion"]:
             pytest.skip("No medico created")
         mid = created_ids["personal_atencion"][-1]
-        r = client.delete(f"/personal-atencion/{mid}")
+        r = client.delete(f"/personal-atencion/{mid}", headers=auth_headers)
         assert r.status_code == 204
         created_ids["personal_atencion"].remove(mid)
 
@@ -312,23 +317,23 @@ class TestPacientes:
         created_ids["pacientes"].append(data["id"])
 
     def test_list_pacientes(self, client, auth_headers):
-        r = client.get("/pacientes/", headers=auth_headers)
+        r = client.get("/pacientes/buscar", headers=auth_headers)
         assert r.status_code == 200
         data = r.json()
         assert "total" in data
         assert "pacientes" in data
 
     def test_search_paciente_by_name(self, client, auth_headers):
-        r = client.get("/pacientes/?nombre=Juan", headers=auth_headers)
+        r = client.get("/pacientes/buscar?nombre=Juan", headers=auth_headers)
         assert r.status_code == 200
         assert r.json()["total"] > 0
 
     def test_search_paciente_by_sexo(self, client, auth_headers):
-        r = client.get("/pacientes/?sexo=M", headers=auth_headers)
+        r = client.get("/pacientes/buscar?sexo=M", headers=auth_headers)
         assert r.status_code == 200
 
     def test_search_paciente_by_estado(self, client, auth_headers):
-        r = client.get("/pacientes/?estado=ACTIVO", headers=auth_headers)
+        r = client.get("/pacientes/buscar?estado=ACTIVO", headers=auth_headers)
         assert r.status_code == 200
 
     def test_get_paciente(self, client, auth_headers):
@@ -645,8 +650,9 @@ class TestConsultas:
         created_ids["consultas"].remove(cid)
 
     def test_buscar_paciente_via_consultas(self, client, auth_headers):
-        r = client.get("/consultas/buscarpaciente", headers=auth_headers)
+        r = client.get("/pacientes/buscar", headers=auth_headers)
         assert r.status_code == 200
+        assert "pacientes" in r.json()
 
     def test_sincronizar_indicadores(self, client, auth_headers):
         desde = (date.today() - timedelta(days=30)).isoformat()
@@ -860,6 +866,7 @@ class TestEncamamiento:
         s = _sufijo()
         r = client.post(
             "/encamamiento/",
+            headers=auth_headers,
             json={
                 "nombre_servicio": f"Servicio Test {s}",
                 "descripcion": "Servicio de prueba",
@@ -871,23 +878,23 @@ class TestEncamamiento:
         created_ids["encamamiento"].append(data["id"])
 
     def test_list_encamamiento(self, client, auth_headers):
-        r = client.get("/encamamiento/")
+        r = client.get("/encamamiento/", headers=auth_headers)
         assert r.status_code == 200
         assert isinstance(r.json(), list)
 
     def test_list_encamamiento_activo(self, client, auth_headers):
-        r = client.get("/encamamiento/?activo=true")
+        r = client.get("/encamamiento/?activo=true", headers=auth_headers)
         assert r.status_code == 200
 
     def test_get_encamamiento(self, client, auth_headers):
         if not created_ids["encamamiento"]:
             pytest.skip("No encamamiento created")
         eid = created_ids["encamamiento"][0]
-        r = client.get(f"/encamamiento/{eid}")
+        r = client.get(f"/encamamiento/{eid}", headers=auth_headers)
         assert r.status_code == 200
 
     def test_get_encamamiento_not_found(self, client, auth_headers):
-        r = client.get("/encamamiento/999999")
+        r = client.get("/encamamiento/999999", headers=auth_headers)
         assert r.status_code == 404
 
     def test_update_encamamiento(self, client, auth_headers):
@@ -896,6 +903,7 @@ class TestEncamamiento:
         eid = created_ids["encamamiento"][0]
         r = client.patch(
             f"/encamamiento/{eid}",
+            headers=auth_headers,
             json={"camas_censables": 15},
         )
         assert r.status_code == 200
@@ -905,7 +913,7 @@ class TestEncamamiento:
         if not created_ids["encamamiento"]:
             pytest.skip("No encamamiento created")
         eid = created_ids["encamamiento"][-1]
-        r = client.delete(f"/encamamiento/{eid}")
+        r = client.delete(f"/encamamiento/{eid}", headers=auth_headers)
         assert r.status_code == 204
         created_ids["encamamiento"].remove(eid)
 
@@ -1000,7 +1008,7 @@ class TestProcedimientos:
     def test_create_catalogo(self, client, auth_headers):
         s = _sufijo()
         r = client.post(
-            "/procedimientos/catalogo",
+            "/catalogo-procedimientos/",
             headers=auth_headers,
             json={
                 "nombre": f"TEST-PROC-{s}",
@@ -1014,18 +1022,18 @@ class TestProcedimientos:
         TestProcedimientos.PROC_ID = data["id"]
 
     def test_list_catalogo(self, client, auth_headers):
-        r = client.get("/procedimientos/catalogo", headers=auth_headers)
+        r = client.get("/catalogo-procedimientos/", headers=auth_headers)
         assert r.status_code == 200
 
     def test_list_catalogo_with_filter(self, client, auth_headers):
-        r = client.get("/procedimientos/catalogo?nombre=TEST", headers=auth_headers)
+        r = client.get("/catalogo-procedimientos/?q=TEST", headers=auth_headers)
         assert r.status_code == 200
 
     def test_get_catalogo_by_id(self, client, auth_headers):
         if not TestProcedimientos.PROC_ID:
             pytest.skip("No procedimiento created")
         r = client.get(
-            f"/procedimientos/catalogo/{TestProcedimientos.PROC_ID}",
+            f"/catalogo-procedimientos/{TestProcedimientos.PROC_ID}",
             headers=auth_headers,
         )
         assert r.status_code == 200
@@ -1033,10 +1041,10 @@ class TestProcedimientos:
     def test_update_catalogo(self, client, auth_headers):
         if not TestProcedimientos.PROC_ID:
             pytest.skip("No procedimiento created")
-        r = client.put(
-            f"/procedimientos/catalogo/{TestProcedimientos.PROC_ID}",
+        r = client.patch(
+            f"/catalogo-procedimientos/{TestProcedimientos.PROC_ID}",
             headers=auth_headers,
-            json={"nombre": "TEST-PROC-UPDATED"},
+            json={"nombre": f"TEST-PROC-UPDATED-{_sufijo()}"},
         )
         assert r.status_code == 200
 
@@ -1097,7 +1105,7 @@ class TestProcedimientos:
         if not TestProcedimientos.PROC_ID:
             pytest.skip("No procedimiento created")
         r = client.delete(
-            f"/procedimientos/catalogo/{TestProcedimientos.PROC_ID}",
+            f"/catalogo-procedimientos/{TestProcedimientos.PROC_ID}",
             headers=auth_headers,
         )
         assert r.status_code == 200
@@ -1592,7 +1600,7 @@ class TestTotales:
         data = r.json()
         assert "totales" in data
         assert "generado_en" in data
-        assert len(data["totales"]) == 5
+        assert len(data["totales"]) == 6
 
     def test_get_totales_with_fecha(self, client, auth_headers):
         r = client.get("/totales/?fecha=2025-01-01", headers=auth_headers)

@@ -121,7 +121,11 @@ def eliminar_municipio(
 
 @router.get("/departamentos", response_model=List[DepartamentoOut])
 @cache(expire=3600)
-def listar_departamentos(db: Session = Depends(get_db)):
+def listar_departamentos(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
     """Obtiene departamentos únicos usando los dos primeros dígitos del código."""
     rows = (
         db.query(
@@ -130,6 +134,8 @@ def listar_departamentos(db: Session = Depends(get_db)):
         )
         .distinct()
         .order_by("codigo")
+        .offset(skip)
+        .limit(limit)
         .all()
     )
     return [{"codigo": r.codigo, "departamento": r.departamento} for r in rows]

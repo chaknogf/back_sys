@@ -14,13 +14,15 @@ def listar(
     db: Session,
     estado: Optional[bool] = None,
     sop: Optional[bool] = None,
+    skip: int = 0,
+    limit: int = 100,
 ) -> list:
     query = db.query(EspecialidadModel)
     if estado is not None:
         query = query.filter(EspecialidadModel.estado == estado)
     if sop is not None:
         query = query.filter(EspecialidadModel.sop == sop)
-    return query.order_by(EspecialidadModel.nombre).all()
+    return query.order_by(EspecialidadModel.nombre).offset(skip).limit(limit).all()
 
 
 def obtener(esp_id: int, db: Session) -> EspecialidadModel:

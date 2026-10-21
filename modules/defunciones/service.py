@@ -528,7 +528,7 @@ def eliminar_defuncion(defuncion_id: int, db: Session) -> None:
         )
 
 
-def sincronizar_defunciones(db: Session) -> dict:
+def sincronizar_defunciones(db: Session, skip: int = 0, limit: int = 200) -> dict:
     """Recorre todos los pacientes y sincroniza el estado de las defunciones.
     
     - Pacientes con estado='F' sin defunción activa → crea o reactiva defunción
@@ -540,9 +540,13 @@ def sincronizar_defunciones(db: Session) -> dict:
     desactivadas = 0
     errores = []
 
+    total_fallecidos = db.execute(
+        text("SELECT COUNT(*) FROM pacientes WHERE estado = 'F'")
+    ).scalar() or 0
     pacientes_f = db.execute(text(
-        "SELECT id, datos_extra FROM pacientes WHERE estado = 'F'"
-    )).mappings().all()
+        """SELECT id, datos_extra FROM pacientes WHERE estado = 'F'
+           ORDER BY id LIMIT :limit OFFSET :skip"""
+    ), {"limit": limit, "skip": skip}).mappings().all()
 
     if pacientes_f:
         pids = [p["id"] for p in pacientes_f]
@@ -571,28 +575,25 @@ def sincronizar_defunciones(db: Session) -> dict:
             except Exception as e:
                 errores.append({"paciente_id": p["id"], "error": str(e)})
 
-    activas_sin_f = db.execute(text(
-        """SELECT d.id, d.paciente_id FROM defunciones d
-           JOIN pacientes p ON p.id = d.paciente_id
-           WHERE d.estado = 'A' AND p.estado != 'F'"""
-    )).mappings().all()
-
-    if activas_sin_f:
-        def_ids = [d["id"] for d in activas_sin_f]
-        try:
-            db.execute(
-                text("UPDATE defunciones SET estado = 'I' WHERE id = ANY(:ids)"),
-                {"ids": def_ids}
-            )
-            db.commit()
-            desactivadas = len(def_ids)
-        except Exception as e:
-            errores.append({"error": str(e)})
+    try:
+        result = db.execute(text(
+            """UPDATE defunciones d SET estado = 'I'
+               FROM pacientes p
+               WHERE p.id = d.paciente_id AND d.estado = 'A' AND p.estado != 'F'"""
+        ))
+        desactivadas = max(result.rowcount or 0, 0)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        errores.append({"error": str(e)})
 
     return {
         "creadas": creadas,
         "reactivadas": reactivadas,
         "desactivadas": desactivadas,
+        "total_pacientes_fallecidos": total_fallecidos,
+        "skip": skip,
+        "limit": limit,
         "errores": errores,
     }
 

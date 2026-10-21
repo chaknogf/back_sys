@@ -1,9 +1,8 @@
 """Endpoints del catálogo y de los procedimientos registrados por personal médico."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi_cache.decorator import cache
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, and_, or_, text
+from sqlalchemy import func, and_, text
 from typing import List, Optional
 from datetime import datetime, date, time, timedelta
 from core.database import get_db
@@ -12,9 +11,6 @@ from modules.procedimientos.models import ProceMedico as ProceMedicoModel
 from modules.procedimientos.models import CatalogoProcedimiento as CatalogoProcedimientoModel
 from modules.especialidades.models import EspecialidadModel
 from modules.procedimientos.schemas import (
-    CatalogoProcedimientoCreate,
-    CatalogoProcedimientoUpdate,
-    CatalogoProcedimientoOut,
     ProceMedicoBase,
     ProceMedicoCreate,
     ProceMedicoUpdate,
@@ -24,7 +20,7 @@ from modules.procedimientos.schemas import (
     ProcedimientosListResponse,
     CATEGORIAS_EDAD,
 )
-from core.security import get_current_user
+from core.security import get_current_user, get_current_admin_user
 
 router = APIRouter(
     prefix="/procedimientos",
@@ -46,156 +42,12 @@ def _filtro_sexo(sexo: str):
     return (ProceMedicoModel.nino_f + ProceMedicoModel.adulto_f + ProceMedicoModel.sin_edad_f) > 0
 
 
-@router.get("/catalogo", response_model=list[CatalogoProcedimientoOut])
-@cache(expire=900)
-def listar_procedimientos(
-    abreviatura: Optional[str] = Query(None, description="Filtrar por abreviatura exacta"),
-    nombre: Optional[str] = Query(None, description="Filtrar por nombre (búsqueda parcial)"),
-    current_user: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db)
-    ):
-    query = db.query(CatalogoProcedimientoModel)
-    if abreviatura:
-        query = query.filter(CatalogoProcedimientoModel.abreviatura == abreviatura)
-    if nombre:
-        query = query.filter(CatalogoProcedimientoModel.nombre.ilike(f"%{nombre}%"))
-    return query.order_by(CatalogoProcedimientoModel.nombre).all()
-
-@router.get("/catalogo/{id}", response_model=CatalogoProcedimientoOut)
-def obtener_procedimiento(
-    id: int,
-    current_user: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db)
-    ):
-    procedimiento = (
-        db.query(CatalogoProcedimientoModel)
-        .filter(CatalogoProcedimientoModel.id == id)
-        .first()
-    )
-
-    if not procedimiento:
-        raise HTTPException(
-            status_code=404,
-            detail="Procedimiento no encontrado"
-        )
-
-    return procedimiento
-
-@router.post("/catalogo", response_model=CatalogoProcedimientoOut)
-def crear_procedimiento(
-    datos: CatalogoProcedimientoCreate,
-    current_user: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    unique_filters = [CatalogoProcedimientoModel.nombre == datos.nombre]
-    if datos.abreviatura is not None:
-        unique_filters.append(CatalogoProcedimientoModel.abreviatura == datos.abreviatura)
-    existing = db.query(CatalogoProcedimientoModel).filter(
-        or_(*unique_filters)
-    ).first()
-
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail="Ya existe un procedimiento con ese nombre o abreviatura"
-        )
-
-    procedimiento = CatalogoProcedimientoModel(
-        **datos.model_dump()
-    )
-
-    db.add(procedimiento)
-    db.commit()
-    db.refresh(procedimiento)
-
-    return procedimiento
-
-@router.put("/catalogo/{id}", response_model=CatalogoProcedimientoOut)
-def actualizar_procedimiento(
-    id: int,
-    datos: CatalogoProcedimientoUpdate,
-    current_user: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    procedimiento = (
-        db.query(CatalogoProcedimientoModel)
-        .filter(CatalogoProcedimientoModel.id == id)
-        .first()
-    )
-
-    if not procedimiento:
-        raise HTTPException(
-            status_code=404,
-            detail="Procedimiento no encontrado"
-        )
-
-    conflict_filters = []
-    if datos.nombre is not None:
-        conflict_filters.append(CatalogoProcedimientoModel.nombre == datos.nombre)
-    if datos.abreviatura is not None:
-        conflict_filters.append(CatalogoProcedimientoModel.abreviatura == datos.abreviatura)
-    if conflict_filters:
-        conflict = db.query(CatalogoProcedimientoModel).filter(
-            CatalogoProcedimientoModel.id != id,
-            or_(*conflict_filters)
-        ).first()
-        if conflict:
-            raise HTTPException(
-                status_code=400,
-                detail="Ya existe otro procedimiento con ese nombre o abreviatura"
-            )
-
-    for key, value in datos.model_dump(exclude_unset=True).items():
-        setattr(procedimiento, key, value)
-
-    db.commit()
-    db.refresh(procedimiento)
-
-    return procedimiento
-
-@router.delete("/catalogo/{id}")
-def eliminar_procedimiento(
-    id: int,
-    current_user: UserModel = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Impide borrar un elemento del catálogo mientras existan registros asociados."""
-    procedimiento = (
-        db.query(CatalogoProcedimientoModel)
-        .filter(CatalogoProcedimientoModel.id == id)
-        .first()
-    )
-
-    if not procedimiento:
-        raise HTTPException(
-            status_code=404,
-            detail="Procedimiento no encontrado"
-        )
-
-    count = db.query(ProceMedicoModel).filter(
-        ProceMedicoModel.id_catalogo_procedimiento == id
-    ).count()
-
-    if count > 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"No se puede eliminar el procedimiento porque tiene {count} registros asociados"
-        )
-
-    db.delete(procedimiento)
-    db.commit()
-
-    return {
-        "message": "Procedimiento eliminado"
-    }
-
-
 @router.get("/", response_model=ProcedimientosListResponse)
 def listar_procedimientos_medicos(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100000),
+    limit: int = Query(50, ge=1, le=200),
     especialidad: Optional[str] = Query(None),
     especialidad_id: Optional[int] = Query(None),
     lugar_servicio: Optional[str] = Query(None),
@@ -328,13 +180,16 @@ def reporte_proce_medicos(
         SELECT
             pm.especialidad,
             pm.lugar_servicio,
-            pm.cantidad,
-            pm.anestesia,
-            pm.nino_m, pm.nino_f,
-            pm.adulto_m, pm.adulto_f,
-            pm.sin_edad_m, pm.sin_edad_f
+            SUM(COALESCE(pm.nino_m, 0) + COALESCE(pm.adulto_m, 0) + COALESCE(pm.sin_edad_m, 0)) AS total_m,
+            SUM(COALESCE(pm.nino_f, 0) + COALESCE(pm.adulto_f, 0) + COALESCE(pm.sin_edad_f, 0)) AS total_f,
+            SUM(CASE WHEN COALESCE(pm.nino_m, 0) + COALESCE(pm.adulto_m, 0) + COALESCE(pm.sin_edad_m, 0) > 0 THEN 1 ELSE 0 END) AS registros_m,
+            SUM(CASE WHEN COALESCE(pm.nino_f, 0) + COALESCE(pm.adulto_f, 0) + COALESCE(pm.sin_edad_f, 0) > 0 THEN 1 ELSE 0 END) AS registros_f,
+            SUM(COALESCE(pm.anestesia, 0)) AS total_anestesia,
+            SUM(COALESCE(pm.nino_m, 0) + COALESCE(pm.nino_f, 0) + COALESCE(pm.adulto_m, 0) + COALESCE(pm.adulto_f, 0) + COALESCE(pm.sin_edad_m, 0) + COALESCE(pm.sin_edad_f, 0)) AS total_cantidad,
+            COUNT(*) AS total_registros
         FROM proce_medicos pm
         WHERE {where_sql}
+        GROUP BY pm.especialidad, pm.lugar_servicio
     """), params).fetchall()
 
     grupos: dict[tuple, dict] = {}
@@ -344,27 +199,26 @@ def reporte_proce_medicos(
 
     for r in registros:
         m = r._mapping
-        cantidad_por_sexo = _cantidades_por_sexo(m)
-
-        for sx, cant in cantidad_por_sexo.items():
-            if cant <= 0:
+        for sexo_key, amount_key, count_key in (
+            ("M", "total_m", "registros_m"),
+            ("F", "total_f", "registros_f"),
+        ):
+            cantidad = int(m[amount_key] or 0)
+            if cantidad <= 0:
                 continue
-            clave = (m["especialidad"], m["lugar_servicio"], sx)
-            g = grupos.setdefault(clave, {
+            clave = (m["especialidad"], m["lugar_servicio"], sexo_key)
+            grupos[clave] = {
                 "especialidad": m["especialidad"],
                 "lugar_servicio": m["lugar_servicio"],
-                "sexo": sx,
-                "total_cantidad": 0,
-                "total_anestesia": 0,
-                "total_registros": 0,
-            })
-            g["total_cantidad"] += cant
-            g["total_registros"] += 1
+                "sexo": sexo_key,
+                "total_cantidad": cantidad,
+                "total_anestesia": int(m["total_anestesia"] or 0),
+                "total_registros": int(m[count_key] or 0),
+            }
 
-        # La anestesia corresponde al registro completo, no a cada sexo
-        gran_total_anestesia += int(m["anestesia"] or 0)
-        gran_total_registros += 1
-        gran_total_cantidad += sum(cantidad_por_sexo.values())
+        gran_total_anestesia += int(m["total_anestesia"] or 0)
+        gran_total_registros += int(m["total_registros"] or 0)
+        gran_total_cantidad += int(m["total_cantidad"] or 0)
 
     return {
         "grupos": sorted(
@@ -482,7 +336,7 @@ def listar_grupos_edad(current_user: UserModel = Depends(get_current_user)):
     ]
 
 
-@router.get("/{id}", response_model=ProceMedicoResponse)
+@router.get("/{id:int}", response_model=ProceMedicoResponse)
 def obtener_procedimiento_medico(
     id: int,
     current_user: UserModel = Depends(get_current_user),
@@ -538,7 +392,7 @@ def crear_procedimiento_medico(
     return nuevo
 
 
-@router.put("/{id}", response_model=ProceMedicoOut)
+@router.put("/{id:int}", response_model=ProceMedicoOut)
 def actualizar_procedimiento_medico(
     id: int,
     datos: ProceMedicoUpdate,
@@ -590,7 +444,7 @@ def actualizar_procedimiento_medico(
     return procedimiento
 
 
-@router.delete("/{id}")
+@router.delete("/{id:int}")
 def eliminar_procedimiento_medico(
     id: int,
     current_user: UserModel = Depends(get_current_user),

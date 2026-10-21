@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from core.security import get_current_user
+from core.security import get_current_user, get_current_admin_user
 from modules.users.models import UserModel
 from modules.variables.schemas import (
     CategoryCreate, CategoryUpdate, CategoryOut, CategoryListResponse,
@@ -42,18 +42,27 @@ from modules.variables.service import (
 router = APIRouter(
     prefix="/variables",
     tags=["Variables Hospitalarias"],
+    dependencies=[Depends(get_current_user)],
 )
 
 
 # ── Hospitals ──
 
 @router.get("/hospitals")
-def listar_hospitales_endpoint(db: Session = Depends(get_db)):
-    return listar_hospitales(db)
+def listar_hospitales_endpoint(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    return listar_hospitales(db, skip, limit)
 
 
 @router.post("/hospitals", response_model=HospitalOut, status_code=201)
-def crear_hospital_endpoint(data: HospitalCreate, db: Session = Depends(get_db)):
+def crear_hospital_endpoint(
+    data: HospitalCreate,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return crear_hospital(data, db)
 
 
@@ -62,13 +71,19 @@ def crear_hospital_endpoint(data: HospitalCreate, db: Session = Depends(get_db))
 @router.get("/departments")
 def listar_departamentos_endpoint(
     hospital_id: Optional[int] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
-    return listar_departamentos(db, hospital_id)
+    return listar_departamentos(db, hospital_id, skip, limit)
 
 
 @router.post("/departments", response_model=DepartmentOut, status_code=201)
-def crear_departamento_endpoint(data: DepartmentCreate, db: Session = Depends(get_db)):
+def crear_departamento_endpoint(
+    data: DepartmentCreate,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return crear_departamento(data, db)
 
 
@@ -103,17 +118,30 @@ def obtener_categoria_endpoint(cat_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/categorias", response_model=CategoryOut, status_code=201)
-def crear_categoria_endpoint(data: CategoryCreate, db: Session = Depends(get_db)):
+def crear_categoria_endpoint(
+    data: CategoryCreate,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return svc_crear_cat(data, db)
 
 
 @router.put("/categorias/{cat_id}", response_model=CategoryOut)
-def actualizar_categoria_endpoint(cat_id: int, data: CategoryUpdate, db: Session = Depends(get_db)):
+def actualizar_categoria_endpoint(
+    cat_id: int,
+    data: CategoryUpdate,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return svc_actualizar_cat(cat_id, data, db)
 
 
 @router.delete("/categorias/{cat_id}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_categoria_endpoint(cat_id: int, db: Session = Depends(get_db)):
+def eliminar_categoria_endpoint(
+    cat_id: int,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return svc_eliminar_cat(cat_id, db)
 
 
@@ -138,17 +166,30 @@ def obtener_variable_endpoint(var_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=VariableOut, status_code=201)
-def crear_variable_endpoint(data: VariableCreate, db: Session = Depends(get_db)):
+def crear_variable_endpoint(
+    data: VariableCreate,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return svc_crear_var(data, db)
 
 
 @router.put("/{var_id}", response_model=VariableOut)
-def actualizar_variable_endpoint(var_id: int, data: VariableUpdate, db: Session = Depends(get_db)):
+def actualizar_variable_endpoint(
+    var_id: int,
+    data: VariableUpdate,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return svc_actualizar_var(var_id, data, db)
 
 
 @router.delete("/{var_id}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_variable_endpoint(var_id: int, db: Session = Depends(get_db)):
+def eliminar_variable_endpoint(
+    var_id: int,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return svc_eliminar_var(var_id, db)
 
 
@@ -181,22 +222,39 @@ def obtener_medicion_endpoint(measurement_id: int, db: Session = Depends(get_db)
 
 
 @router.post("/mediciones/", response_model=MeasurementOut, status_code=201)
-def crear_medicion_endpoint(data: MeasurementCreate, db: Session = Depends(get_db)):
+def crear_medicion_endpoint(
+    data: MeasurementCreate,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return svc_crear_med(data, db)
 
 
 @router.put("/mediciones/{measurement_id}", response_model=MeasurementOut)
-def actualizar_medicion_endpoint(measurement_id: int, data: MeasurementUpdate, db: Session = Depends(get_db)):
+def actualizar_medicion_endpoint(
+    measurement_id: int,
+    data: MeasurementUpdate,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return svc_actualizar_med(measurement_id, data, db)
 
 
 @router.delete("/mediciones/{measurement_id}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_medicion_endpoint(measurement_id: int, db: Session = Depends(get_db)):
+def eliminar_medicion_endpoint(
+    measurement_id: int,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     return svc_eliminar_med(measurement_id, db)
 
 
 @router.post("/mediciones/bulk", response_model=BulkImportResponse)
-def bulk_upsert_endpoint(body: BulkImportRequest, db: Session = Depends(get_db)):
+def bulk_upsert_endpoint(
+    body: BulkImportRequest,
+    db: Session = Depends(get_db),
+    _admin=Depends(get_current_admin_user),
+):
     """Aplica inserción/actualización en lote para las mediciones recibidas."""
     return svc_bulk_upsert(body.mediciones, db)
 

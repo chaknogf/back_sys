@@ -138,7 +138,7 @@ class MeasurementBulkItem(BaseModel):
 
 
 class BulkImportRequest(BaseModel):
-    mediciones: list[MeasurementBulkItem]
+    mediciones: list[MeasurementBulkItem] = Field(..., max_length=1000)
 
 
 class BulkImportResponse(BaseModel):

@@ -5,7 +5,7 @@ import pytest
 
 from core.database import SessionLocal
 from modules.pacientes.models import PacienteModel
-from modules.medicos.models import MedicoModel
+from modules.personal_atencion.models import PersonalAtencionModel
 from modules.sigsa3.models import Sigsa3RegistroModel
 
 
@@ -25,7 +25,7 @@ def _cleanup(paciente_id=None, medico_id=None, registro_id=None):
                 Sigsa3RegistroModel.paciente_id == paciente_id
             ).delete(synchronize_session=False)
         if medico_id is not None:
-            db.query(MedicoModel).filter(MedicoModel.id == medico_id).delete(
+            db.query(PersonalAtencionModel).filter(PersonalAtencionModel.id == medico_id).delete(
                 synchronize_session=False
             )
         if paciente_id is not None:

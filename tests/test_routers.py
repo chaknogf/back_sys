@@ -3,7 +3,7 @@ import time as _time
 from datetime import date, datetime, timedelta
 from core.database import SessionLocal
 from modules.pacientes.models import PacienteModel
-from modules.medicos.models import MedicoModel
+from modules.personal_atencion.models import PersonalAtencionModel
 from modules.consultas.models import ConsultaModel
 from modules.citas.models import CitaModel
 from modules.ciclos.models import CiclosConsulta
@@ -40,7 +40,7 @@ def cleanup():
     try:
         model_map = {
             "pacientes": PacienteModel,
-            "personal_atencion": MedicoModel,
+            "personal_atencion": PersonalAtencionModel,
             "consultas": ConsultaModel,
             "citas": CitaModel,
             "ciclos": CiclosConsulta,
@@ -671,6 +671,9 @@ class TestCitas:
     def test_create_cita(self, client, auth_headers):
         if not created_ids["pacientes"]:
             pytest.skip("No paciente created")
+        fecha = date.today() + timedelta(days=30)
+        while fecha.weekday() >= 5:
+            fecha += timedelta(days=1)
         r = client.post(
             "/citas/",
             headers=auth_headers,
@@ -678,7 +681,7 @@ class TestCitas:
                 "paciente_id": created_ids["pacientes"][0],
                 "expediente": "TST-CITA",
                 "especialidad": "MED",
-                "fecha_cita": (date.today() + timedelta(days=30)).isoformat(),
+                "fecha_cita": fecha.isoformat(),
             },
         )
         assert r.status_code in (200, 201)

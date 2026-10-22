@@ -9,7 +9,7 @@ import pytest
 
 from core.database import SessionLocal
 from modules.pacientes.models import PacienteModel
-from modules.medicos.models import MedicoModel
+from modules.personal_atencion.models import PersonalAtencionModel
 from modules.especialidades.models import EspecialidadModel
 from modules.quirofano.models import (
     IntervencionQuirurgicaModel,
@@ -53,7 +53,7 @@ def cleanup():
         for pid in created_ids["pacientes"]:
             db.query(PacienteModel).filter(PacienteModel.id == pid).delete()
         for mid in created_ids["medicos"]:
-            db.query(MedicoModel).filter(MedicoModel.id == mid).delete()
+            db.query(PersonalAtencionModel).filter(PersonalAtencionModel.id == mid).delete()
         db.commit()
     except Exception:
         db.rollback()

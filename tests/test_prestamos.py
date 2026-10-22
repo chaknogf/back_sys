@@ -125,7 +125,7 @@ class TestListarPrestamosNombre:
             import modules.consultas.models  # noqa: F401
             import modules.citas.models  # noqa: F401
             import modules.ciclos.models  # noqa: F401
-            import modules.medicos.models  # noqa: F401
+            import modules.personal_atencion.models  # noqa: F401
             import modules.users.models  # noqa: F401
             import modules.prestamos.models  # noqa: F401
             import modules.procedimientos.models  # noqa: F401

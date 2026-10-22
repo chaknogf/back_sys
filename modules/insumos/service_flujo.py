@@ -46,7 +46,7 @@ from modules.insumos.helpers import (
 from modules.pacientes.models import PacienteModel
 from modules.consultas.models import ConsultaModel
 from modules.encamamiento.models import EncamamientoModel
-from modules.medicos.models import MedicoModel  # tabla personal_atencion
+from modules.personal_atencion.models import PersonalAtencionModel  # tabla personal_atencion
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ def crear_requisicion(
 ) -> Requisicion:
     validar_existe(db, EncamamientoModel, data.servicio_solicitante_id, "El servicio indicado no existe")
     if data.personal_solicita_id is not None:
-        validar_existe(db, MedicoModel, data.personal_solicita_id, "El personal indicado no existe")
+        validar_existe(db, PersonalAtencionModel, data.personal_solicita_id, "El personal indicado no existe")
 
     req = Requisicion(
         numero=" ",
@@ -173,7 +173,7 @@ def crear_despacho(data: DespachoCreate, usuario_id: int | None, db: Session) ->
     if data.paciente_id is not None:
         validar_existe(db, PacienteModel, data.paciente_id, "El paciente indicado no existe")
     if data.personal_receptor_id is not None:
-        validar_existe(db, MedicoModel, data.personal_receptor_id, "El personal receptor no existe")
+        validar_existe(db, PersonalAtencionModel, data.personal_receptor_id, "El personal receptor no existe")
 
     req = None
     if data.requisicion_id is not None:
@@ -385,7 +385,7 @@ def crear_atencion(data: AtencionCreate, db: Session) -> Atencion:
     if data.servicio_id is not None:
         validar_existe(db, EncamamientoModel, data.servicio_id, "El servicio indicado no existe")
     if data.personal_atencion_id is not None:
-        validar_existe(db, MedicoModel, data.personal_atencion_id, "El personal indicado no existe")
+        validar_existe(db, PersonalAtencionModel, data.personal_atencion_id, "El personal indicado no existe")
 
     atencion = Atencion(
         paciente_id=data.paciente_id,
@@ -496,7 +496,7 @@ def crear_unidosis(data: UnidosisCreate, usuario_id: int | None, db: Session) ->
     if data.atencion_id is not None:
         validar_existe(db, Atencion, data.atencion_id, "La atención indicada no existe")
     if data.personal_prepara_id is not None:
-        validar_existe(db, MedicoModel, data.personal_prepara_id, "El personal indicado no existe")
+        validar_existe(db, PersonalAtencionModel, data.personal_prepara_id, "El personal indicado no existe")
 
     lotes = cargar_lotes(db, [d.lote_id for d in data.detalles])
     verificar_stock(lotes, data.detalles, data.almacen_origen_id)

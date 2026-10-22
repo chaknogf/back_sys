@@ -14,7 +14,7 @@ from core.uploads import read_upload_limited
 from modules.sigsa3.models import Sigsa3Model, Sigsa3RegistroModel
 from modules.sigsa3.schemas import Sigsa3Create, Sigsa3Update, Sigsa3RegistroOut
 from modules.pacientes.models import PacienteModel
-from modules.medicos.models import MedicoModel
+from modules.personal_atencion.models import PersonalAtencionModel
 from modules.consultas.models import ConsultaModel
 from modules.especialidades.models import EspecialidadModel
 from modules.cie10.models import Cie10Model
@@ -412,7 +412,7 @@ def _resolver_fks_staging(db: Session, datos: dict, mapa_ps: dict | None = None)
 
     # Validación de FKs numéricas contra catálogos
     _validar_fk_staging(db, PacienteModel, datos.get("paciente_id"), "paciente_id", "pacientes")
-    _validar_fk_staging(db, MedicoModel, datos.get("personal_atencion_id"), "personal_atencion_id", "personal_atencion")
+    _validar_fk_staging(db, PersonalAtencionModel, datos.get("personal_atencion_id"), "personal_atencion_id", "personal_atencion")
     _validar_fk_staging(db, PersonalSaludModel, datos.get("personal_salud_id"), "personal_salud_id", "personal_salud")
     _validar_fk_staging(db, ConsultaModel, datos.get("consulta_id"), "consulta_id", "consultas")
     _validar_fk_staging(db, EspecialidadModel, datos.get("especialidad_id"), "especialidad_id", "especialidades")
@@ -558,9 +558,9 @@ def _resolver_medico_desde_medicos(db: Session, nombre: str) -> tuple | None:
     Devuelve (personal_atencion_id, especialidad_id) o None."""
     if not nombre:
         return None
-    from modules.medicos.models import MedicoModel
-    medico = db.query(MedicoModel).filter(
-        func.lower(func.trim(MedicoModel.nombre)) == nombre.strip().lower()
+    from modules.personal_atencion.models import PersonalAtencionModel
+    medico = db.query(PersonalAtencionModel).filter(
+        func.lower(func.trim(PersonalAtencionModel.nombre)) == nombre.strip().lower()
     ).first()
     if medico:
         return (medico.id, medico.especialidad_id)

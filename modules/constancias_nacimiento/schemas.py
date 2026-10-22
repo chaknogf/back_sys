@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Dict, Any
 from datetime import date, datetime
 from modules.pacientes.schemas import PacienteNacimientoConstancia
-from modules.medicos.schemas import MedicoOut
+from modules.personal_atencion.schemas import PersonalAtencionOut
 
 
 class ConstanciaNacimientoBase(BaseModel):
@@ -55,7 +55,7 @@ class ConstanciaNacimientoResponse(ConstanciaNacimientoBase):
 
     paciente: Optional[PacienteNacimientoConstancia] = None
     madre: Optional[PacienteNacimientoConstancia] = None 
-    medico: Optional[MedicoOut] = None
+    medico: Optional[PersonalAtencionOut] = None
 
     model_config = ConfigDict(from_attributes=True)
 

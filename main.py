@@ -1,6 +1,7 @@
 """Configura la aplicación FastAPI, sus routers y servicios compartidos."""
 
 import os
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import uvicorn
@@ -12,13 +13,16 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 
-from core.config import REDIS_URL
+from core.config import REDIS_URL, ENVIRONMENT
 from core.database import engine
 from core.exceptions import register_exception_handlers
 from core.limiter import limiter
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from modules.audit_log.middleware import AuditClientIPMiddleware
+
+
+logger = logging.getLogger("main")
 
 
 @asynccontextmanager
@@ -28,14 +32,27 @@ async def lifespan(app: FastAPI):
             from fastapi_cache.backends.redis import RedisBackend
             import redis.asyncio as aioredis
             r = aioredis.from_url(REDIS_URL)
+            await r.ping()
             FastAPICache.init(RedisBackend(r), prefix="fah-cache")
+            logger.info("Caché compartida inicializada en Redis")
         except Exception as e:
-            print(f"⚠️  Redis no disponible, caché en memoria: {e}")
+            if ENVIRONMENT == "production":
+                # En producción la caché DEBE ser compartida entre réplicas.
+                raise RuntimeError(
+                    f"REDIS_URL configurada pero Redis no responde: {e}"
+                ) from e
+            logger.warning(
+                "Redis no disponible, caché en memoria (solo dev): %s", e
+            )
+    else:
+        if ENVIRONMENT == "production":
+            logger.warning(
+                "REDIS_URL no configurada en producción: la caché será local al "
+                "worker y no se compartirá entre réplicas."
+            )
     yield
-    try:
-        await FastAPICache.clear()
-    except Exception:
-        pass
+    # No se limpia la caché al apagar: con almacenamiento compartido (Redis) un
+    # reinicio de un worker borraría la caché de todas las réplicas.
     engine.dispose()
 
 
@@ -50,7 +67,7 @@ from modules.pacientes.recien_nacido_router import router as recien_nacido_route
 from modules.consultas.router import router as consultas_router
 from modules.ciclos.router import router as ciclos_router
 from modules.citas.router import router as citas_router
-from modules.medicos.router import router as medicos_router
+from modules.personal_atencion.router import router as personal_atencion_router
 from modules.nacimientos_legacy.router import router as nacimientos_legacy_router
 from modules.constancias_nacimiento.router import router as constancias_nacimiento_router
 from modules.expediente.router import router as expediente_router
@@ -154,7 +171,7 @@ app.include_router(recien_nacido_router)
 app.include_router(consultas_router)
 app.include_router(ciclos_router)
 app.include_router(citas_router)
-app.include_router(medicos_router)
+app.include_router(personal_atencion_router)
 app.include_router(nacimientos_legacy_router)
 app.include_router(constancias_nacimiento_router)
 app.include_router(expediente_router)

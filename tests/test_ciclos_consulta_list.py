@@ -9,7 +9,8 @@ def _db_con_ciclos(ciclos, nombres):
     db = MagicMock()
     (
         db.query.return_value.options.return_value.filter.return_value
-        .filter.return_value.order_by.return_value.all
+        .filter.return_value.order_by.return_value.offset.return_value
+        .limit.return_value.all
     ).return_value = ciclos
     db.query.return_value.filter.return_value.all.return_value = nombres
     return db

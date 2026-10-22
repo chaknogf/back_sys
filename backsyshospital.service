@@ -1,6 +1,7 @@
 [Unit]
 Description=BackSys Hospital API
-After=network.target postgresql.service
+After=network.target postgresql.service redis.service
+Wants=redis.service
 
 [Service]
 Type=simple

@@ -44,7 +44,11 @@ def _db_historia(consulta, ciclo):
     db.get.return_value = MagicMock(nombre_completo="Juan Pérez", expediente="EXP-1")
 
     consulta_query = MagicMock()
-    consulta_query.filter.return_value.order_by.return_value.all.return_value = [consulta]
+    consulta_query.filter.return_value.count.return_value = 1
+    (
+        consulta_query.filter.return_value.order_by.return_value
+        .offset.return_value.limit.return_value.all
+    ).return_value = [consulta]
 
     ciclo_query = MagicMock()
     ciclo_query.filter.return_value.order_by.return_value.all.return_value = [ciclo]

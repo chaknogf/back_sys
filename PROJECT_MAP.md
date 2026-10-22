@@ -109,7 +109,7 @@ back_sys/
 | **ciclos** | router, schemas, service, models | CiclosConsulta | ciclos_consulta | consultas, especialidades |
 | **eventos** | router, schemas, service, models | EventoConsultaModel | eventos_consulta | consultas |
 | **citas** | router, schemas, service, models | CitaModel | citas | pacientes, especialidades |
-| **medicos** | router, schemas, service, models | MedicoModel | medicos | especialidades |
+| **personal_atencion** | router, schemas, service, models | PersonalAtencionModel | personal_atencion | especialidades |
 | **especialidades** | router, schemas, service, models | EspecialidadModel | especialidades | — |
 | **nacimientos** | router, schemas, service, models | NacimientoModel | nacimientos | pacientes, users |
 | **nacimientos_legacy** | router, schemas, models | NacimientoLegacyModel | nacimientos_legacy | — |
@@ -192,7 +192,7 @@ back_sys/
 | EventoConsultaModel.consulta_id | FK | consultas.id | CASCADE |
 | CitaModel.paciente_id | FK | pacientes.id | RESTRICT |
 | CitaModel.especialidad_id | FK | especialidades.id | SET NULL |
-| MedicoModel.especialidad_id | FK | especialidades.id | SET NULL |
+| PersonalAtencionModel.especialidad_id | FK | especialidades.id | SET NULL |
 | NacimientoModel.paciente_id | FK | pacientes.id | SET NULL |
 | NacimientoModel.madre_id | FK | pacientes.id | SET NULL |
 | NacimientoModel.registrador_id | FK | users.id | SET NULL |

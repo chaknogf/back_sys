@@ -40,7 +40,7 @@ class ConstanciaNacimientoModel(Base):
         foreign_keys=[madre_id],
         back_populates="constancias_como_madre"
     )
-    medico = relationship("MedicoModel", back_populates="constancias")
+    medico = relationship("PersonalAtencionModel", back_populates="constancias")
     registrador = relationship("UserModel")
     historial = relationship("ConstanciaNacimientoHistorialModel", back_populates="constancia")
 

@@ -3,7 +3,7 @@ import time as _time
 from datetime import date, datetime, timedelta
 from core.database import SessionLocal
 from modules.pacientes.models import PacienteModel
-from modules.medicos.models import MedicoModel
+from modules.personal_atencion.models import PersonalAtencionModel
 from modules.consultas.models import ConsultaModel, ConsultaHistorialModel
 from modules.citas.models import CitaModel
 from modules.ciclos.models import CiclosConsulta
@@ -259,10 +259,10 @@ class TestNormalizacionEspecialidad:
     def test_especialidad_id_en_medicos(self):
         db = SessionLocal()
         try:
-            sin_fk = db.query(MedicoModel).filter(
-                MedicoModel.especialidad_id.is_(None)
+            sin_fk = db.query(PersonalAtencionModel).filter(
+                PersonalAtencionModel.especialidad_id.is_(None)
             ).count()
-            total = db.query(MedicoModel).count()
+            total = db.query(PersonalAtencionModel).count()
             con_fk = total - sin_fk
             assert con_fk >= total * 0.9, (
                 f"Solo {con_fk}/{total} médicos tienen especialidad_id"
@@ -449,12 +449,12 @@ class TestNormalizacionDatosExtra:
 
 
 # =====================================================================
-# MEDICOS (public endpoints)
+# MEDICOS (auth required)
 # =====================================================================
 class TestMedicos:
-    def test_create_medico(self, client):
+    def test_create_medico(self, client, admin_headers):
         s = _sufijo()
-        r = client.post("/personal-atencion/", json={
+        r = client.post("/personal-atencion/", headers=admin_headers, json={
             "nombre": f"TEST-DOCTOR-{s}",
             "colegiado": s,
             "dpi": int(f"123456789{s[-3:]}"),
@@ -464,8 +464,8 @@ class TestMedicos:
         assert r.status_code in (200, 201), f"Failed: {r.text}"
         created_ids["medicos"].append(r.json()["id"])
 
-    def test_list_medicos(self, client):
-        r = client.get("/personal-atencion/")
+    def test_list_medicos(self, client, admin_headers):
+        r = client.get("/personal-atencion/", headers=admin_headers)
         assert r.status_code == 200, f"Failed: {r.text}"
         data = r.json()
         if isinstance(data, dict):
@@ -475,33 +475,39 @@ class TestMedicos:
         else:
             assert False, f"Unexpected type: {type(data)}"
 
-    def test_get_medico(self, client):
+    def test_get_medico(self, client, admin_headers):
         if not created_ids["medicos"]:
             pytest.skip("No medico created")
-        r = client.get(f"/personal-atencion/{created_ids['medicos'][0]}")
+        r = client.get(
+            f"/personal-atencion/{created_ids['medicos'][0]}", headers=admin_headers
+        )
         assert r.status_code == 200
 
-    def test_get_medico_not_found(self, client):
-        r = client.get("/personal-atencion/999999")
+    def test_get_medico_not_found(self, client, admin_headers):
+        r = client.get("/personal-atencion/999999", headers=admin_headers)
         assert r.status_code == 404
 
-    def test_update_medico(self, client):
+    def test_update_medico(self, client, admin_headers):
         if not created_ids["medicos"]:
             pytest.skip("No medico created")
         mid = created_ids["medicos"][-1]
-        r = client.put(f"/personal-atencion/{mid}", json={"nombre": "TEST-UPDATED"})
+        r = client.put(
+            f"/personal-atencion/{mid}",
+            headers=admin_headers,
+            json={"nombre": "TEST-UPDATED"},
+        )
         assert r.status_code == 200
         assert "TEST-UPDATED" in r.json()["nombre"]
 
-    def test_list_medicos_filtered(self, client):
-        r = client.get("/personal-atencion/?activo=true")
+    def test_list_medicos_filtered(self, client, admin_headers):
+        r = client.get("/personal-atencion/?activo=true", headers=admin_headers)
         assert r.status_code == 200
 
-    def test_delete_medico(self, client):
+    def test_delete_medico(self, client, admin_headers):
         if not created_ids["medicos"]:
             pytest.skip("No medico created")
         mid = created_ids["medicos"][-1]
-        r = client.delete(f"/personal-atencion/{mid}")
+        r = client.delete(f"/personal-atencion/{mid}", headers=admin_headers)
         assert r.status_code == 204
         created_ids["medicos"].remove(mid)
 
@@ -912,12 +918,15 @@ class TestCitas:
             pytest.skip("No paciente created")
         pid = created_ids["pacientes"][0]
         s = _sufijo()
+        fecha = date.today() + timedelta(days=7)
+        while fecha.weekday() >= 5:
+            fecha += timedelta(days=1)
         r = client.post(
             "/citas/",
             headers=admin_headers,
             json={
                 "paciente_id": pid,
-                "fecha_cita": (date.today() + timedelta(days=7)).isoformat(),
+                "fecha_cita": fecha.isoformat(),
                 "especialidad": "MEDICO",
                 "razon": f"Test cita {s}",
             },
@@ -1036,13 +1045,14 @@ class TestEventos:
 
 
 # =====================================================================
-# ENCAMAMIENTO (public)
+# ENCAMAMIENTO (auth required)
 # =====================================================================
 class TestEncamamiento:
-    def test_create_servicio(self, client):
+    def test_create_servicio(self, client, admin_headers):
         s = _sufijo()
         r = client.post(
             "/encamamiento/",
+            headers=admin_headers,
             json={
                 "nombre_servicio": f"TEST-SERV-{s}",
                 "descripcion": "Test",
@@ -1052,38 +1062,40 @@ class TestEncamamiento:
         assert r.status_code in (200, 201), f"Failed: {r.text}"
         created_ids["encamamiento"].append(r.json()["id"])
 
-    def test_list_servicios(self, client):
-        r = client.get("/encamamiento/")
+    def test_list_servicios(self, client, admin_headers):
+        r = client.get("/encamamiento/", headers=admin_headers)
         assert r.status_code == 200
         assert isinstance(r.json(), list)
 
-    def test_get_servicio(self, client):
+    def test_get_servicio(self, client, admin_headers):
         if not created_ids["encamamiento"]:
             pytest.skip("No servicio created")
         r = client.get(
-            f"/encamamiento/{created_ids['encamamiento'][0]}"
+            f"/encamamiento/{created_ids['encamamiento'][0]}",
+            headers=admin_headers,
         )
         assert r.status_code == 200
 
-    def test_update_servicio(self, client):
+    def test_update_servicio(self, client, admin_headers):
         if not created_ids["encamamiento"]:
             pytest.skip("No servicio created")
         sid = created_ids["encamamiento"][0]
         r = client.patch(
             f"/encamamiento/{sid}",
+            headers=admin_headers,
             json={"camas_censables": 20},
         )
         assert r.status_code == 200
 
-    def test_filter_activo(self, client):
-        r = client.get("/encamamiento/?activo=true")
+    def test_filter_activo(self, client, admin_headers):
+        r = client.get("/encamamiento/?activo=true", headers=admin_headers)
         assert r.status_code == 200
 
-    def test_delete_servicio(self, client):
+    def test_delete_servicio(self, client, admin_headers):
         if not created_ids["encamamiento"]:
             pytest.skip("No servicio created")
         sid = created_ids["encamamiento"][-1]
-        r = client.delete(f"/encamamiento/{sid}")
+        r = client.delete(f"/encamamiento/{sid}", headers=admin_headers)
         assert r.status_code == 204
         created_ids["encamamiento"].remove(sid)
 
@@ -2094,7 +2106,7 @@ def pytest_sessionfinish(session):
             ("citas", CitaModel),
             ("encamamiento", EncamamientoModel),
             ("consultas", ConsultaModel),
-            ("medicos", MedicoModel),
+            ("medicos", PersonalAtencionModel),
             ("especialidades", EspecialidadModel),
             ("pacientes", PacienteModel),
         ]

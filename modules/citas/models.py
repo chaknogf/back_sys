@@ -69,7 +69,7 @@ class CitaModel(Base):
     paciente = relationship("PacienteModel", back_populates="citas")
     especialidad_ref = relationship("EspecialidadModel", lazy="joined")
     personal_atencion = relationship(
-        "MedicoModel",
+        "PersonalAtencionModel",
         foreign_keys=[personal_atencion_id],
         lazy="joined",
     )

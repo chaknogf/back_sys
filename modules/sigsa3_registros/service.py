@@ -9,7 +9,7 @@ from typing import Optional
 from modules.sigsa3.models import Sigsa3RegistroModel
 from modules.pacientes.models import PacienteModel
 from modules.consultas.models import ConsultaModel
-from modules.medicos.models import MedicoModel
+from modules.personal_atencion.models import PersonalAtencionModel
 from modules.personal_salud.models import PersonalSaludModel
 from modules.cie10.models import Cie10Model
 from modules.especialidades.models import EspecialidadModel
@@ -25,7 +25,7 @@ def _base_query(db: Session):
             PacienteModel.nombre_completo,
             PacienteModel.expediente,
             PacienteModel.sexo,
-            MedicoModel.nombre,
+            PersonalAtencionModel.nombre,
             PersonalSaludModel.nombre,
             TipoConsultaSigsa3Model.nombre,
             Cie10Model.codigo,
@@ -33,7 +33,7 @@ def _base_query(db: Session):
             EspecialidadModel.nombre,
         )
         .outerjoin(PacienteModel, Sigsa3RegistroModel.paciente_id == PacienteModel.id)
-        .outerjoin(MedicoModel, Sigsa3RegistroModel.personal_atencion_id == MedicoModel.id)
+        .outerjoin(PersonalAtencionModel, Sigsa3RegistroModel.personal_atencion_id == PersonalAtencionModel.id)
         .outerjoin(PersonalSaludModel, Sigsa3RegistroModel.personal_salud_id == PersonalSaludModel.id)
         .outerjoin(TipoConsultaSigsa3Model, Sigsa3RegistroModel.tipo_consulta_id == TipoConsultaSigsa3Model.id)
         .outerjoin(Cie10Model, Sigsa3RegistroModel.codigo_cie_10_id == Cie10Model.id)
@@ -84,7 +84,7 @@ def _filtros(
             or_(
                 PacienteModel.nombre_completo.ilike(term),
                 PacienteModel.expediente.ilike(term),
-                MedicoModel.nombre.ilike(term),
+                PersonalAtencionModel.nombre.ilike(term),
                 PersonalSaludModel.nombre.ilike(term),
                 TipoConsultaSigsa3Model.nombre.ilike(term),
                 Cie10Model.codigo.ilike(term),
@@ -149,7 +149,7 @@ def _validar_fks(db: Session, data) -> None:
     contra sus tablas de catálogo (coincidencias garantizadas)."""
     _validar_fk_existe(db, PacienteModel, data.paciente_id, "paciente_id", "pacientes")
     if data.personal_atencion_id is not None:
-        _validar_fk_existe(db, MedicoModel, data.personal_atencion_id, "personal_atencion_id", "personal_atencion")
+        _validar_fk_existe(db, PersonalAtencionModel, data.personal_atencion_id, "personal_atencion_id", "personal_atencion")
     _validar_fk_existe(db, PersonalSaludModel, data.personal_salud_id, "personal_salud_id", "personal_salud")
     _validar_fk_existe(db, ConsultaModel, data.consulta_id, "consulta_id", "consultas")
     _validar_fk_existe(db, TipoConsultaSigsa3Model, data.tipo_consulta_id, "tipo_consulta_id", "tipos_consulta_sigsa3")
@@ -184,7 +184,7 @@ def _resolver_especialidad_desde_medico(db: Session, personal_atencion_id, espec
     if especialidad_id is not None:
         return especialidad_id
     if personal_atencion_id is not None:
-        medico = db.get(MedicoModel, personal_atencion_id)
+        medico = db.get(PersonalAtencionModel, personal_atencion_id)
         if medico and medico.especialidad_id is not None:
             return medico.especialidad_id
     return None
@@ -281,7 +281,7 @@ def actualizar_registro(registro_id: int, data: Sigsa3RegistroUpdate, db: Sessio
     finales = {k: update_data.get(k, getattr(registro, k)) for k in campos}
     _validar_fk_existe(db, PacienteModel, finales["paciente_id"], "paciente_id", "pacientes")
     if finales["personal_atencion_id"] is not None:
-        _validar_fk_existe(db, MedicoModel, finales["personal_atencion_id"], "personal_atencion_id", "personal_atencion")
+        _validar_fk_existe(db, PersonalAtencionModel, finales["personal_atencion_id"], "personal_atencion_id", "personal_atencion")
     _validar_fk_existe(db, PersonalSaludModel, finales["personal_salud_id"], "personal_salud_id", "personal_salud")
     _validar_fk_existe(db, ConsultaModel, finales["consulta_id"], "consulta_id", "consultas")
     _validar_fk_existe(db, TipoConsultaSigsa3Model, finales["tipo_consulta_id"], "tipo_consulta_id", "tipos_consulta_sigsa3")

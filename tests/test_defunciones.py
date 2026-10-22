@@ -3,7 +3,7 @@ import time as _time
 from datetime import datetime, timedelta
 from core.database import SessionLocal
 from modules.pacientes.models import PacienteModel
-from modules.medicos.models import MedicoModel
+from modules.personal_atencion.models import PersonalAtencionModel
 from modules.defunciones.models import DefuncionModel
 
 
@@ -22,7 +22,7 @@ def cleanup():
         for pid in created_ids["pacientes"]:
             db.query(PacienteModel).filter(PacienteModel.id == pid).delete()
         for mid in created_ids["medicos"]:
-            db.query(MedicoModel).filter(MedicoModel.id == mid).delete()
+            db.query(PersonalAtencionModel).filter(PersonalAtencionModel.id == mid).delete()
         db.commit()
     finally:
         db.close()
@@ -38,10 +38,11 @@ class TestDefunciones:
         yield
         cleanup()
 
-    def _crear_medico(self, client):
+    def _crear_medico(self, client, auth_headers):
         s = _sufijo()
         r = client.post(
             "/personal-atencion/",
+            headers=auth_headers,
             json={
                 "nombre": f"Dr. Forense {s}",
                 "colegiado": str(s),
@@ -74,7 +75,7 @@ class TestDefunciones:
         return data
 
     def test_create_defuncion(self, client, auth_headers):
-        medico = self._crear_medico(client)
+        medico = self._crear_medico(client, auth_headers)
         paciente = self._crear_paciente(client, auth_headers)
         now = datetime.now().isoformat()
 
@@ -99,7 +100,7 @@ class TestDefunciones:
         created_ids["defunciones"].append(data["id"])
 
     def test_create_defuncion_fetal(self, client, auth_headers):
-        medico = self._crear_medico(client)
+        medico = self._crear_medico(client, auth_headers)
         madre = self._crear_paciente(client, auth_headers, sexo="F", fecha_nac="1995-03-20")
 
         r = client.post(
@@ -133,7 +134,7 @@ class TestDefunciones:
         assert isinstance(data["defunciones"], list)
 
     def test_get_defuncion(self, client, auth_headers):
-        medico = self._crear_medico(client)
+        medico = self._crear_medico(client, auth_headers)
         paciente = self._crear_paciente(client, auth_headers)
 
         cr = client.post(
@@ -161,7 +162,7 @@ class TestDefunciones:
         assert r.status_code == 404
 
     def test_update_defuncion(self, client, auth_headers):
-        medico = self._crear_medico(client)
+        medico = self._crear_medico(client, auth_headers)
         paciente = self._crear_paciente(client, auth_headers)
 
         cr = client.post(
@@ -191,7 +192,7 @@ class TestDefunciones:
         assert data["causa_b"] == "Nueva causa secundaria"
 
     def test_delete_defuncion(self, client, auth_headers):
-        medico = self._crear_medico(client)
+        medico = self._crear_medico(client, auth_headers)
         paciente = self._crear_paciente(client, auth_headers)
 
         cr = client.post(
@@ -214,7 +215,7 @@ class TestDefunciones:
         assert r.status_code == 404
 
     def test_registrar_defuncion_endpoint(self, client, auth_headers):
-        medico = self._crear_medico(client)
+        medico = self._crear_medico(client, auth_headers)
         paciente = self._crear_paciente(client, auth_headers)
 
         r = client.post(
@@ -236,7 +237,7 @@ class TestDefunciones:
         assert rp.json()["estado"] == "F"
 
     def test_registrar_defuncion_ya_fallecido(self, client, auth_headers):
-        medico = self._crear_medico(client)
+        medico = self._crear_medico(client, auth_headers)
         paciente = self._crear_paciente(client, auth_headers)
 
         r = client.post(

@@ -622,14 +622,14 @@ def _resolve_intervencion(row, db: Session) -> dict:
 
 def _base_query_intervenciones(db: Session):
     from modules.pacientes.models import PacienteModel
-    from modules.medicos.models import MedicoModel
+    from modules.personal_atencion.models import PersonalAtencionModel
     from modules.especialidades.models import EspecialidadModel
     from modules.procedimientos.models import AreaCuerpoIntervenida
 
     return db.query(
         IntervencionQuirurgicaModel,
         PacienteModel,
-        MedicoModel,
+        PersonalAtencionModel,
         EstadoCirugiaModel,
         FormatoProcedimientoModel,
         ProcedenciaProcedimientoModel,
@@ -640,7 +640,7 @@ def _base_query_intervenciones(db: Session):
     ).select_from(IntervencionQuirurgicaModel).outerjoin(
         PacienteModel, PacienteModel.id == IntervencionQuirurgicaModel.paciente_id
     ).outerjoin(
-        MedicoModel, MedicoModel.id == IntervencionQuirurgicaModel.personal_atencion_id
+        PersonalAtencionModel, PersonalAtencionModel.id == IntervencionQuirurgicaModel.personal_atencion_id
     ).outerjoin(
         EstadoCirugiaModel, EstadoCirugiaModel.estado_cirugia_id == IntervencionQuirurgicaModel.estado_cirugia_id
     ).outerjoin(
@@ -877,8 +877,8 @@ def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_
     ).first():
         raise HTTPException(status_code=404, detail="Número de quirófano no encontrado")
     if data.personal_atencion_id:
-        from modules.medicos.models import MedicoModel
-        if not db.query(MedicoModel).filter(MedicoModel.id == data.personal_atencion_id).first():
+        from modules.personal_atencion.models import PersonalAtencionModel
+        if not db.query(PersonalAtencionModel).filter(PersonalAtencionModel.id == data.personal_atencion_id).first():
             raise HTTPException(status_code=404, detail="Médico no encontrado")
 
     area_nombre = _area_cuerpo_nombre(db, data.id_area_cuerpo_intervenida)

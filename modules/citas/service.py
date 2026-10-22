@@ -7,7 +7,7 @@ from datetime import datetime, date, time, timedelta
 
 from modules.citas.models import CitaModel, CitaDiaInhabilModel
 from modules.pacientes.models import PacienteModel
-from modules.medicos.models import MedicoModel
+from modules.personal_atencion.models import PersonalAtencionModel
 from modules.citas.schemas import (
     CitaCreate, CitaListResponse, CitaUpdate, CitaResponse, CitaBase, CitasPorFechaRazon,
     DiaInhabilCreate, DiaInhabilUpdate,
@@ -58,7 +58,7 @@ def crear_cita(cita: CitaCreate, current_user, db: Session):
     """Valida día hábil y personal asignado antes de persistir la cita."""
     _validar_fecha_cita(db, cita.fecha_cita)
     if cita.personal_atencion_id is not None:
-        if db.get(MedicoModel, cita.personal_atencion_id) is None:
+        if db.get(PersonalAtencionModel, cita.personal_atencion_id) is None:
             raise HTTPException(
                 status_code=404,
                 detail="El personal de atención asignado no existe",
@@ -216,7 +216,7 @@ def actualizar_cita(cita_id: int, datos: CitaUpdate, db: Session):
         if "fecha_cita" in datos_dict:
             _validar_fecha_cita(db, datos_dict["fecha_cita"])
         if "personal_atencion_id" in datos_dict and datos_dict.get("personal_atencion_id") is not None:
-            if db.get(MedicoModel, datos_dict["personal_atencion_id"]) is None:
+            if db.get(PersonalAtencionModel, datos_dict["personal_atencion_id"]) is None:
                 raise HTTPException(
                     status_code=404,
                     detail="El personal de atención asignado no existe",

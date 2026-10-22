@@ -57,5 +57,5 @@ class DefuncionModel(Base):
 
     paciente = relationship("PacienteModel", foreign_keys=[paciente_id])
     madre = relationship("PacienteModel", foreign_keys=[madre_id])
-    medico = relationship("MedicoModel", foreign_keys=[personal_atencion_id])
+    medico = relationship("PersonalAtencionModel", foreign_keys=[personal_atencion_id])
     registrador = relationship("UserModel")

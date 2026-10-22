@@ -51,7 +51,7 @@ class IntervencionQuirurgicaModel(Base):
     rango_especialista = relationship("RangoEspecialistaModel")
     especialidad = relationship("EspecialidadModel")
     quirofano_numero = relationship("QuirofanoNumeroModel")
-    medico = relationship("MedicoModel")
+    medico = relationship("PersonalAtencionModel")
 
 
 class QuirofanoNumeroModel(Base):

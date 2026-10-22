@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime
 
 
-class MedicoBase(BaseModel):
+class PersonalAtencionBase(BaseModel):
     nombre: str = Field(..., max_length=200)
     colegiado: Optional[str] = Field(None, max_length=20)
     pasaporte: Optional[str] = Field(None, max_length=20)
@@ -13,11 +13,11 @@ class MedicoBase(BaseModel):
     activo: Optional[bool] = True
 
 
-class MedicoCreate(MedicoBase):
+class PersonalAtencionCreate(PersonalAtencionBase):
     pass
 
 
-class MedicoUpdate(BaseModel):
+class PersonalAtencionUpdate(BaseModel):
     nombre: Optional[str] = Field(None, max_length=200)
     colegiado: Optional[str] = Field(None, max_length=20)
     pasaporte: Optional[str] = Field(None, max_length=20)
@@ -27,7 +27,7 @@ class MedicoUpdate(BaseModel):
     activo: Optional[bool] = None
 
 
-class MedicoOut(MedicoBase):
+class PersonalAtencionOut(PersonalAtencionBase):
     id: int
     created_at: datetime
     especialidad_nombre: Optional[str] = None
@@ -35,8 +35,8 @@ class MedicoOut(MedicoBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class MedicoListResponse(BaseModel):
+class PersonalAtencionListResponse(BaseModel):
     total: int
-    personal_atencion: list[MedicoOut]
+    personal_atencion: list[PersonalAtencionOut]
 
     model_config = ConfigDict(from_attributes=True)

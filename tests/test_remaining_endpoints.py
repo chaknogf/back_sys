@@ -3,7 +3,7 @@ import time as _time
 from datetime import date, datetime, timedelta
 from core.database import SessionLocal
 from modules.pacientes.models import PacienteModel
-from modules.medicos.models import MedicoModel
+from modules.personal_atencion.models import PersonalAtencionModel
 from modules.nacimientos.models import NacimientoModel
 from modules.nacimientos_legacy.models import NacimientoLegacy
 from modules.defunciones.models import DefuncionModel
@@ -48,7 +48,7 @@ def cleanup():
         for pid in created_ids["pacientes"]:
             db.query(PacienteModel).filter(PacienteModel.id == pid).delete()
         for mid in created_ids["medicos"]:
-            db.query(MedicoModel).filter(MedicoModel.id == mid).delete()
+            db.query(PersonalAtencionModel).filter(PersonalAtencionModel.id == mid).delete()
         db.commit()
     finally:
         db.close()
@@ -64,10 +64,11 @@ def _sufijo():
 class TestCensoCamas:
     SERVICIO_ID = None
 
-    def test_create_servicio(self, client):
+    def test_create_servicio(self, client, auth_headers):
         s = _sufijo()
         r = client.post(
             "/encamamiento/",
+            headers=auth_headers,
             json={
                 "nombre_servicio": f"Censo Test {s}",
                 "descripcion": "Para test de censo",
@@ -78,11 +79,12 @@ class TestCensoCamas:
         TestCensoCamas.SERVICIO_ID = r.json()["id"]
         created_ids["censo_servicios"].append(r.json()["id"])
 
-    def test_create_censo(self, client):
+    def test_create_censo(self, client, auth_headers):
         if not TestCensoCamas.SERVICIO_ID:
             pytest.skip("No servicio created")
         r = client.post(
             "/censo-camas/",
+            headers=auth_headers,
             json={
                 "fecha": date.today().isoformat(),
                 "servicio_id": TestCensoCamas.SERVICIO_ID,
@@ -98,10 +100,10 @@ class TestCensoCamas:
         assert data["totales"]["ocupados"] == 18
         created_ids["censo_camas"].append(data["id"])
 
-    def test_create_censo_duplicate_pair_conflicts(self, client):
+    def test_create_censo_duplicate_pair_conflicts(self, client, auth_headers):
         if not TestCensoCamas.SERVICIO_ID:
             pytest.skip("No servicio created")
-        r = client.post("/censo-camas/", json={
+        r = client.post("/censo-camas/", headers=auth_headers, json={
             "fecha": date.today().isoformat(),
             "servicio_id": TestCensoCamas.SERVICIO_ID,
             "masculino": {},
@@ -109,11 +111,12 @@ class TestCensoCamas:
         })
         assert r.status_code == 409
 
-    def test_upsert_censo(self, client):
+    def test_upsert_censo(self, client, auth_headers):
         if not TestCensoCamas.SERVICIO_ID:
             pytest.skip("No servicio created")
         r = client.post(
             "/censo-camas/upsert",
+            headers=auth_headers,
             json={
                 "fecha": date.today().isoformat(),
                 "servicio_id": TestCensoCamas.SERVICIO_ID,
@@ -126,65 +129,75 @@ class TestCensoCamas:
         assert data["masculino"]["ocupados"] == 15
         assert data["femenino"]["ocupados"] == 9
 
-    def test_list_censo(self, client):
-        r = client.get("/censo-camas/")
+    def test_list_censo(self, client, auth_headers):
+        r = client.get("/censo-camas/", headers=auth_headers)
         assert r.status_code == 200
         data = r.json()
         assert "total" in data
         assert "registros" in data
 
-    def test_list_censo_with_filters(self, client):
+    def test_list_censo_with_filters(self, client, auth_headers):
         if not TestCensoCamas.SERVICIO_ID:
             pytest.skip("No servicio created")
-        r = client.get(f"/censo-camas/?servicio_id={TestCensoCamas.SERVICIO_ID}")
+        r = client.get(
+            f"/censo-camas/?servicio_id={TestCensoCamas.SERVICIO_ID}",
+            headers=auth_headers,
+        )
         assert r.status_code == 200
         data = r.json()
         assert data["total"] >= 1
 
-    def test_get_censo(self, client):
+    def test_get_censo(self, client, auth_headers):
         if not created_ids["censo_camas"]:
             pytest.skip("No censo created")
         cid = created_ids["censo_camas"][0]
-        r = client.get(f"/censo-camas/{cid}")
+        r = client.get(f"/censo-camas/{cid}", headers=auth_headers)
         assert r.status_code == 200
         assert r.json()["id"] == cid
 
-    def test_get_censo_not_found(self, client):
-        r = client.get("/censo-camas/999999")
+    def test_get_censo_not_found(self, client, auth_headers):
+        r = client.get("/censo-camas/999999", headers=auth_headers)
         assert r.status_code == 404
 
-    def test_update_censo(self, client):
+    def test_update_censo(self, client, auth_headers):
         if not created_ids["censo_camas"]:
             pytest.skip("No censo created")
         cid = created_ids["censo_camas"][0]
         r = client.put(
             f"/censo-camas/{cid}",
+            headers=auth_headers,
             json={"masculino": {"ocupados": 20, "egresos": 3}},
         )
         assert r.status_code == 200
         assert r.json()["masculino"]["ocupados"] == 20
 
-    def test_resumen_diario(self, client):
-        r = client.get(f"/censo-camas/resumen/{date.today().isoformat()}")
+    def test_resumen_diario(self, client, auth_headers):
+        r = client.get(
+            f"/censo-camas/resumen/{date.today().isoformat()}", headers=auth_headers
+        )
         assert r.status_code == 200
         data = r.json()
         assert "fecha" in data
         assert "servicios" in data
 
-    def test_estadisticas_censo(self, client):
+    def test_estadisticas_censo(self, client, auth_headers):
         desde = (date.today() - timedelta(days=7)).isoformat()
         hasta = date.today().isoformat()
-        r = client.get(f"/censo-camas/estadisticas?desde={desde}&hasta={hasta}")
+        r = client.get(
+            f"/censo-camas/estadisticas?desde={desde}&hasta={hasta}",
+            headers=auth_headers,
+        )
         assert r.status_code == 200
         data = r.json()
         assert "servicios" in data
 
-    def test_bulk_create_censo(self, client):
+    def test_bulk_create_censo(self, client, auth_headers):
         if not TestCensoCamas.SERVICIO_ID:
             pytest.skip("No servicio created")
         ayer = (date.today() - timedelta(days=1)).isoformat()
         r = client.post(
             "/censo-camas/bulk",
+            headers=auth_headers,
             json=[
                 {
                     "fecha": ayer,
@@ -198,23 +211,24 @@ class TestCensoCamas:
         data = r.json()
         assert data.get("total") or data.get("creados") or isinstance(data.get("ids"), list)
 
-    def test_delete_censo(self, client):
+    def test_delete_censo(self, client, auth_headers):
         if not created_ids["censo_camas"]:
             pytest.skip("No censo created")
         cid = created_ids["censo_camas"][-1]
-        r = client.delete(f"/censo-camas/{cid}")
+        r = client.delete(f"/censo-camas/{cid}", headers=auth_headers)
         assert r.status_code == 204
         created_ids["censo_camas"].remove(cid)
 
-    def test_import_csv_no_file(self, client):
-        r = client.post("/censo-camas/importar-csv")
+    def test_import_csv_no_file(self, client, auth_headers):
+        r = client.post("/censo-camas/importar-csv", headers=auth_headers)
         assert r.status_code in (400, 422)
 
-    def test_hospitalizacion_por_especialidad(self, client):
+    def test_hospitalizacion_por_especialidad(self, client, auth_headers):
         desde = (date.today() - timedelta(days=30)).isoformat()
         hasta = date.today().isoformat()
         r = client.get(
-            f"/censo-camas/hospitalizacion-por-especialidad?desde={desde}&hasta={hasta}"
+            f"/censo-camas/hospitalizacion-por-especialidad?desde={desde}&hasta={hasta}",
+            headers=auth_headers,
         )
         assert r.status_code == 200
         data = r.json()
@@ -223,19 +237,21 @@ class TestCensoCamas:
         assert "total_hospitalizados" in data
         assert isinstance(data["especialidades"], list)
 
-    def test_hospitalizacion_por_especialidad_invalid_range(self, client):
+    def test_hospitalizacion_por_especialidad_invalid_range(self, client, auth_headers):
         r = client.get(
-            "/censo-camas/hospitalizacion-por-especialidad?desde=2026-01-02&hasta=2026-01-01"
+            "/censo-camas/hospitalizacion-por-especialidad?desde=2026-01-02&hasta=2026-01-01",
+            headers=auth_headers,
         )
         assert r.status_code in (400, 200)
 
-    def test_copiar_dia_anterior(self, client):
+    def test_copiar_dia_anterior(self, client, auth_headers):
         if not TestCensoCamas.SERVICIO_ID:
             pytest.skip("No servicio created")
         ayer = (date.today() - timedelta(days=1)).isoformat()
         hoy = date.today().isoformat()
         r = client.post(
             "/censo-camas/copiar-dia-anterior",
+            headers=auth_headers,
             json={"origen": ayer, "destino": hoy, "servicio_id": TestCensoCamas.SERVICIO_ID},
         )
         assert r.status_code == 200
@@ -245,11 +261,12 @@ class TestCensoCamas:
         assert isinstance(data["copiados"], int)
         assert isinstance(data["actualizados"], int)
 
-    def test_copiar_dia_anterior_todos_servicios(self, client):
+    def test_copiar_dia_anterior_todos_servicios(self, client, auth_headers):
         ayer = (date.today() - timedelta(days=1)).isoformat()
         mañana = (date.today() + timedelta(days=1)).isoformat()
         r = client.post(
             "/censo-camas/copiar-dia-anterior",
+            headers=auth_headers,
             json={"origen": ayer, "destino": mañana},
         )
         assert r.status_code == 200
@@ -447,28 +464,30 @@ class TestNacimientosExtra:
 class TestNacimientosLegacyExtra:
     LEGACY_ID = None
 
-    def test_list_and_get_first(self, client):
-        r = client.get("/nacimientos-legacy/?limit=1")
+    def test_list_and_get_first(self, client, auth_headers):
+        r = client.get("/nacimientos-legacy/?limit=1", headers=auth_headers)
         if r.status_code == 200 and len(r.json()) > 0:
             TestNacimientosLegacyExtra.LEGACY_ID = r.json()[0]["id"]
         else:
             pytest.skip("No legacy records in DB")
 
-    def test_update_legacy(self, client):
+    def test_update_legacy(self, client, auth_headers):
         if not TestNacimientosLegacyExtra.LEGACY_ID:
             pytest.skip("No legacy record to update")
         lid = TestNacimientosLegacyExtra.LEGACY_ID
         r = client.put(
             f"/nacimientos-legacy/{lid}",
+            headers=auth_headers,
             json={"madre": "MADRE ACTUALIZADA TEST"},
         )
         assert r.status_code == 200
         data = r.json()
         assert data["madre"] == "MADRE ACTUALIZADA TEST"
 
-    def test_update_legacy_not_found(self, client):
+    def test_update_legacy_not_found(self, client, auth_headers):
         r = client.put(
             "/nacimientos-legacy/999999",
+            headers=auth_headers,
             json={"madre": "NO EXISTE"},
         )
         assert r.status_code == 404

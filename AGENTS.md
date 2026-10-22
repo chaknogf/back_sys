@@ -16,15 +16,26 @@ pytest tests/ -v
 
 ## Stack
 
-- **Framework**: FastAPI 0.122 (Python 3.11+)
-- **Server**: Uvicorn 0.38
+- **Framework**: FastAPI 0.139 (Python 3.11+; dev corriendo 3.14)
+- **Server**: Uvicorn 0.38 (workers via gunicorn 26)
 - **Database**: PostgreSQL 18 (db: `hospital`)
 - **ORM**: SQLAlchemy 2.0 + psycopg2-binary
 - **Auth**: JWT (joserfc HS256) + Argon2 (passlib)
 - **Validation**: Pydantic 2.12
 - **Email**: FastAPI-Mail (SMTP Gmail) + Jinja2 templates
+- **Cache / Rate limit**: Redis 8 (fastapi-cache2 + slowapi; fallback a memoria)
 - **Testing**: pytest 9 + FastAPI TestClient
-- **Package manager**: Poetry (primary) + pip
+- **Package manager**: Poetry (primario) + pip (`requirements.txt` es el que usa `deploy.sh`)
+
+## Roles & Authorization
+
+- **Roles actuales**: `admin`, `regular` (campo `users.role`, `String(20)`, sin enum ni CHECK). Todo usuario nuevo se crea como `regular` (`modules/users/service.py`).
+- **Guards**: `get_current_user` (cualquier autenticado) y `get_current_admin_user` (solo `admin`, `core/security.py`).
+- **No existe rol read-only**: para un CRM con solo-GET habría que introducir un rol `read_only` + una dependency `require_role(*roles)` (ver auditoría).
+- **⚠️ Riesgos conocidos** (pendientes de corregir):
+  - `PUT /users/{id}` permite que un usuario se auto-asigne `role: admin` (`modules/users/router.py:65`, `schemas.py:25`).
+  - `POST /pacientes/merge`, borrados individuales de SIGSA-3/consultas/constancias/procedimientos y `GET /audit-log` solo exigen `auth`, no admin.
+  - `GET /users/{id}` expone email/rol/unidad de cualquier usuario a cualquier autenticado.
 
 ## Architecture: Modular Monolith
 
@@ -46,7 +57,7 @@ back_sys/
 │   ├── ciclos/                # Clinical cycles
 │   ├── encamamiento/          # Bed census by service
 │   ├── eventos/               # Clinical events (admission, evolution, discharge)
-│   ├── medicos/               # Doctors CRUD
+│   ├── personal_atencion/     # Doctors/staff CRUD (tabla personal_atencion)
 │   ├── citas/                 # Appointments
 │   ├── expediente/            # Correlative number generation
 │   ├── constancias_nacimiento/ # Birth certificates
@@ -90,7 +101,7 @@ All routes under root path `/fah` (e.g., `https://host/fah/auth/login`).
 | Users | `/users` | `GET/POST`, `GET/PUT /{id}`, `DELETE /{id}` |
 | Patients | `/pacientes` | `GET/POST`, `GET/PATCH /{id}`, `/duplicados`, `/merge`, `/madre-hijo/{id}` (auto-crea constancia_nacimiento + nacimiento), `/neonatales` |
 | Consultations | `/consultas` | `GET/POST`, `GET/PATCH /{id}`, `/registro`, `/pacienteId/{id}` |
-| Doctors | `/medicos` | `GET/POST`, `GET/PUT/DELETE /{id}` |
+| Doctors | `/personal-atencion` | `GET/POST`, `GET/PUT/DELETE /{id}` |
 | Encamamiento | `/encamamiento` | `GET/POST`, `GET/PATCH/DELETE /{id}`, filtros: `activo` |
 | Appointments | `/citas` | `GET/POST`, `GET/PUT/DELETE /{id}`, `/disponibles` |
 | Cycles | `/ciclos` | `GET/POST`, `GET /{id}` |
@@ -115,10 +126,10 @@ All routes under root path `/fah` (e.g., `https://host/fah/auth/login`).
 
 - **Name**: `hospital` (PostgreSQL)
 - **Extensions**: `pg_trgm`, `unaccent`
-- **Key tables**: `pacientes` (JSONB fields), `consultas`, `medicos`, `users`, `citas`, `ciclos_consulta`, `eventos_consulta`, `procedimientos`, `proce_medicos`, `constancia_nacimiento`, `prestamos`, `expediente_control`, `municipios`, `paises_iso`, `audit_log`, `laboratorios`, `rayos_x`, `encamamiento`, `nacimientos` (sin datos redundantes — solo `id`, `paciente_id`, `madre_id`, `registrador_id`, `peso_gramos`, `clasificacion_nacimiento`, `trabajo_parto`, timestamps), `nacimientos_legacy`, `sigsa3`, `censo_camas`, `defunciones`, `cie10_catalogo`, `personal_salud`
+- **Key tables**: `pacientes` (JSONB fields), `consultas`, `personal_atencion`, `users`, `citas`, `ciclos_consulta`, `eventos_consulta`, `procedimientos`, `proce_medicos`, `constancia_nacimiento`, `prestamos`, `expediente_control`, `municipios`, `paises_iso`, `audit_log`, `laboratorios`, `rayos_x`, `encamamiento`, `nacimientos` (sin datos redundantes — solo `id`, `paciente_id`, `madre_id`, `registrador_id`, `peso_gramos`, `clasificacion_nacimiento`, `trabajo_parto`, timestamps), `nacimientos_legacy`, `sigsa3`, `censo_camas`, `defunciones`, `cie10_catalogo`, `personal_salud`
 - **Indexes**: GIN on JSONB, partial unique indexes, trigram GIN on `nombre_completo`
 - **Trigger**: `trg_set_nombre_completo` auto-generates full name from JSONB `nombre` before insert/update
-- **Tables with `personal_salud`**: Catalog of healthcare workers for SIGSA-3 association, linked to `medicos` table
+- **Tables with `personal_salud`**: Catalog of healthcare workers for SIGSA-3 association, linked to `personal_atencion` table
 
 ## Full Endpoint Reference
 
@@ -146,7 +157,7 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Pacientes | GET | `/pacientes/debug/count` | auth | dict | Conteo |
 | Pacientes | GET | `/pacientes/expediente/{expediente}` | auth | `PacienteContacto` | By expediente |
 | Pacientes | GET | `/pacientes/duplicados/nombres-similares` | auth | dict | Trigram/soundex |
-| Pacientes | POST | `/pacientes/merge` | admin | dict | Merge duplicados |
+| Pacientes | POST | `/pacientes/merge` | auth | dict | Merge duplicados (⚠️ ver nota de seguridad: debería ser admin) |
 | Pacientes | POST | `/pacientes/madre-hijo/{madre_id}` | auth | `PacienteOut` (201) | Crear desde madre |
 | Consultas | GET | `/consultas/` | auth | `ConsultaListResponse` | List (15+ filtros) |
 | Consultas | GET | `/pacientes/buscar` | auth | `PacienteListResponse` | Búsqueda compartida de pacientes para recepción |
@@ -168,11 +179,11 @@ All routes under root path `/fah`. Auth: `admin` = requires `get_current_admin_u
 | Citas | GET | `/citas/{cita_id}` | auth | `CitaResponse` | By ID |
 | Citas | PUT | `/citas/{cita_id}` | auth | `CitaResponse` | Update |
 | Citas | DELETE | `/citas/{cita_id}` | auth | dict | Soft delete |
-| Medicos | POST | `/medicos/` | public | `MedicoOut` (201) | Create |
-| Medicos | GET | `/medicos/` | public | `List[MedicoOut]` | List (filtros: id, activo, nombre, colegiado, especialidad) |
-| Medicos | GET | `/medicos/{medico_id}` | public | `MedicoOut` | By ID |
-| Medicos | PUT | `/medicos/{medico_id}` | public | `MedicoOut` | Update |
-| Medicos | DELETE | `/medicos/{medico_id}` | public | 204 | Delete |
+| Medicos | POST | `/personal-atencion/` | admin | `PersonalAtencionOut` (201) | Create |
+| Medicos | GET | `/personal-atencion/` | auth | `PersonalAtencionListResponse` | List (filtros: id, activo, nombre, colegiado, especialidad) |
+| Medicos | GET | `/personal-atencion/{personal_atencion_id}` | auth | `PersonalAtencionOut` | By ID |
+| Medicos | PUT | `/personal-atencion/{personal_atencion_id}` | admin | `PersonalAtencionOut` | Update |
+| Medicos | DELETE | `/personal-atencion/{personal_atencion_id}` | admin | 204 | Delete |
 | Nac. Legacy | GET | `/nacimientos-legacy/` | auth | `List[NacimientoLegacyResponse]` | List (filtros: id, madre, doc, fecha) |
 | Nac. Legacy | PUT | `/nacimientos-legacy/{id}` | auth | `NacimientoLegacyResponse` | Update |
 | Const. Nac. | POST | `/constancias-nacimiento/` | auth | `ConstanciaNacimientoResponse` (201) | Create |
@@ -456,6 +467,13 @@ modules/
 3. Passwords hashed with **Argon2** (memory_cost=65536, time_cost=3, parallelism=4)
 4. Token expiry: configured via `ACCESS_TOKEN_EXPIRE_MINUTES` (default 1440 min = 24h)
 
+## Testing Notes
+
+- `pytest tests/ -q` — suite completa (requiere PostgreSQL `hospital` real).
+- El rate limit se **desactiva en tests** vía `RATELIMIT_ENABLED=false` (seteado en `tests/conftest.py` antes de importar `main`). Sin esto, el login fixture supera el límite de 10/min y produce una cascada de errores 429.
+- Fixtures: `auth_headers` (usuario `test_integration`) y `admin_headers` (usuario `admin`); los endpoints de escritura exigen auth, así que **todo test que mute datos debe pasar headers**.
+- `ENVIRONMENT=development` está fijado en `.env`; con Redis ausente la app degrada a memoria con warnings.
+
 ## Related Projects
 
 - **hospital3** → Angular 20 PWA frontend (the main consumer of this API)
@@ -468,8 +486,22 @@ POSTGRES_USER/PASSWORD/HOST/PORT/DB
 SECRET_KEY
 ACCESS_TOKEN_EXPIRE_MINUTES
 MAIL_USERNAME/PASSWORD/FROM/SERVER/PORT
-ENVIRONMENT
+ENVIRONMENT               # development | production (controla caché/Redis y degradación)
+REDIS_URL                 # rate limit + cache; en production si está definida y cae, no arranca
 FRONTEND_URL
 CHAT_LLM_PROVIDER/MODEL/API_KEY
 OPENCODE_SERVER_URL/PASSWORD  # Si usas opencode como gateway
 ```
+
+## Known Debt / Audit Highlights
+
+Ver auditoría senior (2026-10). Prioridades:
+
+1. **CRÍTICO**: `.env` con secretos reales versionado en el repo remoto → rotar `SECRET_KEY`, DB, mail y API keys; purgar del historial.
+2. **CRÍTICO**: auto-escalada de privilegios en `PUT /users/{id}` (usuario puede ponerse `role: admin`).
+3. **ALTO**: falta rol read-only y ownership; merge y borrados físicos sin admin; `audit-log`/`GET users/{id}` sin admin.
+4. **ALTO**: `generar_expediente()` hace `commit()` interno → rompe atomicidad en alta madre-hijo (`modules/expediente/service.py`).
+5. **MEDIO**: errores filtran `str(exc)`/`body` (posible PHI) — `core/exceptions.py`; docs públicas; CORS/Hosts laxos.
+6. **MEDIO**: dependencias — `pyproject.toml` declara 63 (29 transitivas mal listadas, 14 huérfanas); `pytest`/`rust_engine` no declarados; `requirements.txt` (usado por deploy) trae `numpy`/`et-xmlfile`/`pillow` innecesarias.
+7. **MEDIO**: índices faltantes en `citas`, `prestamos`, `defunciones`, `audit_log`; N+1 en varios services.
+8. **BAJO**: código muerto (`modules/sigsa3/implementacion/sigsa3_optimizado.py`, helpers de `chat/service.py`), duplicación de helpers (`_unaccent_ilike`, parseo de fechas, cálculo de edad).

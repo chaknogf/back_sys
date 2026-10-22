@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session, aliased
 
 from modules.especialidades.models import EspecialidadModel
 from modules.pacientes.models import PacienteModel
-from modules.medicos.models import MedicoModel
+from modules.personal_atencion.models import PersonalAtencionModel
 from modules.procedimientos.models import AreaCuerpoIntervenida
 from modules.catalogo_procedimientos.models import CatalogoProcedimiento
 
@@ -178,7 +178,7 @@ def _query_intervenciones(
         db.query(
             IntervencionQuirurgicaModel,
             PacienteModel,
-            MedicoModel,
+            PersonalAtencionModel,
             EstadoCirugiaModel,
             FormatoProcedimientoModel,
             ProcedenciaProcedimientoModel,
@@ -194,7 +194,7 @@ def _query_intervenciones(
         )
         .select_from(IntervencionQuirurgicaModel)
         .outerjoin(PacienteModel, PacienteModel.id == IntervencionQuirurgicaModel.paciente_id)
-        .outerjoin(MedicoModel, MedicoModel.id == IntervencionQuirurgicaModel.personal_atencion_id)
+        .outerjoin(PersonalAtencionModel, PersonalAtencionModel.id == IntervencionQuirurgicaModel.personal_atencion_id)
         .outerjoin(
             EstadoCirugiaModel,
             EstadoCirugiaModel.estado_cirugia_id == IntervencionQuirurgicaModel.estado_cirugia_id,

@@ -8,6 +8,9 @@ load_dotenv(override=True)
 # ── Zona horaria de la aplicación (Guatemala UTC-6) ──
 APP_TIMEZONE = ZoneInfo("America/Guatemala")
 
+# ── Entorno de ejecución: "production" activa comprobaciones estrictas ──
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
+
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError(

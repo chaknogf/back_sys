@@ -7,14 +7,19 @@ from typing import Optional
 
 from core.database import get_db
 from core.security import get_current_user, get_current_admin_user
-from .models import MedicoModel
-from .schemas import MedicoCreate, MedicoUpdate, MedicoOut, MedicoListResponse
+from .models import PersonalAtencionModel
+from .schemas import (
+    PersonalAtencionCreate,
+    PersonalAtencionUpdate,
+    PersonalAtencionOut,
+    PersonalAtencionListResponse,
+)
 from .service import (
-    crear_medico as service_crear_medico,
-    listar_medicos as service_listar_medicos,
-    obtener_medico as service_obtener_medico,
-    actualizar_medico as service_actualizar_medico,
-    eliminar_medico as service_eliminar_medico,
+    crear_personal_atencion as service_crear_personal_atencion,
+    listar_personal_atencion as service_listar_personal_atencion,
+    obtener_personal_atencion as service_obtener_personal_atencion,
+    actualizar_personal_atencion as service_actualizar_personal_atencion,
+    eliminar_personal_atencion as service_eliminar_personal_atencion,
 )
 
 router = APIRouter(
@@ -24,17 +29,17 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=MedicoOut, status_code=status.HTTP_201_CREATED)
-def crear_medico(
-    data: MedicoCreate,
+@router.post("/", response_model=PersonalAtencionOut, status_code=status.HTTP_201_CREATED)
+def crear_personal_atencion(
+    data: PersonalAtencionCreate,
     db: Session = Depends(get_db),
     _admin=Depends(get_current_admin_user),
 ):
-    return service_crear_medico(data, db)
+    return service_crear_personal_atencion(data, db)
 
 
-@router.get("/", response_model=MedicoListResponse)
-def listar_medicos(
+@router.get("/", response_model=PersonalAtencionListResponse)
+def listar_personal_atencion(
     id: Optional[int] = None,
     activo: Optional[bool] = None,
     nombre: Optional[str] = None,
@@ -46,7 +51,7 @@ def listar_medicos(
     db: Session = Depends(get_db)
 ):
     """Busca y pagina personal de atención por identificadores y datos de catálogo."""
-    return service_listar_medicos(
+    return service_listar_personal_atencion(
         db=db,
         id=id,
         activo=activo,
@@ -59,25 +64,25 @@ def listar_medicos(
     )
 
 
-@router.get("/{personal_atencion_id}", response_model=MedicoOut)
-def obtener_medico(personal_atencion_id: int, db: Session = Depends(get_db)):
-    return service_obtener_medico(personal_atencion_id, db)
+@router.get("/{personal_atencion_id}", response_model=PersonalAtencionOut)
+def obtener_personal_atencion(personal_atencion_id: int, db: Session = Depends(get_db)):
+    return service_obtener_personal_atencion(personal_atencion_id, db)
 
 
-@router.put("/{personal_atencion_id}", response_model=MedicoOut)
-def actualizar_medico(
+@router.put("/{personal_atencion_id}", response_model=PersonalAtencionOut)
+def actualizar_personal_atencion(
     personal_atencion_id: int,
-    data: MedicoUpdate,
+    data: PersonalAtencionUpdate,
     db: Session = Depends(get_db),
     _admin=Depends(get_current_admin_user),
 ):
-    return service_actualizar_medico(personal_atencion_id, data, db)
+    return service_actualizar_personal_atencion(personal_atencion_id, data, db)
 
 
 @router.delete("/{personal_atencion_id}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_medico(
+def eliminar_personal_atencion(
     personal_atencion_id: int,
     db: Session = Depends(get_db),
     _admin=Depends(get_current_admin_user),
 ):
-    return service_eliminar_medico(personal_atencion_id, db)
+    return service_eliminar_personal_atencion(personal_atencion_id, db)

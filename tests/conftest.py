@@ -1,3 +1,7 @@
+import os
+
+os.environ.setdefault("RATELIMIT_ENABLED", "false")
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session

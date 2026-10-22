@@ -16,8 +16,8 @@ from modules.estadisticas.service import (
 RANGO_VACIO = ("1990-01-01", "1990-01-31")
 
 
-def test_catalogo_de_indicadores_cubre_las_doce_claves():
-    assert len(INDICADORES_CONSULTA) == 12
+def test_catalogo_de_indicadores_cubre_las_once_claves():
+    assert len(INDICADORES_CONSULTA) == 11
     assert all(meta["etiqueta"] for meta in INDICADORES_CONSULTA.values())
     assert all(meta["tipo"] in ("booleano", "texto") for meta in INDICADORES_CONSULTA.values())
 

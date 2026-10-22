@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, Integer, String, Text, Date, SmallInteger, ForeignKey, TIMESTAMP, Index, text
+from sqlalchemy import Column, BigInteger, Integer, String, Text, Date, SmallInteger, ForeignKey, TIMESTAMP, Index, Boolean, text
 from sqlalchemy.orm import relationship
 from core.database import Base
 
@@ -48,11 +48,19 @@ class Sigsa3Model(Base):
 
 
 class Sigsa3RegistroModel(Base):
-    """Normalizado: solo FKs, sin datos redundantes."""
+    """Normalizado: FKs + datos crudos de respaldo.
+
+    `paciente_id` es opcional: un registro puede normalizarse sin paciente
+    asociado (cuando el `no_historia_clinica` no cruza con expediente,
+    documento de consulta ni CUI). En ese caso `sin_asociar=True` y las columnas
+    crudas (`nombre_paciente`, `no_historia_clinica`, `sexo`, edades,
+    `tipo_consulta`, `codigo_cie_10`, `personal_salud`) conservan los valores
+    originales para recuperarlos/reportarlos aunque no haya FK.
+    """
     __tablename__ = "sigsa3_registros"
 
     id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
-    paciente_id = Column(Integer, ForeignKey("pacientes.id", ondelete="SET NULL"), nullable=False, index=True)
+    paciente_id = Column(Integer, ForeignKey("pacientes.id", ondelete="SET NULL"), nullable=True, index=True)
     personal_atencion_id = Column(Integer, ForeignKey("personal_atencion.id", ondelete="SET NULL"), nullable=True, index=True)
     personal_salud_id = Column(Integer, ForeignKey("personal_salud.id", ondelete="SET NULL"), nullable=True, index=True)
     consulta_id = Column(Integer, ForeignKey("consultas.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -65,10 +73,22 @@ class Sigsa3RegistroModel(Base):
     # ID del registro staging (sigsa3) de origen. Sin FK (default NULL) para
     # evitar restricciones al purgar staging tras normalizar.
     sigsa3_id = Column(BigInteger, nullable=True, default=None, index=True)
+    # Datos crudos / fallback cuando no hay paciente asociado.
+    sin_asociar = Column(Boolean, nullable=False, default=False, server_default=text("FALSE"))
+    nombre_paciente = Column(String(150), nullable=True)
+    no_historia_clinica = Column(String(30), nullable=True)
+    sexo = Column(String(1), nullable=True)
+    edad_anios = Column(Integer, nullable=True)
+    edad_meses = Column(Integer, nullable=True)
+    edad_dias = Column(Integer, nullable=True)
+    tipo_consulta = Column(String(80), nullable=True)
+    codigo_cie_10 = Column(String(30), nullable=True)
+    personal_salud = Column(String(100), nullable=True)
     normalized_at = Column(TIMESTAMP(timezone=False), server_default=text("CURRENT_TIMESTAMP"))
 
     __table_args__ = (
         Index("ix_sigsa3_reg_paciente_fecha", "paciente_id", "fecha_consulta"),
         Index("ix_sigsa3_reg_fecha", "fecha_consulta"),
         Index("ix_sigsa3_reg_sigsa3_id", "sigsa3_id"),
+        Index("ix_sigsa3_reg_sin_asociar", "sin_asociar"),
     )

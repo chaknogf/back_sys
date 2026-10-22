@@ -112,7 +112,7 @@ def _serializar(row) -> dict:
         "normalized_at": reg.normalized_at,
         "paciente_nombre": pac_nombre,
         "paciente_expediente": pac_expediente,
-        "sexo": pac_sexo,
+        "sexo": pac_sexo or reg.sexo,
         "personal_atencion_nombre": med_nombre,
         "personal_salud_nombre": ps_nombre,
         "tipo_consulta_nombre": tc_nombre,
@@ -120,6 +120,16 @@ def _serializar(row) -> dict:
         "codigo_cie_10_descripcion": cie10_desc,
         "codigo_cie_10_completo": cie10_completo,
         "especialidad_nombre": esp_nombre,
+        "sigsa3_id": reg.sigsa3_id,
+        "sin_asociar": reg.sin_asociar,
+        "nombre_paciente_raw": reg.nombre_paciente,
+        "no_historia_clinica": reg.no_historia_clinica,
+        "edad_anios": reg.edad_anios,
+        "edad_meses": reg.edad_meses,
+        "edad_dias": reg.edad_dias,
+        "tipo_consulta_raw": reg.tipo_consulta,
+        "codigo_cie_10_raw": reg.codigo_cie_10,
+        "personal_salud_raw": reg.personal_salud,
     }
 
 

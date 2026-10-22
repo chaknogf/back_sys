@@ -6,8 +6,9 @@ from datetime import date, datetime
 
 
 class Sigsa3RegistroBase(BaseModel):
-    """Datos normalizados; paciente y fecha son obligatorios, las referencias son opcionales."""
-    paciente_id: int = Field(..., description="ID del paciente (obligatorio)")
+    """Datos normalizados; la fecha es obligatoria y el paciente puede faltar
+    (registros normalizados sin asociar conservan los datos crudos)."""
+    paciente_id: Optional[int] = Field(None, description="ID del paciente (opcional; NULL si no se pudo asociar)")
     personal_atencion_id: Optional[int] = Field(None, description="ID del médico (opcional)")
     personal_salud_id: Optional[int] = None
     consulta_id: Optional[int] = None
@@ -51,6 +52,16 @@ class Sigsa3RegistroOut(Sigsa3RegistroBase):
     codigo_cie_10_completo: Optional[str] = None
     especialidad_nombre: Optional[str] = None
     sigsa3_id: Optional[int] = None
+    # Fallback crudo cuando el registro quedó sin paciente asociado.
+    sin_asociar: bool = False
+    nombre_paciente_raw: Optional[str] = None
+    no_historia_clinica: Optional[str] = None
+    edad_anios: Optional[int] = None
+    edad_meses: Optional[int] = None
+    edad_dias: Optional[int] = None
+    tipo_consulta_raw: Optional[str] = None
+    codigo_cie_10_raw: Optional[str] = None
+    personal_salud_raw: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

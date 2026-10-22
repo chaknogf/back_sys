@@ -2196,12 +2196,90 @@ def _personal_salud_sin_match(db: Session) -> list[dict]:
     return [{"nombre": r[0], "total": r[1]} for r in rows]
 
 
+def _nhc_a_entero(nhc: str | None) -> str | None:
+    """Convierte un `no_historia_clinica` a su forma entera cuando venía como
+    número en notación científica (ej. '1.78837E+12' → '1788370000000').
+
+    Excel/CSV guardó CUIs largos como float. Se expande para poder cruzar
+    contra `pacientes.cui`. Devuelve None si no es recuperable."""
+    if not nhc:
+        return None
+    s = nhc.strip()
+    m = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)[eE]\+?([0-9]+)", s)
+    if not m:
+        return None
+    try:
+        val = int(round(float(s)))
+    except (ValueError, OverflowError):
+        return None
+    return str(val)
+
+
+def _resolver_paciente_normalizacion(db: Session, reg, cache: dict) -> int | None:
+    """Resuelve `paciente_id` para un registro de staging, en este orden:
+
+    1. `no_historia_clinica` = `pacientes.expediente`
+    2. `no_historia_clinica` = `consultas.documento` (→ paciente_id de la consulta)
+    3. `no_historia_clinica` = `pacientes.cui` (incluye NH en notación científica)
+
+    Devuelve el id de paciente o None. Usa `cache` para no repetir consultas.
+    """
+    nhc = (reg.no_historia_clinica or "").strip()
+    if not nhc:
+        return None
+    if nhc in cache:
+        return cache[nhc]
+
+    paciente_id: int | None = None
+
+    # 1. expediente
+    row = db.execute(
+        text("SELECT id FROM pacientes WHERE btrim(expediente) = :n LIMIT 1"),
+        {"n": nhc},
+    ).first()
+    if row:
+        paciente_id = row[0]
+
+    # 2. documento de consulta
+    if paciente_id is None:
+        row = db.execute(
+            text("SELECT paciente_id FROM consultas WHERE btrim(documento) = :n ORDER BY id LIMIT 1"),
+            {"n": nhc},
+        ).first()
+        if row:
+            paciente_id = row[0]
+
+    # 3. CUI (bigint). Se expande la notación científica y se compara numérico.
+    if paciente_id is None:
+        candidatos = {nhc}
+        expandido = _nhc_a_entero(nhc)
+        if expandido:
+            candidatos.add(expandido)
+        for cand in candidatos:
+            if not cand.isdigit():
+                continue
+            row = db.execute(
+                text("SELECT id FROM pacientes WHERE cui = CAST(:n AS bigint) LIMIT 1"),
+                {"n": cand},
+            ).first()
+            if row:
+                paciente_id = row[0]
+                break
+
+    cache[nhc] = paciente_id
+    return paciente_id
+
+
 def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
              ids: list[int] | None = None, max_registros: int | None = None) -> dict:
     """Migra registros de sigsa3 (staging) a sigsa3_registros (normalizado).
 
-    - Solo migra registros con paciente_id (obligatorio).
-      personal_atencion_id y consulta_id son opcionales.
+    - Migra TODOS los registros (con o sin paciente). Cuando no hay paciente,
+      se normaliza igual con `paciente_id NULL` y `sin_asociar=True`, copiando
+      los valores crudos (nombre, nhc, sexo, edades, tipo_consulta, cie10,
+      personal_salud) para no perder información.
+    - Antes de normalizar intenta resolver `paciente_id` por cadena:
+      expediente → documento de consulta → CUI (ver `_resolver_paciente_normalizacion`).
     - Copia sigsa3_id (id del staging) en sigsa3_registros para trazabilidad.
     - NO borra en línea: al final purga de sigsa3 los id migrados (los que
       tienen sigsa3_id en sigsa3_registros). En staging solo quedan huérfanos.
@@ -2218,16 +2296,16 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
     """
     cie10_cache = {}
     esp_cache = {}
+    paciente_cache = {}
 
-    base_filter = [
-        Sigsa3Model.paciente_id.isnot(None),
-        Sigsa3Model.paciente_id != 0,
-    ]
+    base_filter = []
     if ids:
         base_filter.append(Sigsa3Model.id.in_(ids))
 
     if dry_run:
-        q = db.query(Sigsa3Model).filter(*base_filter)
+        q = db.query(Sigsa3Model)
+        if base_filter:
+            q = q.filter(*base_filter)
         migrables = q.count()
         stats = _stats_staging(db)
         if ids:
@@ -2256,6 +2334,8 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
     res_cie10_existente = 0
     res_cie10_creado = 0
     res_cie10_pendiente = 0
+    total_sin_paciente = 0
+    total_paciente_resuelto = 0
 
     def _resoluciones():
         return {
@@ -2263,22 +2343,32 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
             "cie10_existente": res_cie10_existente,
             "cie10_creado_auto": res_cie10_creado,
             "cie10_pendiente": res_cie10_pendiente,
+            "paciente_resuelto_en_normalizacion": total_paciente_resuelto,
+            "migrados_sin_paciente": total_sin_paciente,
         }
 
     while True:
-        query = (
-            db.query(Sigsa3Model)
-            .filter(*base_filter)
-            .order_by(Sigsa3Model.id)
-            .limit(batch_size)
+        query = db.query(Sigsa3Model)
+        if base_filter:
+            query = query.filter(*base_filter)
+        registros = (
+            query.order_by(Sigsa3Model.id).limit(batch_size).all()
         )
-        registros = query.all()
         if not registros:
             break
 
         lote_ids = []  # sigsa3_id de los migrados en este lote (rastro de purga)
         for reg in registros:
             try:
+                paciente_id = reg.paciente_id
+                if not paciente_id:
+                    paciente_id = _resolver_paciente_normalizacion(db, reg, paciente_cache)
+                    if paciente_id:
+                        total_paciente_resuelto += 1
+                sin_asociar = not paciente_id
+                if sin_asociar:
+                    total_sin_paciente += 1
+
                 tipo_id = _resolver_tipo_consulta_id(reg.tipo_consulta) or reg.tipo_consulta_id
                 if tipo_id is not None:
                     res_tipo += 1
@@ -2299,7 +2389,7 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
                 esp_id = reg.especialidad_id
 
                 nuevo = Sigsa3RegistroModel(
-                    paciente_id=reg.paciente_id,
+                    paciente_id=paciente_id,
                     personal_atencion_id=reg.personal_atencion_id,
                     personal_salud_id=reg.personal_salud_id,
                     consulta_id=reg.consulta_id,
@@ -2310,6 +2400,16 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
                     codigo_cie_10_id=cie10_id,
                     especialidad_id=esp_id,
                     sigsa3_id=reg.id,
+                    sin_asociar=sin_asociar,
+                    nombre_paciente=reg.nombre_paciente,
+                    no_historia_clinica=reg.no_historia_clinica,
+                    sexo=reg.sexo,
+                    edad_anios=reg.edad_anios,
+                    edad_meses=reg.edad_meses,
+                    edad_dias=reg.edad_dias,
+                    tipo_consulta=reg.tipo_consulta,
+                    codigo_cie_10=reg.codigo_cie_10,
+                    personal_salud=reg.personal_salud,
                 )
                 db.add(nuevo)
                 db.flush()

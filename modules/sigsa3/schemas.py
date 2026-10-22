@@ -60,7 +60,7 @@ class Sigsa3Out(Sigsa3Base):
 
 class Sigsa3RegistroOut(BaseModel):
     id: int
-    paciente_id: int
+    paciente_id: Optional[int] = None
     personal_atencion_id: Optional[int] = None
     personal_salud_id: Optional[int] = None
     consulta_id: Optional[int] = None
@@ -71,6 +71,16 @@ class Sigsa3RegistroOut(BaseModel):
     codigo_cie_10_id: Optional[int] = None
     especialidad_id: Optional[int] = None
     sigsa3_id: Optional[int] = None
+    sin_asociar: bool = False
+    nombre_paciente: Optional[str] = None
+    no_historia_clinica: Optional[str] = None
+    sexo: Optional[str] = None
+    edad_anios: Optional[int] = None
+    edad_meses: Optional[int] = None
+    edad_dias: Optional[int] = None
+    tipo_consulta: Optional[str] = None
+    codigo_cie_10: Optional[str] = None
+    personal_salud: Optional[str] = None
     normalized_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)

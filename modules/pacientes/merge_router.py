@@ -18,6 +18,25 @@ from .service import agregar_evento
 router = APIRouter(prefix="/pacientes", tags=["merge_paciente"])
 
 
+_VALORES_BASURA = {"nan", "null", "none", "undefined", "n/a", "na", "0"}
+
+
+def _es_vacio(valor) -> bool:
+    """Determina si un valor debe considerarse 'vacío' para el merge.
+
+    Además de None y cadena vacía, trata como vacío la basura típica de
+    importaciones: 'nan', 'null', 'N/A', el string '0', y el 0 numérico.
+    No toca valores legítimos (p. ej. 0.0 de coordenadas no existen aquí)."""
+    if valor is None:
+        return True
+    if isinstance(valor, str):
+        return valor.strip().lower() in _VALORES_BASURA or valor.strip() == ""
+    if isinstance(valor, (int, float)) and not isinstance(valor, bool):
+        return valor == 0
+    return False
+
+
+
 def merge_telefonos(principal, duplicado):
     """
     Fusiona teléfonos de contacto manejando tanto strings como arrays.
@@ -46,7 +65,7 @@ def merge_telefonos(principal, duplicado):
         for t in lista:
             if t is not None:
                 t_str = str(t).strip()
-                if t_str and t_str != "":
+                if t_str and not _es_vacio(t_str):
                     limpia.append(t_str)
         return limpia
 
@@ -66,21 +85,29 @@ def merge_telefonos(principal, duplicado):
     flag_modified(principal, "contacto")
 
 
-def merge_campos_unicos(principal, duplicado, db: Session):
+def merge_campos_unicos(principal, duplicado, db: Session, valores_dup: dict | None = None):
     """
     Maneja el merge de campos con constraint UNIQUE.
     Si el duplicado tiene un valor y el principal no, lo asigna.
-    Si ambos tienen valores diferentes, o si el valor ya existe en otro paciente, los guarda en datos_extra del principal.
+    Si ambos tienen valores diferentes, o si el valor ya existe en otro paciente,
+    los guarda en datos_extra del principal.
+
+    `valores_dup` permite pasar un snapshot de los valores del duplicado cuando
+    estos ya fueron liberados en el objeto (cui/expediente/pasaporte = None) para
+    evitar la violación del UNIQUE durante la transacción.
     """
     campos_unicos = ["cui", "expediente", "pasaporte"]
     campos_alternativos = {}
 
     for campo in campos_unicos:
         valor_principal = getattr(principal, campo, None)
-        valor_dup = getattr(duplicado, campo, None)
+        if valores_dup is not None and campo in valores_dup:
+            valor_dup = valores_dup[campo]
+        else:
+            valor_dup = getattr(duplicado, campo, None)
 
-        if valor_dup is not None:
-            if valor_principal is None:
+        if not _es_vacio(valor_dup):
+            if _es_vacio(valor_principal):
                 ya_existe = db.query(PacienteModel).filter(
                     getattr(PacienteModel, campo) == valor_dup,
                     PacienteModel.id.notin_([principal.id, duplicado.id]),
@@ -101,10 +128,23 @@ def merge_campos_unicos(principal, duplicado, db: Session):
         if principal.datos_extra is None:
             principal.datos_extra = {}
 
+        # El CUI del registro NO principal se guarda en datos_extra.personaid.
+        # Si hay varios CUIs alternos, se agregan al final separados por espacio.
+        cuis_alternos = campos_alternativos.get("cui", [])
+        if cuis_alternos:
+            existentes = str(principal.datos_extra.get("personaid") or "").split()
+            for valor in cuis_alternos:
+                v = str(valor)
+                if v not in existentes:
+                    existentes.append(v)
+            principal.datos_extra["personaid"] = " ".join(existentes)
+
         if "merge" not in principal.datos_extra:
             principal.datos_extra["merge"] = {}
 
         for campo, valores in campos_alternativos.items():
+            if campo == "cui":
+                continue
             if campo not in principal.datos_extra["merge"]:
                 principal.datos_extra["merge"][campo] = []
 
@@ -134,7 +174,9 @@ def merge_nombre(principal, duplicado):
 
 
 def merge_contacto(principal, duplicado):
-    """Fusiona el contacto: combina teléfonos y rellena los demás campos vacíos."""
+    """Fusiona el contacto: combina teléfonos, completa los campos vacíos o con
+    basura del principal con los del duplicado y, si ambos tienen valor, conserva
+    el más completo (evita pisar un dato bueno con uno truncado/basura)."""
     merge_telefonos(principal, duplicado)
 
     c_pri = principal.contacto or {}
@@ -145,7 +187,17 @@ def merge_contacto(principal, duplicado):
         if key == "telefonos":
             continue
         valor_pri = c_pri.get(key)
-        if (valor_pri is None or valor_pri == "") and value not in (None, ""):
+        if _es_vacio(valor_pri) and not _es_vacio(value):
+            c_pri[key] = value
+            cambiado = True
+        elif (
+            not _es_vacio(valor_pri)
+            and not _es_vacio(value)
+            and isinstance(valor_pri, str)
+            and isinstance(value, str)
+            and len(value.strip()) > len(valor_pri.strip())
+        ):
+            # Ambos con valor: preferir el más completo (más largo).
             c_pri[key] = value
             cambiado = True
 
@@ -166,7 +218,7 @@ def _fill_campos_vacios(principal, duplicado):
     for campo in campos:
         valor_pri = getattr(principal, campo, None)
         valor_dup = getattr(duplicado, campo, None)
-        if (valor_pri is None or valor_pri == "") and valor_dup not in (None, ""):
+        if _es_vacio(valor_pri) and not _es_vacio(valor_dup):
             setattr(principal, campo, valor_dup)
 
     # Metadatos: conservar auditoría del duplicado también
@@ -198,7 +250,7 @@ def _deep_fill(dest: dict, fuente: dict) -> bool:
                     cambiado = True
         else:
             valor_pri = dest.get(key)
-            if (valor_pri is None or valor_pri == "") and value not in (None, ""):
+            if _es_vacio(valor_pri) and not _es_vacio(value):
                 dest[key] = value
                 cambiado = True
     return cambiado
@@ -254,25 +306,34 @@ def merge_expedientes_anteriores(principal, duplicado):
 def merge_referencias(principal, duplicado):
     """
     Fusiona las referencias evitando duplicados por nombre y parentesco.
+    Si el duplicado trae una referencia con el mismo nombre+parentesco que ya
+    existe, completa sus campos vacíos (teléfono, idpersona, expediente, etc.)
+    en vez de descartarla por completo.
     """
     if not duplicado.referencias:
         return
 
     referencias_actuales = principal.referencias or []
 
-    refs_existentes = set()
-    for ref in referencias_actuales:
-        nombre = (ref.get("nombre") or "").strip().upper()
-        parentesco = (ref.get("parentesco") or "").strip().lower()
-        refs_existentes.add((nombre, parentesco))
+    def _clave(ref: dict):
+        return (
+            (ref.get("nombre") or "").strip().upper(),
+            (ref.get("parentesco") or "").strip().lower(),
+        )
+
+    por_clave = {_clave(ref): ref for ref in referencias_actuales}
 
     for ref_dup in duplicado.referencias:
-        nombre = (ref_dup.get("nombre") or "").strip().upper()
-        parentesco = (ref_dup.get("parentesco") or "").strip().lower()
-
-        if (nombre, parentesco) not in refs_existentes:
+        clave = _clave(ref_dup)
+        existente = por_clave.get(clave)
+        if existente is None:
             referencias_actuales.append(ref_dup)
-            refs_existentes.add((nombre, parentesco))
+            por_clave[clave] = ref_dup
+        else:
+            # Completar campos vacíos / basura de la referencia existente.
+            for k, v in ref_dup.items():
+                if _es_vacio(existente.get(k)) and not _es_vacio(v):
+                    existente[k] = v
 
     principal.referencias = referencias_actuales
     flag_modified(principal, "referencias")
@@ -330,19 +391,37 @@ def merge_pacientes(
                     detail=f"El paciente ID {dup.id} ya está marcado como inactivo"
                 )
 
-            # El CUI puede colisionar con el principal; se conserva como referencia antes de liberar el UNIQUE.
+            merge_nombre(principal, dup)
+            merge_contacto(principal, dup)
+
+            # Capturar los valores únicos del duplicado ANTES de liberarlos, para
+            # poder copiarlos al principal luego sin violar el UNIQUE.
+            valores_dup = {
+                "cui": dup.cui,
+                "expediente": dup.expediente,
+                "pasaporte": dup.pasaporte,
+            }
+
+            # Liberar el UNIQUE del duplicado PRIMERO y persistirlo (flush), para
+            # que al copiar su cui/expediente/pasaporte al principal no se viole el
+            # constraint por tener el mismo valor en dos filas dentro de la txn.
+            # Se conserva el CUI original como referencia (personaid).
             if dup.cui is not None:
                 if dup.datos_extra is None:
                     dup.datos_extra = {}
                 if "personaid" not in dup.datos_extra:
                     dup.datos_extra["personaid"] = str(dup.cui)
-                dup.cui = None
                 flag_modified(dup, "datos_extra")
 
-            merge_nombre(principal, dup)
-            merge_contacto(principal, dup)
+            dup.cui = None
+            dup.expediente = None
+            dup.pasaporte = None
+            db.flush()
 
-            campos_alt = merge_campos_unicos(principal, dup, db)
+            # Copiar campos únicos (cui/expediente/pasaporte) del duplicado al
+            # principal si le faltan; si el principal ya tiene valor, el del
+            # duplicado queda como alternativa en datos_extra.merge.
+            campos_alt = merge_campos_unicos(principal, dup, db, valores_dup)
 
             _fill_campos_vacios(principal, dup)
 
@@ -354,10 +433,6 @@ def merge_pacientes(
             if hasattr(dup, 'consultas'):
                 for consulta in dup.consultas:
                     consulta.paciente_id = principal.id
-
-            dup.cui = None
-            dup.expediente = None
-            dup.pasaporte = None
 
             dup.estado = "I"
 

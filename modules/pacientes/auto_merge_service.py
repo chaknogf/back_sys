@@ -134,28 +134,39 @@ def auto_merge_duplicados(
             for dup in duplicados:
                 if dup.estado == "I":
                     continue
+
+                # Snapshot de los campos únicos ANTES de liberarlos.
+                valores_dup = {
+                    "cui": dup.cui,
+                    "expediente": dup.expediente,
+                    "pasaporte": dup.pasaporte,
+                }
+
+                # Liberar el UNIQUE del duplicado y persistir (flush) antes de
+                # copiar su cui/expediente/pasaporte al maestro.
                 if dup.cui is not None:
                     if dup.datos_extra is None:
                         dup.datos_extra = {}
                     if "personaid" not in dup.datos_extra:
                         dup.datos_extra["personaid"] = str(dup.cui)
-                    dup.cui = None
                     from sqlalchemy.orm.attributes import flag_modified
                     flag_modified(dup, "datos_extra")
-
-                merge_telefonos(master, dup)
-                merge_nombre(master, dup)
-                merge_campos_unicos(master, dup, db)
-                _fill_campos_vacios(master, dup)
-                merge_datos_extra(master, dup)
-                merge_referencias(master, dup)
-                merge_expedientes_anteriores(master, dup)
-
-                _reasignar_dependientes(db, dup.id, master.id)
 
                 dup.cui = None
                 dup.expediente = None
                 dup.pasaporte = None
+                db.flush()
+
+                merge_telefonos(master, dup)
+                merge_nombre(master, dup)
+                merge_campos_unicos(master, dup, db, valores_dup)
+                _fill_campos_vacios(master, dup)
+                merge_datos_extra(master, dup)
+                merge_referencias(master, dup)
+                merge_expedientes_anteriores(master, dup, valores_dup.get("expediente"))
+
+                _reasignar_dependientes(db, dup.id, master.id)
+
                 dup.estado = "I"
 
                 agregar_evento(dup, usuario=usuario, accion="AUTO_MERGE",

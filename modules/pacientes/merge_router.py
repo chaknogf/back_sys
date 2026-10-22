@@ -280,12 +280,13 @@ def merge_datos_extra(principal, duplicado):
         flag_modified(principal, "datos_extra")
 
 
-def merge_expedientes_anteriores(principal, duplicado):
+def merge_expedientes_anteriores(principal, duplicado, expediente_dup=None):
     """Conserva los expedientes de los duplicados en el principal como lista
-    de expedientes anteriores (sin duplicados)."""
+    de expedientes anteriores (sin duplicados). `expediente_dup` permite pasar
+    el valor original cuando ya fue liberado del objeto duplicado."""
     from sqlalchemy.orm.attributes import flag_modified
 
-    exp_dup = duplicado.expediente
+    exp_dup = expediente_dup if expediente_dup is not None else duplicado.expediente
     if not exp_dup:
         return
     exp_pri = principal.expediente
@@ -428,7 +429,7 @@ def merge_pacientes(
             merge_datos_extra(principal, dup)
 
             merge_referencias(principal, dup)
-            merge_expedientes_anteriores(principal, dup)
+            merge_expedientes_anteriores(principal, dup, valores_dup.get("expediente"))
 
             if hasattr(dup, 'consultas'):
                 for consulta in dup.consultas:

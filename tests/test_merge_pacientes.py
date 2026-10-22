@@ -14,6 +14,7 @@ from modules.pacientes.merge_router import (
     merge_referencias,
     merge_campos_unicos,
     merge_datos_extra,
+    merge_expedientes_anteriores,
     _fill_campos_vacios,
 )
 
@@ -140,6 +141,34 @@ class TestCamposUnicos:
         merge_campos_unicos(pri, dup, db_session)
 
         assert pri.datos_extra["personaid"] == "1111111111111 3596692999005"
+
+
+class TestExpedientesAnteriores:
+    def test_expediente_dup_va_a_anteriores(self):
+        pri = _pac(expediente="26A-100")
+        dup = _pac(expediente="26A-200")
+
+        merge_expedientes_anteriores(pri, dup)
+
+        assert pri.datos_extra["expedientes_anteriores"] == ["26A-200"]
+
+    def test_expediente_desde_snapshot_tras_liberar(self):
+        """El endpoint libera dup.expediente=None antes de llamar la función; el
+        valor original se pasa por snapshot."""
+        pri = _pac(expediente="26A-100")
+        dup = _pac(expediente=None)
+
+        merge_expedientes_anteriores(pri, dup, "26A-200")
+
+        assert pri.datos_extra["expedientes_anteriores"] == ["26A-200"]
+
+    def test_no_duplica_expediente_igual_al_principal(self):
+        pri = _pac(expediente="26A-100")
+        dup = _pac(expediente="26A-100")
+
+        merge_expedientes_anteriores(pri, dup)
+
+        assert not (pri.datos_extra or {}).get("expedientes_anteriores")
 
 
 class TestFillCamposVacios:

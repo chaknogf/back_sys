@@ -230,7 +230,7 @@ def buscar_consultas_por_paciente(
 def desactivar_consulta(
     consulta_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
+    current_user: UserModel = Depends(get_current_admin_user)
 ):
     return service_desactivar_consulta(consulta_id, db, current_user)
 
@@ -239,7 +239,7 @@ def desactivar_consulta(
 def eliminar_consulta(
     consulta_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
+    current_user: UserModel = Depends(get_current_admin_user)
 ):
     """Elimina físicamente una consulta mediante el servicio de mantenimiento."""
     return service_eliminar_consulta(consulta_id, db)

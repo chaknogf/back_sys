@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from core.database import get_db
 from core.limiter import limiter
-from core.security import get_current_user
+from core.security import get_current_user, get_current_admin_user
 from modules.users.models import UserModel
 from modules.agente.schemas import (
     ReglaAgenteCreate,
@@ -102,7 +102,7 @@ def listar_reglas(
 def crear_regla(
     body: ReglaAgenteCreate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     if body.tipo not in ("sinonimo_entidad", "sinonimo_agrupacion", "sinonimo_medida"):
         raise HTTPException(400, "tipo inválido")
@@ -123,7 +123,7 @@ def crear_regla(
 def eliminar_regla(
     regla_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     regla = db.get(ReglaAgente, regla_id)
     if not regla:

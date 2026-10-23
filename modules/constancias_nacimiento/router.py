@@ -10,7 +10,7 @@ from sqlalchemy import inspect, desc, func, or_
 from sqlalchemy.orm import Session, joinedload, attributes
 from decimal import Decimal
 from core.database import get_db
-from core.security import get_current_user
+from core.security import get_current_user, get_current_admin_user
 from core.config import APP_TIMEZONE
 from modules.users.models import UserModel
 from modules.constancias_nacimiento.models import ConstanciaNacimientoModel
@@ -277,7 +277,7 @@ def actualizar_estado_informe(
 def eliminar_constancia(
     constancia_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
+    current_user: UserModel = Depends(get_current_admin_user)
 ):
     constancia = db.get(ConstanciaNacimientoModel, constancia_id)
     if not constancia:

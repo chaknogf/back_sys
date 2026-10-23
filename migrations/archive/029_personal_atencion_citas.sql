@@ -10,7 +10,7 @@
 -- 4) Agrega `citas.personal_atencion_id` (quién atiende la cita).
 --
 -- Aplicar en producción:
---   PGPASSWORD=secreto123 psql -h localhost -U admin -d hospital \
+--   PGPASSWORD=<tu_password> psql -h localhost -U admin -d hospital \
 --     -v ON_ERROR_STOP=1 -f migrations/029_personal_atencion_citas.sql
 -- =====================================================================
 

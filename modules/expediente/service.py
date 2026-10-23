@@ -8,7 +8,11 @@ from core.config import APP_TIMEZONE
 
 
 def _generar_correlativo(db: Session, tipo: str, formato: str) -> str:
-    """Bloquea la fila anual durante el incremento y confirma el contador antes de devolverlo."""
+    """Incrementa el contador anual bajo bloqueo de fila.
+
+    No confirma la transacción: el llamador hace commit (o rollback) junto con
+    el resto de su operación, para que el correlativo y el documento que lo usa
+    sean atómicos."""
     anio_actual = int(datetime.now(APP_TIMEZONE).strftime("%y"))
     control = (
         db.query(CorrelativoControl)
@@ -25,7 +29,7 @@ def _generar_correlativo(db: Session, tipo: str, formato: str) -> str:
         db.flush()
     control.ultimo_correlativo += 1
     correlativo = control.ultimo_correlativo
-    db.commit()
+    db.flush()
     return formato.format(correlativo=correlativo, anio=anio_actual)
 
 

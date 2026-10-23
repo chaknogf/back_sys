@@ -93,7 +93,7 @@ def actualizar_intervencion(
 def eliminar_intervencion(
     intervencion_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return svc.eliminar_intervencion(intervencion_id, db)
 

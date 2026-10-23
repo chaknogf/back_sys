@@ -1,13 +1,20 @@
+import os
+import sys
 import httpx
 import json
 import time
 
 BASE = 'http://127.0.0.1:8000/fah'
 
+ADMIN_USER = os.environ.get('PIPELINE_USER')
+ADMIN_PASSWORD = os.environ.get('PIPELINE_PASSWORD')
+if not ADMIN_USER or not ADMIN_PASSWORD:
+    sys.exit('Defina PIPELINE_USER y PIPELINE_PASSWORD en el entorno.')
+
 with httpx.Client(timeout=300) as client:
     # Login (form data OAuth2)
     login = client.post(f'{BASE}/auth/login',
-                        data={'username': 'admin', 'password': 'admin'})
+                        data={'username': ADMIN_USER, 'password': ADMIN_PASSWORD})
     if login.status_code != 200:
         print(f'Login failed: {login.status_code} {login.text}')
         exit(1)

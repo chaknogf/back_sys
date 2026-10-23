@@ -447,7 +447,7 @@ def actualizar_procedimiento_medico(
 @router.delete("/{id:int}")
 def eliminar_procedimiento_medico(
     id: int,
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     procedimiento = (

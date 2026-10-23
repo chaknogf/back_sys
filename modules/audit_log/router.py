@@ -5,7 +5,7 @@ from typing import Optional
 from datetime import datetime
 
 from core.database import get_db
-from core.security import get_current_user
+from core.security import get_current_user, get_current_admin_user
 from modules.users.models import UserModel
 from .models import AuditLogModel
 
@@ -21,7 +21,7 @@ def listar_logs(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     query = db.query(AuditLogModel).order_by(desc(AuditLogModel.fecha_hora))
 

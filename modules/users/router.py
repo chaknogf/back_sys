@@ -4,10 +4,23 @@ from typing import Optional
 
 from core.database import get_db
 from core.limiter import limiter
-from core.security import get_current_user, create_password_reset_token
+from core.security import (
+    Role,
+    create_password_reset_token,
+    get_current_user,
+    require_role,
+)
 from core.config import APP_BASE_URL
 from .models import UserModel
-from .schemas import UserCreate, UserResponse, UserUpdate, UsersList, SolicitarRecuperacion, ConfirmarRecuperacion
+from .schemas import (
+    UserCreate,
+    UserResponse,
+    UserSelfUpdate,
+    UserAdminUpdate,
+    UsersList,
+    SolicitarRecuperacion,
+    ConfirmarRecuperacion,
+)
 from .service import (
     list_users,
     get_user_by_id,
@@ -31,10 +44,8 @@ def listar_usuarios(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
+    current_user: UserModel = Depends(require_role(Role.ADMIN))
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="No autorizado")
     filters = {k: v for k, v in {"id": id, "username": username, "email": email, "rol": rol}.items() if v is not None}
     return list_users(db, filters, skip, limit)
 
@@ -43,7 +54,7 @@ def listar_usuarios(
 def obtener_usuario(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
+    current_user: UserModel = Depends(require_role(Role.ADMIN))
 ):
     return get_user_by_id(db, user_id)
 
@@ -53,10 +64,8 @@ async def crear_usuario(
     user_data: UserCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
+    current_user: UserModel = Depends(require_role(Role.ADMIN))
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Solo admins pueden crear usuarios")
     nuevo_usuario = create_user(db, user_data)
     background_tasks.add_task(send_welcome_email, nuevo_usuario)
     return nuevo_usuario
@@ -65,13 +74,25 @@ async def crear_usuario(
 @router.put("/{user_id}", response_model=UserResponse)
 def actualizar_usuario(
     user_id: int,
-    update_data: UserUpdate,
+    update_data: UserAdminUpdate,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
+    # La autoridad real está en `update_user`: descarta `role`/`estado` si el
+    # solicitante no es admin y bloquea la edición de otros perfiles.
     if current_user.role != "admin" and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="No autorizado")
-    return update_user(db, user_id, update_data)
+    return update_user(db, user_id, update_data, current_user=current_user)
+
+
+@router.patch("/me", response_model=UserResponse)
+def actualizar_mi_perfil(
+    update_data: UserSelfUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Auto-edición segura de perfil: nunca acepta `role` ni `estado`."""
+    return update_user(db, current_user.id, update_data, current_user=current_user)
 
 
 @router.post("/recuperar/solicitar")
@@ -118,10 +139,8 @@ def confirmar_restablecer(
 def eliminar_usuario(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
+    current_user: UserModel = Depends(require_role(Role.ADMIN))
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Solo admins pueden eliminar")
     if current_user.id == user_id:
         raise HTTPException(status_code=400, detail="No puedes eliminarte a ti mismo")
     delete_user(db, user_id)

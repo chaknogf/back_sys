@@ -1,3 +1,4 @@
+import uuid
 import pytest
 import time as _time
 from datetime import date, datetime, timedelta
@@ -161,7 +162,7 @@ class TestEspecialidades:
         s = _sufijo()
         r = client.post("/especialidades/", headers=admin_headers, json={
             "nombre": f"TEST-ESP-{s}",
-            "abreviatura": f"TE{s[-3:]}",
+            "abreviatura": "T" + uuid.uuid4().hex[:8].upper(),
         })
         assert r.status_code in (200, 201)
         created_ids["especialidades"].append(r.json()["id"])

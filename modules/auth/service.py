@@ -2,6 +2,7 @@
 
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
+from core.config import ACCESS_TOKEN_EXPIRE_MINUTES
 from core.security import verify_password, create_access_token
 from modules.users.models import UserModel
 
@@ -28,7 +29,7 @@ def authenticate_user(db: Session, username: str, password: str) -> dict:
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "expires_in": 86400,
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         "user": {
             "id": user.id,
             "nombre": user.nombre,

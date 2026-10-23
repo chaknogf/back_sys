@@ -3,7 +3,7 @@
 Mapeo de las modificaciones SQL del proyecto y comandos para aplicarlas.
 
 - **Motor**: PostgreSQL, base `hospital` en `localhost`.
-- **Conexión usada**: `psql -h localhost -U admin -d hospital` (password `secreto123`).
+- **Conexión usada**: `psql -h localhost -U admin -d hospital` (password en la variable `PGPASSWORD`).
 - **Estado actual**: `002` → `030` aplicadas, más `032_procedimientos_unificado.sql`, `074_quirofano_intervencion_especialidad.sql`, `075_quirofano_intervencion_consulta.sql`, `078_quirofano_config_periodo.sql`, `080_catalogo_procedimientos_nuevos.sql`, `081_ciclos_consulta_quirofano.sql`, `082_ciclos_consulta_indice_ultima_nota.sql`, `083_catalogo_procedimientos_especialidades.sql`, `084_almacen_insumos.sql`, `085_proce_medicos_no_especificado.sql` y `086_sigsa3_registros_sin_paciente.sql`.
   El rango `031` → `073` (parches one-off con IDs hardcodeados del dump de
   producción) fue **consolidado y eliminado**; no existe `001` (el esquema base de
@@ -15,7 +15,7 @@ Mapeo de las modificaciones SQL del proyecto y comandos para aplicarlas.
 Una migración:
 
 ```bash
-PGPASSWORD=secreto123 psql -h localhost -U admin -d hospital \
+PGPASSWORD=<tu_password> psql -h localhost -U admin -d hospital \
   -v ON_ERROR_STOP=1 -f migrations/030_censo_camas_unificar_sexos.sql
 ```
 

@@ -427,6 +427,17 @@ def _apply_expediente_range(query, desde: Optional[str], hasta: Optional[str]):
     return query
 
 
+def _unir_ultima_consulta(query, ultima_consulta, join_type: str):
+    """'inner': solo pacientes con consultas activas. 'outer': incluye también los
+    pacientes sin ninguna consulta (ultima_fecha NULL)."""
+    condicion = PacienteModel.id == ultima_consulta.c.paciente_id
+    if join_type == "outer":
+        return query.outerjoin(ultima_consulta, condicion)
+    if join_type == "inner":
+        return query.join(ultima_consulta, condicion)
+    raise ValueError(f"join_type no soportado: {join_type!r}")
+
+
 def _exec_expedientes_query(
     db: Session,
     ultima_consulta,
@@ -442,8 +453,7 @@ def _exec_expedientes_query(
     hace_un_anio = date(date.today().year - 1, date.today().month, date.today().day)
 
     count_query = (
-        db.query(PacienteModel.id)
-        .join(ultima_consulta, PacienteModel.id == ultima_consulta.c.paciente_id)
+        _unir_ultima_consulta(db.query(PacienteModel.id), ultima_consulta, join_type)
         .filter(PacienteModel.estado != "I")
         .filter(PacienteModel.expediente.isnot(None))
         .filter(PacienteModel.expediente != "")
@@ -462,9 +472,11 @@ def _exec_expedientes_query(
     total = count_query.count()
 
     data_query = (
-        db.query(PacienteModel, ultima_consulta.c.ultima_fecha)
-        .options(load_only(*_LIST_COLS))
-        .join(ultima_consulta, PacienteModel.id == ultima_consulta.c.paciente_id)
+        _unir_ultima_consulta(
+            db.query(PacienteModel, ultima_consulta.c.ultima_fecha).options(load_only(*_LIST_COLS)),
+            ultima_consulta,
+            join_type,
+        )
         .filter(PacienteModel.estado != "I")
         .filter(PacienteModel.expediente.isnot(None))
         .filter(PacienteModel.expediente != "")

@@ -3,7 +3,7 @@
 import os
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -98,6 +98,8 @@ from modules.quirofano.router import router as quirofano_router
 from modules.variables.router import router as variables_router
 from modules.insumos.router import router as insumos_router
 
+from core.security import write_guard as _write_guard
+
 app = FastAPI(
     lifespan=lifespan,
     title="Hospital General Tipo I de Tecpán - Sistema FAH",
@@ -126,6 +128,9 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     root_path="/fah",
+    # RBAC global: POST/PUT/PATCH/DELETE exigen rol con nivel de escritura
+    # (admin/editor/regular). Los GET quedan abiertos al rol read_only.
+    dependencies=[Depends(_write_guard)],
 )
 
 app.state.limiter = limiter  # shared instance from core/limiter.py

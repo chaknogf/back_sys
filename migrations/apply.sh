@@ -9,7 +9,11 @@ set -euo pipefail
 PGHOST="${PGHOST:-localhost}"
 PGUSER="${PGUSER:-admin}"
 PGDATABASE="${PGDATABASE:-hospital}"
-export PGPASSWORD="${PGPASSWORD:-secreto123}"
+if [ -z "${PGPASSWORD:-}" ]; then
+  echo "Defina PGPASSWORD en el entorno antes de ejecutar este script." >&2
+  exit 1
+fi
+export PGPASSWORD
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

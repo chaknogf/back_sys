@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from core.dependencies import get_db, get_current_user
+from core.dependencies import get_db, get_current_user, get_current_admin_user
 from modules.users.models import UserModel
 from .schemas import (
     Sigsa3RegistroCreate,
@@ -98,6 +98,6 @@ def actualizar(
 def eliminar(
     registro_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service_eliminar(registro_id, db)

@@ -27,6 +27,9 @@ echo ""
 echo "[4/9] Instalando dependencias (versiones fijadas en requirements.txt)..."
 pip install -r requirements.txt
 
+echo "  → Verificando consistencia de dependencias (pip check)..."
+pip check
+
 echo ""
 echo "[5/9] Ejecutando migraciones de seguridad..."
 python -c "
@@ -71,6 +74,14 @@ echo "  → Total conexiones estimadas: $((WORKERS * ${DB_POOL_SIZE:-10}))"
 
 echo ""
 echo "[10/9] Reiniciando servicio..."
+echo "  → Verificando Redis (requerido en producción: rate limit y caché compartidos)..."
+python -c "
+from core.config import REDIS_URL
+import redis
+redis.Redis.from_url(REDIS_URL, socket_connect_timeout=3).ping()
+print('  → Redis OK:', REDIS_URL)
+" || { echo 'ERROR: Redis no responde. Abortando antes de reiniciar el servicio.'; exit 1; }
+
 # Si usas systemd con gunicorn:
 #   sudo cp backsyshospital.service /etc/systemd/system/
 #   sudo systemctl daemon-reload

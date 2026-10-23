@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from core.security import hash_password, verify_password_reset_token
 from modules.users.models import UserModel
-from modules.users.schemas import UserCreate, UserUpdate
+from modules.users.schemas import UserCreate
 from core.mail import mail_config
 from fastapi_mail import FastMail, MessageSchema, MessageType
 
@@ -50,11 +50,43 @@ def create_user(db: Session, user_data: UserCreate):
     return nuevo_usuario
 
 
-def update_user(db: Session, user_id: int, update_data: UserUpdate):
+# Campos que únicamente un administrador puede modificar. Se filtran por
+# lista blanca en `update_user`, sin importar qué esquema o payload reciba.
+CAMPOS_SOLO_ADMIN = frozenset({"role", "estado"})
+
+
+def update_user(db: Session, user_id: int, update_data, current_user: UserModel):
+    """Actualiza un usuario aplicando una lista blanca estricta.
+
+    Un solicitante que no sea `admin` no puede modificar el perfil de otro
+    usuario ni cambiar los campos privilegiados (`role`, `estado`), aunque el
+    payload los incluya: se descartan por código y se registra el intento.
+    """
     usuario = db.query(UserModel).filter(UserModel.id == user_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    for key, value in update_data.model_dump(exclude_unset=True).items():
+
+    es_admin = getattr(current_user, "role", None) == "admin"
+    if not es_admin and current_user.id != usuario.id:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    datos = update_data.model_dump(exclude_unset=True)
+
+    if not es_admin:
+        bloqueados = CAMPOS_SOLO_ADMIN.intersection(datos)
+        for campo in bloqueados:
+            datos.pop(campo)
+        if bloqueados:
+            logger.warning(
+                "Intento de escalar privilegios: usuario %s (role=%s) intentó "
+                "modificar %s en /users/%s; campos descartados",
+                current_user.id,
+                getattr(current_user, "role", None),
+                sorted(bloqueados),
+                user_id,
+            )
+
+    for key, value in datos.items():
         if key == "password" and value:
             setattr(usuario, key, hash_password(value))
         else:

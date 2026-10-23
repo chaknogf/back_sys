@@ -113,7 +113,7 @@ def actualizar(
 def eliminar(
     registro_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service_eliminar(registro_id, db)
 

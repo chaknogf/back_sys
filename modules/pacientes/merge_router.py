@@ -9,7 +9,7 @@ from typing import List
 from datetime import datetime, timezone
 
 from core.database import get_db
-from core.security import get_current_user
+from core.security import get_current_user, get_current_admin_user
 from modules.users.models import UserModel
 from .models import PacienteModel
 from .service import agregar_evento
@@ -345,7 +345,7 @@ def merge_pacientes(
     principal_id: int = Query(..., description="ID del paciente principal"),
     ids: List[int] = Query(..., min_items=2, description="IDs de pacientes a fusionar"),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(get_current_admin_user),
 ):
     ids_unicos = list(set(ids))
     if principal_id not in ids_unicos:

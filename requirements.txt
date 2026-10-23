@@ -2,6 +2,9 @@
 # Versiones fijadas (==) a lo que realmente corre en produccion.
 # deploy.sh instala este archivo con `pip install -r requirements.txt`.
 # Las dependencias transitivas las resuelve pip automaticamente.
+# Dependencias de desarrollo y pruebas: ver requirements-dev.txt.
+# `rust_engine` (motor nativo opcional de duplicados) no se distribuye por pip:
+# si no esta instalado, la app usa el fallback Python (modules/pacientes/duplicados_service).
 fastapi==0.139.0
 uvicorn==0.38.0
 sqlalchemy==2.0.51
@@ -19,8 +22,8 @@ fastapi-mail==1.6.5
 pandas==3.0.3
 numpy==2.3.3
 openpyxl==3.1.5
+# Pillow: openpyxl solo carga imagenes (logos de plantillas de reportes de quirofano) si esta instalado.
 pillow==11.1.0
-et-xmlfile==2.0.0
 slowapi==0.1.10
 fastapi-cache2==0.2.2
 redis==8.0.1

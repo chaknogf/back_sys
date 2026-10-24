@@ -37,13 +37,16 @@ async def lifespan(app: FastAPI):
             logger.info("Caché compartida inicializada en Redis")
         except Exception as e:
             if ENVIRONMENT == "production":
-                # En producción la caché DEBE ser compartida entre réplicas.
-                raise RuntimeError(
-                    f"REDIS_URL configurada pero Redis no responde: {e}"
-                ) from e
-            logger.warning(
-                "Redis no disponible, caché en memoria (solo dev): %s", e
-            )
+                logger.error(
+                    "Redis no responde en producción (%s). Se arranca en modo "
+                    "degradado: caché y rate limit en memoria por worker. "
+                    "Revise REDIS_URL y el estado del servicio Redis.",
+                    e,
+                )
+            else:
+                logger.warning(
+                    "Redis no disponible, caché en memoria (solo dev): %s", e
+                )
     else:
         if ENVIRONMENT == "production":
             logger.warning(

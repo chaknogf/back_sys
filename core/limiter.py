@@ -36,7 +36,11 @@ def _redis_disponible() -> bool:
 def _build_limiter() -> Limiter:
     if REDIS_URL and _redis_disponible():
         logger.info("Rate limit con almacenamiento compartido en Redis")
-        return Limiter(key_func=_client_ip, storage_uri=REDIS_URL)
+        return Limiter(
+            key_func=_client_ip,
+            storage_uri=REDIS_URL,
+            in_memory_fallback_enabled=True,
+        )
 
     if ENVIRONMENT == "production":
         logger.error(

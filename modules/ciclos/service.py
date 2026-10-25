@@ -38,6 +38,8 @@ def obtener_ciclos_por_consulta(
         query = query.filter(CiclosConsulta.activo.is_(activo))
 
     ciclos = query.order_by(CiclosConsulta.numero.asc()).offset(skip).limit(limit).all()
+    from modules.quirofano.service import resolver_intervenciones_ciclos
+    resolver_intervenciones_ciclos(ciclos, db)
 
     usuarios = {c.usuario for c in ciclos if c.usuario}
     if usuarios:
@@ -72,6 +74,9 @@ def obtener_ciclo(ciclo_id: int, db: Session):
     if not ciclo:
         raise HTTPException(status_code=404, detail="Ciclo no encontrado")
 
+    from modules.quirofano.service import resolver_intervenciones_ciclos
+    resolver_intervenciones_ciclos([ciclo], db)
+
     return _adjuntar_usuario_nombre(ciclo, db)
 
 
@@ -102,6 +107,10 @@ def obtener_ultimo_ciclo_por_consulta(
         )
         .first()
     )
+
+    if ciclo:
+        from modules.quirofano.service import resolver_intervenciones_ciclos
+        resolver_intervenciones_ciclos([ciclo], db)
 
     return _adjuntar_usuario_nombre(ciclo, db)
 
@@ -176,7 +185,6 @@ def obtener_ultimo_odontograma(paciente_id: int, db: Session):
         .order_by(CiclosConsulta.registro.desc().nullslast(), CiclosConsulta.id.desc())
         .all()
     )
-
     for ciclo in ciclos:
         datos_medicos = ciclo.datos_medicos
         if not isinstance(datos_medicos, dict):
@@ -297,6 +305,8 @@ def obtener_historia_clinica(paciente_id: int, db: Session, skip: int = 0, limit
         .order_by(CiclosConsulta.consulta_id.asc(), CiclosConsulta.numero.asc())
         .all()
     )
+    from modules.quirofano.service import resolver_intervenciones_ciclos
+    resolver_intervenciones_ciclos(ciclos, db)
 
     # Obtener nombres de usuarios
     usuario_ids = list(set(c.usuario for c in ciclos if c.usuario))

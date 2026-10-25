@@ -1,6 +1,7 @@
 """Reglas de catálogos quirúrgicos, importación CSV e intervenciones."""
 
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 from sqlalchemy import func, desc, text, inspect as sa_inspect
 from fastapi import HTTPException, status
 from datetime import date
@@ -785,19 +786,10 @@ def _avanzar_consulta_a_quirofano(db: Session, consulta_id: int | None, usuario:
     )
 
 
-def _nombre_catalogo(db: Session, model, pk: int | None, campo: str = "nombre") -> str | None:
-    """Lee un nombre legible de un catálogo; devuelve None si no hay id o no existe."""
-    if not pk:
-        return None
-    fila = db.query(getattr(model, campo)).filter(getattr(model, model.__table__.primary_key.columns.keys()[0]) == pk).first()
-    return fila[0] if fila else None
-
-
 def _crear_nota_quirofano(db: Session, reg: IntervencionQuirurgicaModel, usuario: str | None = None) -> None:
-    """Crea la nota médica (ciclo) de la consulta con los datos de la intervención en JSONB.
+    """Crea la nota médica vinculada a la intervención en JSONB.
 
-    El payload vive en `ciclos_consulta.quirofano` (JSONB flexible, mismo patrón
-    que `uisau`) para no acoplar la nota a la forma tabular de la intervención.
+    El JSONB guarda la referencia y la lectura resuelve el detalle vigente.
     """
     if not reg.consulta_id:
         return
@@ -807,39 +799,9 @@ def _crear_nota_quirofano(db: Session, reg: IntervencionQuirurgicaModel, usuario
     if not consulta:
         return
 
-    procedimientos = [
-        p for p in (reg.procedimiento_principal, reg.procedimiento_2, reg.procedimiento_3,
-                    reg.procedimiento_4, reg.procedimiento_5) if p
-    ]
-
-    def _hora(valor):
-        return valor.isoformat() if valor else None
-
-    payload = {
-        "intervencion_id": reg.intervencion_id,
-        "fecha": reg.fecha.isoformat() if reg.fecha else None,
-        "expediente": reg.expediente,
-        "procedimientos": procedimientos,
-        "area_cuerpo_intervenida": reg.area_cuerpo_intervenida,
-        "estado_cirugia": {
-            "id": reg.estado_cirugia_id,
-            "nombre": _nombre_catalogo(db, EstadoCirugiaModel, reg.estado_cirugia_id),
-        },
-        "quirofano_numero": {
-            "id": reg.quirofano_numero_id,
-            "nombre": _nombre_catalogo(db, QuirofanoNumeroModel, reg.quirofano_numero_id),
-        },
-        "especialidad_id": reg.especialidad_id,
-        "personal_atencion_id": reg.personal_atencion_id,
-        "horas": {
-            "inicio_anestesia": _hora(reg.hora_inicio_anestesia),
-            "inicio_intervencion": _hora(reg.hora_inicio_intervencion),
-            "finaliza_intervencion": _hora(reg.hora_finaliza_intervencion),
-            "finaliza_limpieza_prepara_quirofano": _hora(reg.hora_finaliza_limpieza_prepara_quirofano),
-        },
-        "observaciones": reg.observaciones,
-        "datos_extra": reg.datos_extra,
-    }
+    # El JSONB conserva el enlace; el detalle se resuelve desde la intervención
+    # vigente al leer la historia clínica.
+    payload = {"intervencion_id": reg.intervencion_id}
 
     ultimo_numero = (
         db.query(func.coalesce(func.max(CiclosConsulta.numero), 0))
@@ -854,9 +816,32 @@ def _crear_nota_quirofano(db: Session, reg: IntervencionQuirurgicaModel, usuario
         usuario=usuario or "",
         especialidad=consulta.especialidad,
         servicio=consulta.servicio,
-        contenido=f"Nota quirúrgica: {procedimientos[0] if procedimientos else 'intervención registrada'}",
+        contenido=f"Nota quirúrgica: {reg.procedimiento_principal or 'intervención registrada'}",
         quirofano=payload,
     ))
+
+
+def resolver_intervenciones_ciclos(ciclos: list, db: Session) -> None:
+    """Sustituye enlaces quirúrgicos por el detalle actual para la respuesta API.
+
+    Conserva snapshots antiguos si no contienen un id o la intervención fue
+    eliminada físicamente.
+    """
+    ids = {
+        c.quirofano.get("intervencion_id")
+        for c in ciclos
+        if isinstance(c.quirofano, dict) and c.quirofano.get("intervencion_id")
+    }
+    if not ids:
+        return
+    rows = _base_query_intervenciones(db).filter(
+        IntervencionQuirurgicaModel.intervencion_id.in_(ids)
+    ).all()
+    detalles = {row[0].intervencion_id: _resolve_intervencion(row, db) for row in rows}
+    for ciclo in ciclos:
+        enlace = ciclo.quirofano
+        if isinstance(enlace, dict) and enlace.get("intervencion_id") in detalles:
+            set_committed_value(ciclo, "quirofano", detalles[enlace["intervencion_id"]])
 
 
 def crear_intervencion(data: IntervencionQuirurgicaCreate, db: Session, created_by: str | None = None) -> dict:

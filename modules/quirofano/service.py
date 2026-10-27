@@ -671,8 +671,14 @@ def listar_intervenciones(
     fecha_hasta: str | None = None,
     activo: bool | None = True,
     q: str | None = None,
+    documento: str | None = None,
+    nombre: str | None = None,
+    paciente_nombre: str | None = None,
+    especialidad_id: int | None = None,
+    especialidad: str | None = None,
 ) -> dict:
     from modules.pacientes.models import PacienteModel
+    from modules.consultas.models import ConsultaModel
 
     q_base = _base_query_intervenciones(db)
 
@@ -698,6 +704,25 @@ def listar_intervenciones(
             func.lower(PacienteModel.nombre_completo).like(like)
             | func.lower(IntervencionQuirurgicaModel.expediente).like(like)
         )
+    if documento:
+        doc_like = f"%{documento.strip().lower()}%"
+        q_base = q_base.outerjoin(
+            ConsultaModel, ConsultaModel.id == IntervencionQuirurgicaModel.consulta_id
+        ).filter(
+            (func.lower(IntervencionQuirurgicaModel.expediente).like(doc_like)) |
+            (func.lower(PacienteModel.expediente).like(doc_like)) |
+            (func.lower(func.coalesce(ConsultaModel.documento, "")).like(doc_like))
+        )
+    nombre_buscar = nombre or paciente_nombre
+    if nombre_buscar:
+        like_n = f"%{nombre_buscar.strip().lower()}%"
+        q_base = q_base.filter(func.lower(func.coalesce(PacienteModel.nombre_completo, "")).like(like_n))
+    if especialidad_id is not None:
+        q_base = q_base.filter(IntervencionQuirurgicaModel.especialidad_id == especialidad_id)
+    if especialidad:
+        from modules.especialidades.models import EspecialidadModel
+        like_e = f"%{especialidad.strip().lower()}%"
+        q_base = q_base.filter(func.lower(func.coalesce(EspecialidadModel.nombre, "")).like(like_e))
 
     total = q_base.count()
     rows = (

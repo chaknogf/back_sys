@@ -44,6 +44,12 @@ def listar_intervenciones(
     fecha_hasta: Optional[date] = Query(None, alias="fecha_hasta"),
     activos: Optional[bool] = Query(True),
     q: Optional[str] = Query(None),
+    documento: Optional[str] = Query(None, description="Filtrar por documento de identidad del paciente"),
+    hoja_emergencia: Optional[str] = Query(None, description="Filtrar por hoja de emergencia (documento/hoja emergencia)"),
+    nombre: Optional[str] = Query(None, description="Filtrar por nombre completo del paciente"),
+    paciente_nombre: Optional[str] = Query(None, description="Alias de nombre"),
+    especialidad_id: Optional[int] = Query(None, description="Filtrar por especialidad"),
+    especialidad: Optional[str] = Query(None, description="Filtrar por nombre de especialidad"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
@@ -58,6 +64,10 @@ def listar_intervenciones(
         fecha_hasta=fecha_hasta.isoformat() if fecha_hasta else None,
         activo=activos,
         q=q,
+        documento=documento or hoja_emergencia,
+        nombre=nombre or paciente_nombre,
+        especialidad_id=especialidad_id,
+        especialidad=especialidad,
     )
 
 

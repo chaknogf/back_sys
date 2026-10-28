@@ -3,6 +3,7 @@ Router de MERGE_PACIENTE: Fusiona múltiples registros de pacientes en uno solo.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from typing import List
@@ -434,6 +435,19 @@ def merge_pacientes(
             if hasattr(dup, 'consultas'):
                 for consulta in dup.consultas:
                     consulta.paciente_id = principal.id
+
+            # Registros SIGSA-3 (staging y normalizados) siguen al paciente igual
+            # que las consultas. Sin esto, la asociación quedaría apuntando a un
+            # paciente desactivado.
+            db.execute(
+                text("UPDATE sigsa3 SET paciente_id = :pid WHERE paciente_id = :dup"),
+                {"pid": principal.id, "dup": dup.id},
+            )
+            db.execute(
+                text("UPDATE sigsa3_registros SET paciente_id = :pid, sin_asociar = FALSE "
+                     "WHERE paciente_id = :dup"),
+                {"pid": principal.id, "dup": dup.id},
+            )
 
             dup.estado = "I"
 

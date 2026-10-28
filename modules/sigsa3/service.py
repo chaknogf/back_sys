@@ -2232,6 +2232,10 @@ def _resolver_paciente_normalizacion(db: Session, reg, cache: dict) -> int | Non
 
     paciente_id: int | None = None
 
+    # 0. si el registro ya tiene paciente_id (asociación asoc-v2), respetar
+    if getattr(reg, "paciente_id", None):
+        return reg.paciente_id
+
     # 1. expediente
     row = db.execute(
         text("SELECT id FROM pacientes WHERE btrim(expediente) = :n LIMIT 1"),
@@ -2365,7 +2369,8 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
                     paciente_id = _resolver_paciente_normalizacion(db, reg, paciente_cache)
                     if paciente_id:
                         total_paciente_resuelto += 1
-                sin_asociar = not paciente_id
+                pacientes_sigsa3_id = reg.pacientes_sigsa3_id
+                sin_asociar = not (paciente_id or pacientes_sigsa3_id)
                 if sin_asociar:
                     total_sin_paciente += 1
 
@@ -2390,6 +2395,7 @@ def normalizar(db: Session, batch_size: int = 1000, dry_run: bool = False,
 
                 nuevo = Sigsa3RegistroModel(
                     paciente_id=paciente_id,
+                    pacientes_sigsa3_id=pacientes_sigsa3_id,
                     personal_atencion_id=reg.personal_atencion_id,
                     personal_salud_id=reg.personal_salud_id,
                     consulta_id=reg.consulta_id,

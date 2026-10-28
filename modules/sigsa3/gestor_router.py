@@ -154,6 +154,24 @@ def eliminar_periodo(
     return eliminar_por_periodo(data.desde, data.hasta, db)
 
 
+@router.post("/asociacion/aplicar")
+def aplicar_asociacion_endpoint(
+    dry_run: bool = Query(True, description="Solo simular (por defecto). False escribe asociaciones y crea pacientes."),
+    limit: int = Query(None, ge=1, le=100000, description="Tope de registros a evaluar"),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_admin_user),
+):
+    """Asociación SIGSA-3 → paciente y consulta. Diferencial e idempotente.
+    Con dry_run=true no escribe nada. Con dry_run=false asigna paciente_id/consulta_id
+    y crea pacientes con datos mínimos (datos_extra.origen='sigsa3') cuando no existe
+    ninguno parecido."""
+    from modules.sigsa3.asociacion_servicio import aplicar_asociacion
+    try:
+        return aplicar_asociacion(db, dry_run=dry_run, limit=limit, usuario=current_user.username)
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
 @router.post("/sincronizar-medico-especialidad")
 def sincronizar_medico_especialidad(
     db: Session = Depends(get_db),
@@ -210,7 +228,7 @@ def asociar_pacientes_masivo_stream(
 def normalizar_sigsa3(
     dry_run: bool = Query(False, description="Solo simular: cuenta y reporta sin migrar ni borrar"),
     ids: str = Query(None, max_length=10000, description="IDs de staging a migrar (CSV: '1,2,3')"),
-    max_registros: int = Query(500, ge=1, le=5000, description="Tope de registros por corrida (default 500)"),
+    max_registros: int = Query(2000, ge=1, le=10000, description="Tope de registros por corrida (default 2000)"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_admin_user),
 ):

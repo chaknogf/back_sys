@@ -28,6 +28,7 @@ class Sigsa3Model(Base):
     codigo_cie_10 = Column(String(30), nullable=True)
     dx = Column(Text, nullable=True)
     especialidad_id = Column(Integer, ForeignKey("especialidades.id", ondelete="SET NULL"), nullable=True, index=True)
+    pacientes_sigsa3_id = Column(BigInteger, nullable=True, index=True)
 
     __table_args__ = (
         Index("ix_sigsa3_nombre_paciente", "nombre_paciente"),
@@ -73,6 +74,7 @@ class Sigsa3RegistroModel(Base):
     # ID del registro staging (sigsa3) de origen. Sin FK (default NULL) para
     # evitar restricciones al purgar staging tras normalizar.
     sigsa3_id = Column(BigInteger, nullable=True, default=None, index=True)
+    pacientes_sigsa3_id = Column(BigInteger, nullable=True, index=True)
     # Datos crudos / fallback cuando no hay paciente asociado.
     sin_asociar = Column(Boolean, nullable=False, default=False, server_default=text("FALSE"))
     nombre_paciente = Column(String(150), nullable=True)

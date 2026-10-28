@@ -181,6 +181,35 @@ for mod in ("fastapi", "sqlalchemy", "psycopg2", "joserfc", "passlib", "argon2",
 print("  ✓ imports críticos OK")
 PY
 
+# ── [6/12] Motor nativo rust_engine (PyO3) ───────────────────────
+# rust_engine NO está en requirements.txt. Se instala desde:
+#   RUST_ENGINE_WHEEL=/ruta/rust_engine-*.whl   (wheel ya compilado para ESTA plataforma)
+#   RUST_ENGINE_DIR=/ruta/medicalapp/rust_engine (compila con cargo + maturin en el servidor)
+# Sin ninguna de las dos, la app usa el fallback Python (más lento, mismo resultado).
+# RUST_ENGINE_REQUIRED=1 hace que el deploy falle si el motor nativo no queda activo.
+info "[6/12] Motor nativo rust_engine..."
+RUST_ENGINE_REQUIRED="${RUST_ENGINE_REQUIRED:-0}"
+if [ -n "${RUST_ENGINE_WHEEL:-}" ]; then
+  python -m pip install --force-reinstall "$RUST_ENGINE_WHEEL" \
+    || die "No se pudo instalar RUST_ENGINE_WHEEL=$RUST_ENGINE_WHEEL"
+elif [ -n "${RUST_ENGINE_DIR:-}" ]; then
+  command -v cargo >/dev/null 2>&1 || die "RUST_ENGINE_DIR definido pero 'cargo' no está instalado (instala rustup)."
+  [ -f "$RUST_ENGINE_DIR/pyproject.toml" ] || die "No existe $RUST_ENGINE_DIR/pyproject.toml"
+  python -m pip install --force-reinstall "$RUST_ENGINE_DIR" \
+    || die "Falló la compilación de rust_engine desde $RUST_ENGINE_DIR"
+else
+  warn "rust_engine no configurado (RUST_ENGINE_WHEEL / RUST_ENGINE_DIR). Se usa el fallback Python."
+fi
+
+if python -c "import sys, rust_engine; sys.exit(0 if rust_engine.nativo_disponible() else 1)" 2>/dev/null; then
+  ok "rust_engine nativo activo"
+else
+  if [ "$RUST_ENGINE_REQUIRED" = "1" ]; then
+    die "rust_engine nativo NO está activo y RUST_ENGINE_REQUIRED=1."
+  fi
+  warn "rust_engine nativo NO activo: se usará el fallback Python."
+fi
+
 # ── [7/12] Respaldo de base de datos ─────────────────────────────
 info "[7/12] Respaldo de base de datos..."
 if [ "${SKIP_DB_BACKUP:-0}" = "1" ]; then

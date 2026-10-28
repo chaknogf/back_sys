@@ -43,7 +43,7 @@ def detalle(
 def crear(
     data: schemas.CatalogoProcedimientoCreate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    # current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service.crear_catalogo(data, db)
 
@@ -53,7 +53,7 @@ def actualizar(
     cat_id: int,
     data: schemas.CatalogoProcedimientoUpdate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_admin_user),
+    # current_user: UserModel = Depends(get_current_admin_user),
 ):
     return service.actualizar_catalogo(cat_id, data, db)
 

@@ -7,8 +7,7 @@
 # - Instala las dependencias de sistema que falten (python3/venv, psql, redis)
 #   usando dnf/yum o apt-get. Desactivable con INSTALL_SYSTEM_DEPS=0.
 # - Valida la configuración de .env y avisa de ajustes peligrosos en producción.
-# - Respalda la base de datos antes de aplicar migraciones (SKIP_DB_BACKUP=1).
-# - Aplica migraciones numeradas e índices de concurrencia.
+# - Respalda la base de datos antes de reiniciar servicios (SKIP_DB_BACKUP=1).
 # - Asegura Redis, instala el unit de systemd y reinicia el servicio.
 # - Verifica /health tras el reinicio.
 #
@@ -21,7 +20,7 @@ PROJECT_DIR="${PROJECT_DIR:-/opt/back_sys}"
 VENV_DIR="${VENV_DIR:-$PROJECT_DIR/env}"
 SERVICE_NAME="${SERVICE_NAME:-backsyshospital}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8015/health}"
-BACKUP_DIR="${BACKUP_DIR:-$PROJECT_DIR/backups}"
+BACKUP_DIR="${BACKUP_DIR:-/home/matrix/predeploys}"
 
 # ── Utilidades de salida ─────────────────────────────────────────
 info()  { printf '\n\033[1;36m%s\033[0m\n' "$*"; }
@@ -46,8 +45,8 @@ printf '\033[1;35m=====================================\n'
 printf '   BACKSYS HOSPITAL DEPLOY\n'
 printf '=====================================\033[0m\n'
 
-# ── [1/12] Cargar configuración (.env) ───────────────────────────
-info "[1/12] Cargando configuración (.env)..."
+# ── [1/8] Cargar configuración (.env) ────────────────────────────
+info "[1/8] Cargando configuración (.env)..."
 if [ ! -f .env ]; then
   if [ -f .env.example ]; then
     cp .env.example .env
@@ -68,7 +67,7 @@ export REDIS_URL POSTGRES_HOST POSTGRES_PORT POSTGRES_DB POSTGRES_USER
 ok ".env cargado (BD=$POSTGRES_DB, host=$POSTGRES_HOST:$POSTGRES_PORT)"
 
 # ── Validación de configuración crítica ──────────────────────────
-info "[2/12] Validando configuración..."
+info "[2/8] Validando configuración..."
 missing=()
 for v in SECRET_KEY POSTGRES_USER POSTGRES_DB POSTGRES_HOST POSTGRES_PASSWORD; do
   [ -n "${!v:-}" ] || missing+=("$v")
@@ -81,18 +80,15 @@ case "${SECRET_KEY}" in
 esac
 [ ${#SECRET_KEY} -ge 32 ] || warn "SECRET_KEY tiene menos de 32 caracteres; usa 'python -c \"import secrets;print(secrets.token_hex(32))\"'."
 if [ "${ENVIRONMENT:-development}" != "production" ]; then
-  warn "ENVIRONMENT=${ENVIRONMENT:-development}. En producción define ENVIRONMENT=production (caché/rate-limit compartidos y chequeos estrictos)."
+  warn "ENVIRONMENT=${ENVIRONMENT:-development}. En producción define ENVIRONMENT=production."
 fi
 if [ "${ENVIRONMENT:-development}" = "production" ] && [ "${DEBUG:-false}" = "true" ]; then
   warn "DEBUG=true con ENVIRONMENT=production. Pon DEBUG=false."
 fi
-case "${ACCESS_TOKEN_EXPIRE_MINUTES:-}" in
-  ''|*[!0-9]*) warn "ACCESS_TOKEN_EXPIRE_MINUTES no es numérico; revisa el .env." ;;
-esac
 ok "Configuración validada"
 
-# ── [3/12] Dependencias de sistema ───────────────────────────────
-info "[3/12] Verificando dependencias de sistema..."
+# ── [3/8] Dependencias de sistema ────────────────────────────────
+info "[3/8] Verificando dependencias de sistema..."
 
 translate_pkg() { # $1 = nombre lógico, $2 = gestor
   case "$2:$1" in
@@ -144,14 +140,14 @@ install_system_deps() {
 }
 install_system_deps
 
-# ── [4/12] Actualizar repositorio ────────────────────────────────
-info "[4/12] Actualizando repositorio..."
+# ── [4/8] Actualizar repositorio ─────────────────────────────────
+info "[4/8] Actualizando repositorio..."
 PREV_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 git pull --ff-only origin main
 ok "Código actualizado ($PREV_SHA -> $(git rev-parse --short HEAD))"
 
-# ── [5/12] Entorno virtual ───────────────────────────────────────
-info "[5/12] Preparando entorno virtual..."
+# ── [5/8] Entorno virtual ────────────────────────────────────────
+info "[5/8] Preparando entorno virtual..."
 if [ ! -x "$VENV_DIR/bin/python" ]; then
   warn "No existe $VENV_DIR; creándolo con venv."
   python3 -m venv "$VENV_DIR"
@@ -160,17 +156,17 @@ fi
 source "$VENV_DIR/bin/activate"
 ok "Entorno activo: $(python -V)"
 
-# ── [6/12] Actualizar gestor de paquetes e instalar dependencias ─
-info "[6/12] Actualizando pip/setuptools/wheel..."
-python -m pip install --upgrade pip setuptools wheel
+# ── [6/8] Actualizar gestor de paquetes e instalar dependencias ──
+info "[6/8] Actualizando pip/setuptools/wheel..."
+python -m pip install --upgrade pip setuptools wheel --quiet || true
 
-info "[6/12] Instalando dependencias (requirements.txt)..."
+info "[6/8] Instalando dependencias (requirements.txt)..."
 python -m pip install -r requirements.txt
-info "[6/12] Verificando consistencia de dependencias..."
+info "[6/8] Verificando consistencia de dependencias..."
 if python -m pip check; then
   ok "Dependencias consistentes"
 else
-  warn "pip check reportó conflictos; revisa requirements antes de producción."
+  warn "pip check reportó conflictos; revisa requirements."
 fi
 
 # Smoke test de imports críticos
@@ -181,111 +177,30 @@ for mod in ("fastapi", "sqlalchemy", "psycopg2", "joserfc", "passlib", "argon2",
 print("  ✓ imports críticos OK")
 PY
 
-# ── [6/12] Motor nativo rust_engine (PyO3) ───────────────────────
-# rust_engine NO está en requirements.txt. Se instala desde:
-#   RUST_ENGINE_WHEEL=/ruta/rust_engine-*.whl   (wheel ya compilado para ESTA plataforma)
-#   RUST_ENGINE_DIR=/ruta/medicalapp/rust_engine (compila con cargo + maturin en el servidor)
-# Sin ninguna de las dos, la app usa el fallback Python (más lento, mismo resultado).
-# RUST_ENGINE_REQUIRED=1 hace que el deploy falle si el motor nativo no queda activo.
-info "[6/12] Motor nativo rust_engine..."
-RUST_ENGINE_REQUIRED="${RUST_ENGINE_REQUIRED:-0}"
-if [ -n "${RUST_ENGINE_WHEEL:-}" ]; then
-  python -m pip install --force-reinstall "$RUST_ENGINE_WHEEL" \
-    || die "No se pudo instalar RUST_ENGINE_WHEEL=$RUST_ENGINE_WHEEL"
-elif [ -n "${RUST_ENGINE_DIR:-}" ]; then
-  command -v cargo >/dev/null 2>&1 || die "RUST_ENGINE_DIR definido pero 'cargo' no está instalado (instala rustup)."
-  [ -f "$RUST_ENGINE_DIR/pyproject.toml" ] || die "No existe $RUST_ENGINE_DIR/pyproject.toml"
-  python -m pip install --force-reinstall "$RUST_ENGINE_DIR" \
-    || die "Falló la compilación de rust_engine desde $RUST_ENGINE_DIR"
-else
-  warn "rust_engine no configurado (RUST_ENGINE_WHEEL / RUST_ENGINE_DIR). Se usa el fallback Python."
-fi
-
-if python -c "import sys, rust_engine; sys.exit(0 if rust_engine.nativo_disponible() else 1)" 2>/dev/null; then
-  ok "rust_engine nativo activo"
-else
-  if [ "$RUST_ENGINE_REQUIRED" = "1" ]; then
-    die "rust_engine nativo NO está activo y RUST_ENGINE_REQUIRED=1."
-  fi
-  warn "rust_engine nativo NO activo: se usará el fallback Python."
-fi
-
-# ── [7/12] Respaldo de base de datos ─────────────────────────────
-info "[7/12] Respaldo de base de datos..."
+# ── [7/8] Respaldo de base de datos ──────────────────────────────
+info "[7/8] Respaldo de base de datos..."
 if [ "${SKIP_DB_BACKUP:-0}" = "1" ]; then
   warn "Respaldo omitido (SKIP_DB_BACKUP=1)"
 elif command -v pg_dump >/dev/null 2>&1; then
-  # Se cambió la ruta fuera del proyecto para evitar conflictos en Git
-  BACKUP_DIR="${BACKUP_DIR:-/home/matrix/predeploys}"
   mkdir -p "$BACKUP_DIR"
   BACKUP_FILE="$BACKUP_DIR/pre_deploy_$(date +%Y%m%d_%H%M%S).dump"
   if PGPASSWORD="$POSTGRES_PASSWORD" pg_dump \
       -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" \
       -d "$POSTGRES_DB" -Fc -f "$BACKUP_FILE"; then
-    ok "Respaldo: $BACKUP_FILE"
+    ok "Respaldo guardado: $BACKUP_FILE"
   else
-    die "Falló pg_dump. Abortando antes de tocar la BD (usa SKIP_DB_BACKUP=1 para omitir)."
+    die "Falló pg_dump. Abortando (usa SKIP_DB_BACKUP=1 para omitir)."
   fi
 else
   warn "pg_dump no disponible; se omite el respaldo."
 fi
 
-# ── [8/12] Migraciones ───────────────────────────────────────────
-info "[8/12] Aplicando migraciones..."
-export PGHOST="$POSTGRES_HOST"
-export PGPORT="$POSTGRES_PORT"
-export PGUSER="$POSTGRES_USER"
-export PGDATABASE="$POSTGRES_DB"
-export PGPASSWORD="$POSTGRES_PASSWORD"
+# Limpieza automática de respaldos antiguos (> 7 días) en la carpeta externa
+find "$BACKUP_DIR" -name "pre_deploy_*.dump" -type f -mtime +7 -delete 2>/dev/null || true
 
-if command -v psql >/dev/null 2>&1; then
-  if [ -x migrations/apply.sh ]; then
-    bash migrations/apply.sh
-  else
-    warn "migrations/apply.sh no encontrado o no ejecutable; se omite."
-  fi
-
-  info "[8/12] Aplicando índices de concurrencia..."
-  psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-    -v ON_ERROR_STOP=0 -f scripts/indices_concurrencia.sql \
-    || warn "Algunos índices no se aplicaron (posiblemente ya existían)."
-  ok "Índices procesados"
-else
-  warn "psql no disponible; aplica manualmente:"
-  warn "  PGPASSWORD=... bash migrations/apply.sh"
-  warn "  psql -d $POSTGRES_DB -f scripts/indices_concurrencia.sql"
-fi
-
-info "[8/12] Asegurando catálogo CIE-10..."
-python - <<'PY'
-from core.database import SessionLocal
-from modules.cie10.service import asegurar_catalogo
-db = SessionLocal()
-try:
-    total = asegurar_catalogo(db)
-    print(f"  ✓ Catálogo CIE-10: {total} códigos")
-finally:
-    db.close()
-PY
-
-# ── [9/12] Redis ─────────────────────────────────────────────────
-info "[9/12] Verificando Redis (rate limit y caché compartidos)..."
+# ── [9/8 - Redis] ────────────────────────────────────────────────
+info "Verificando Redis (rate limit y caché compartidos)..."
 redis_ok() { python -c "import redis; redis.Redis.from_url('$REDIS_URL', socket_connect_timeout=3, socket_timeout=3).ping()" >/dev/null 2>&1; }
-redis_write_ok() {
-  python - "$REDIS_URL" >/dev/null 2>&1 <<'PY'
-import sys
-import redis
-
-r = redis.Redis.from_url(
-    sys.argv[1], socket_connect_timeout=3, socket_timeout=3
-)
-clave = "fah-deploy-health"
-r.set(clave, "ok", ex=30)
-if r.get(clave) != b"ok":
-    raise SystemExit(1)
-r.delete(clave)
-PY
-}
 if redis_ok; then
   ok "Redis responde en $REDIS_URL"
 else
@@ -296,16 +211,12 @@ else
       || $SUDO systemctl enable --now redis.service 2>/dev/null || true
   fi
   sleep 2
-  redis_ok || die "Redis no responde en $REDIS_URL. En producción es obligatorio (rate limit/caché)."
+  redis_ok || die "Redis no responde en $REDIS_URL."
   ok "Redis iniciado"
 fi
-if ! redis_write_ok; then
-  die "Redis responde a PING pero rechaza escrituras en $REDIS_URL (disco lleno, 'stop-writes-on-bgsave-error' o 'maxmemory' con 'noeviction'). Revise: redis-cli -u '$REDIS_URL' INFO persistence"
-fi
-ok "Redis acepta escrituras (SET/GET/DEL)"
 
-# ── [10/12] Permisos SELinux (si aplica) ─────────────────────────
-info "[10/12] Permisos SELinux..."
+# ── [10/8] Permisos SELinux (si aplica) ──────────────────────────
+info "Permisos SELinux..."
 if command -v chcon >/dev/null 2>&1 && command -v getenforce >/dev/null 2>&1 \
    && [ "$(getenforce 2>/dev/null)" = "Enforcing" ]; then
   $SUDO chcon -R -t usr_t "$PROJECT_DIR"
@@ -315,8 +226,8 @@ else
   ok "SELinux no enforcing; se omite"
 fi
 
-# ── [11/12] Servicio systemd ─────────────────────────────────────
-info "[11/12] Configurando servicio systemd ($SERVICE_NAME)..."
+# ── [11/8] Servicio systemd ──────────────────────────────────────
+info "Configurando servicio systemd ($SERVICE_NAME)..."
 UNIT_SRC="$PROJECT_DIR/backsyshospital.service"
 UNIT_DST="/etc/systemd/system/$SERVICE_NAME.service"
 if [ -f "$UNIT_SRC" ]; then
@@ -330,19 +241,18 @@ if [ -f "$UNIT_SRC" ]; then
     $SUDO systemctl daemon-reload
     $SUDO systemctl enable "$SERVICE_NAME" >/dev/null 2>&1 || true
   else
-    warn "systemctl no disponible; no se instala el servicio."
+    warn "systemctl no disponible."
   fi
 else
   warn "$UNIT_SRC no encontrado; se omite la instalación del servicio."
 fi
 
-# ── [12/12] Reiniciar y verificar ────────────────────────────────
-info "[12/12] Reiniciando servicio..."
+# ── [12/8] Reiniciar y verificar ─────────────────────────────────
+info "Reiniciando servicio..."
 WORKERS="${WORKERS:-4}"
 DB_POOL_SIZE="${DB_POOL_SIZE:-5}"
 echo "  → Workers: $WORKERS"
 echo "  → Pool de BD por worker: $DB_POOL_SIZE conexiones"
-echo "  → Total conexiones estimadas: $((WORKERS * DB_POOL_SIZE))"
 
 if command -v systemctl >/dev/null 2>&1; then
   $SUDO systemctl restart "$SERVICE_NAME"
@@ -350,12 +260,16 @@ else
   warn "systemctl no disponible: inicia manualmente gunicorn."
 fi
 
-info "[12/12] Verificando salud del servicio..."
+# Pausa breve para dar tiempo a que Gunicorn levante los workers y abra el puerto
+sleep 3
+
+info "Verificando salud del servicio..."
 healthy=0
 for i in $(seq 1 20); do
   if command -v curl >/dev/null 2>&1; then
     if curl -fsS --max-time 3 "$HEALTH_URL" | grep -q '"status":"ok"'; then
       healthy=1
+      break
     fi
   else
     if python - "$HEALTH_URL" <<'PY'
@@ -366,9 +280,11 @@ try:
 except Exception:
     sys.exit(1)
 PY
-    then healthy=1; fi
+    then 
+      healthy=1
+      break
+    fi
   fi
-  [ "$healthy" = "1" ] && break
   sleep 2
 done
 
@@ -376,7 +292,7 @@ if [ "$healthy" != "1" ]; then
   printf '\n'
   warn "El servicio no respondió OK en $HEALTH_URL"
   warn "Revisa: journalctl -u $SERVICE_NAME -n 80 --no-pager"
-  warn "Rollback de código si hace falta: git reset --hard $PREV_SHA && $SUDO systemctl restart $SERVICE_NAME"
+  warn "Rollback: git reset --hard $PREV_SHA && $SUDO systemctl restart $SERVICE_NAME"
   die "Deploy finalizado con errores."
 fi
 
@@ -386,4 +302,4 @@ printf '=====================================\033[0m\n'
 echo "  Servicio: $SERVICE_NAME"
 echo "  Health:   $HEALTH_URL"
 echo "  Código:   $(git rev-parse --short HEAD)"
-echo "  Rollback: git reset --hard $PREV_SHA && sudo systemctl restart $SERVICE_NAME"
+echo "  Rollback: git reset --hard $PREV_SHA && $SUDO systemctl restart $SERVICE_NAME"

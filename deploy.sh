@@ -215,6 +215,8 @@ info "[7/12] Respaldo de base de datos..."
 if [ "${SKIP_DB_BACKUP:-0}" = "1" ]; then
   warn "Respaldo omitido (SKIP_DB_BACKUP=1)"
 elif command -v pg_dump >/dev/null 2>&1; then
+  # Se cambió la ruta fuera del proyecto para evitar conflictos en Git
+  BACKUP_DIR="${BACKUP_DIR:-/home/matrix/predeploys}"
   mkdir -p "$BACKUP_DIR"
   BACKUP_FILE="$BACKUP_DIR/pre_deploy_$(date +%Y%m%d_%H%M%S).dump"
   if PGPASSWORD="$POSTGRES_PASSWORD" pg_dump \

@@ -344,7 +344,7 @@ def merge_referencias(principal, duplicado):
 @router.post("/merge", status_code=200)
 def merge_pacientes(
     principal_id: int = Query(..., description="ID del paciente principal"),
-    ids: List[int] = Query(..., min_items=2, description="IDs de pacientes a fusionar"),
+    ids: List[int] = Query(..., min_length=2, description="IDs de pacientes a fusionar"),
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_admin_user),
 ):

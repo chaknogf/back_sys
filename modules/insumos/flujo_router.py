@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from core.security import get_current_user, get_current_admin_user
+from core.security import get_current_user, get_current_admin_user, require_role
 from modules.users.models import UserModel
 from modules.insumos.schemas import (
     RequisicionCreate,
@@ -66,7 +66,7 @@ def aprobar_requisicion(
     requisicion_id: int,
     data: EstadoAccion | None = None,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(require_role("admin", "jefe_farmacia")),
 ):
     return service_flujo.aprobar_requisicion(requisicion_id, current_user.id, data, db)
 
@@ -76,7 +76,7 @@ def rechazar_requisicion(
     requisicion_id: int,
     data: EstadoAccion | None = None,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(require_role("admin", "jefe_farmacia")),
 ):
     return service_flujo.rechazar_requisicion(requisicion_id, current_user.id, data, db)
 
@@ -129,7 +129,7 @@ def obtener_despacho(
 def despachar_despacho(
     despacho_id: int,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(require_role("admin", "jefe_farmacia")),
 ):
     """Ejecuta el despacho: descuenta lotes, escribe kardex y cierra la requisición."""
     return service_flujo.despachar_despacho(despacho_id, current_user.id, db)
@@ -139,7 +139,7 @@ def despachar_despacho(
 def anular_despacho(
     despacho_id: int,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(get_current_admin_user),
+    _: UserModel = Depends(require_role("admin", "jefe_farmacia")),
 ):
     """Solo despachos en borrador; los ejecutados ya movieron stock."""
     return service_flujo.anular_despacho(despacho_id, db)

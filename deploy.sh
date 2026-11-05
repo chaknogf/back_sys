@@ -140,6 +140,37 @@ install_system_deps() {
 }
 install_system_deps
 
+# ── [3b/8] Rust (toolchain) ──────────────────────────────────────
+# Rust NO es obligatorio para ejecutar la app: `rust_engine` (motor nativo
+# opcional de duplicados) no está en el repo y hay fallback Python puro.
+# Sin embargo, algunas dependencias (pydantic-core, cryptography, argon2)
+# pueden requerir compilación desde fuente en plataformas sin wheel precompilado,
+# lo que necesita cargo/rustc. Aquí se verifica e instala si falta.
+ensure_rust() {
+  [ "${INSTALL_RUST:-1}" = "1" ] || { ok "Instalación de Rust desactivada (INSTALL_RUST=0)"; return 0; }
+  if command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1; then
+    ok "Rust ya instalado: $(rustc --version)"
+    return 0
+  fi
+  warn "Rust no encontrado; intentando instalar con rustup..."
+  if ! command -v curl >/dev/null 2>&1; then
+    warn "curl no disponible; no se puede instalar Rust automáticamente."
+    return 0
+  fi
+  if curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; then
+    # shellcheck disable=SC1091
+    [ -f "${HOME}/.cargo/env" ] && source "${HOME}/.cargo/env"
+    if command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1; then
+      ok "Rust instalado: $(rustc --version)"
+    else
+      warn "rustup terminó pero cargo/rustc no están en PATH; revisa ${HOME}/.cargo/env"
+    fi
+  else
+    warn "Falló la instalación de Rust; se continúa (solo se necesita para compilar dependencias nativas)."
+  fi
+}
+ensure_rust
+
 # ── [4/8] Actualizar repositorio ─────────────────────────────────
 info "[4/8] Actualizando repositorio..."
 PREV_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
@@ -157,6 +188,8 @@ source "$VENV_DIR/bin/activate"
 ok "Entorno activo: $(python -V)"
 
 # ── [6/8] Actualizar gestor de paquetes e instalar dependencias ──
+# Asegurar que cargo/rustc estén en PATH (por si se instaló Rust con rustup).
+[ -f "${HOME}/.cargo/env" ] && source "${HOME}/.cargo/env" || true
 info "[6/8] Actualizando pip/setuptools/wheel..."
 python -m pip install --upgrade pip setuptools wheel --quiet || true
 

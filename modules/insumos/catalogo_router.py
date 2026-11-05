@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from core.security import get_current_user, get_current_admin_user
+from core.security import get_current_user, get_current_admin_user, require_role
 from core.uploads import read_upload_limited
 from modules.users.models import UserModel
 from modules.insumos.schemas import (
@@ -60,7 +60,7 @@ def contar_catalogo(
 async def importar_csv(
     file: UploadFile = File(..., description="CSV del catálogo (7 columnas del Excel)"),
     db: Session = Depends(get_db),
-    _: UserModel = Depends(get_current_user),
+    _: UserModel = Depends(get_current_admin_user),
 ):
     """Importa el catálogo espejo: upsert por código de insumo y de presentación.
 
@@ -96,7 +96,7 @@ def actualizar_insumo(
     insumo_id: int,
     data: InsumoUpdate,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(get_current_user),
+    _: UserModel = Depends(require_role("admin", "jefe_farmacia")),
 ):
     return service.actualizar_insumo(insumo_id, data, db)
 
@@ -105,7 +105,7 @@ def actualizar_insumo(
 def eliminar_insumo(
     insumo_id: int,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(get_current_admin_user),
+    _: UserModel = Depends(require_role("admin", "jefe_farmacia")),
 ):
     return service.eliminar_insumo(insumo_id, db)
 
@@ -154,7 +154,7 @@ def actualizar_presentacion(
     presentacion_id: int,
     data: PresentacionUpdate,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(get_current_user),
+    _: UserModel = Depends(require_role("admin", "jefe_farmacia")),
 ):
     return service.actualizar_presentacion(presentacion_id, data, db)
 
@@ -163,7 +163,7 @@ def actualizar_presentacion(
 def eliminar_presentacion(
     presentacion_id: int,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(get_current_admin_user),
+    _: UserModel = Depends(require_role("admin", "jefe_farmacia")),
 ):
     return service.eliminar_presentacion(presentacion_id, db)
 

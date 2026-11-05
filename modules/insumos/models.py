@@ -16,6 +16,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     func,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from core.database import Base
@@ -32,6 +33,7 @@ class Insumo(Base):
     nombre = Column(Text, nullable=False)
     # Texto crudo del CSV ("Estado: X;  Grado: Y;  Uso: Z;"); parseo a JSONB pendiente.
     caracteristicas = Column(Text, nullable=False, server_default="")
+    caracteristicas_jsonb = Column(JSON, nullable=False, server_default="{}")
     activo = Column(Boolean, nullable=False, default=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
@@ -57,6 +59,8 @@ class Presentacion(Base):
     nombre = Column(String(50), nullable=False, default="Envase")
     # Texto crudo del CSV ("250 Mililitro"); NO es stock, el stock es de lotes.
     cantidad_unidad = Column(Text, nullable=False, server_default="")
+    cantidad_unidad_valor = Column(Numeric(14, 3))
+    unidad_medida = Column(String(30))
     codigo_presentacion = Column(String(20), nullable=False, unique=True, index=True)
     activo = Column(Boolean, nullable=False, default=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

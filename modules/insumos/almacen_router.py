@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from core.security import get_current_user, get_current_admin_user
+from core.security import get_current_user, get_current_admin_user, require_role
 from modules.users.models import UserModel
 from modules.insumos.schemas import (
     AlmacenCreate,
@@ -67,7 +67,7 @@ def actualizar_almacen(
     almacen_id: int,
     data: AlmacenUpdate,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(get_current_user),
+    _: UserModel = Depends(require_role("admin", "jefe_farmacia")),
 ):
     return service_almacen.actualizar_almacen(almacen_id, data, db)
 
@@ -76,7 +76,7 @@ def actualizar_almacen(
 def eliminar_almacen(
     almacen_id: int,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(get_current_admin_user),
+    _: UserModel = Depends(require_role("admin", "jefe_farmacia")),
 ):
     return service_almacen.eliminar_almacen(almacen_id, db)
 
@@ -118,7 +118,7 @@ def ingresar_lote(
 def ajustar_lote(
     data: LoteAjusteCreate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(require_role("admin", "jefe_farmacia")),
 ):
     """Ajuste de inventario (conteo físico): fija la cantidad real del lote."""
     return service_almacen.ajustar_lote(data, current_user.id, db)

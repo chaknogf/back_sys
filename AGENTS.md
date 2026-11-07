@@ -503,5 +503,5 @@ Ver auditoría senior (2026-10). Prioridades:
 4. **ALTO**: `generar_expediente()` hace `commit()` interno → rompe atomicidad en alta madre-hijo (`modules/expediente/service.py`).
 5. **MEDIO**: errores filtran `str(exc)`/`body` (posible PHI) — `core/exceptions.py`; docs públicas; CORS/Hosts laxos.
 6. **MEDIO**: dependencias — `pyproject.toml` declara 63 (29 transitivas mal listadas, 14 huérfanas); `pytest`/`rust_engine` no declarados; `requirements.txt` (usado por deploy) trae `numpy`/`et-xmlfile`/`pillow` innecesarias.
-7. **MEDIO**: índices faltantes en `citas`, `prestamos`, `defunciones`, `audit_log`; N+1 en varios services.
-8. **BAJO**: código muerto (`modules/sigsa3/implementacion/sigsa3_optimizado.py`, helpers de `chat/service.py`), duplicación de helpers (`_unaccent_ilike`, parseo de fechas, cálculo de edad).
+7. **MEDIO**: índices base añadidos en migración `089` para `citas`, `prestamos`, `defunciones`, `audit_log` (N+1 y cubrimiento de consultas específicas siguen pendientes).
+8. **BAJO**: código muerto eliminado (`sigsa3_optimizado.py`, helpers de `chat/service.py`). Duplicación residual de helpers (`_unaccent_ilike`, parseo de fechas, cálculo de edad) se mantiene hasta tercer uso (regla de tres).

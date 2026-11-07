@@ -4,11 +4,12 @@ Cada operación que mueve stock descuenta/suma `lotes` y escribe su
 `kardex_movimientos` con la referencia al documento que lo originó.
 """
 
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from modules.insumos.models import (
     Almacen,
@@ -50,6 +51,37 @@ from modules.personal_atencion.models import PersonalAtencionModel  # tabla pers
 
 
 # ---------------------------------------------------------------------------
+# Consultas enriquecidas (etiquetas para el frontend)
+# ---------------------------------------------------------------------------
+
+def _query_requisiciones(db: Session):
+    """Requisiciones con servicio y líneas ya resueltas (sin N+1)."""
+    return db.query(Requisicion).options(
+        joinedload(Requisicion.servicio_solicitante),
+        selectinload(Requisicion.detalles)
+        .joinedload(RequisicionDetalle.presentacion)
+        .joinedload(Presentacion.insumo),
+    )
+
+
+def _query_despachos(db: Session):
+    """Despachos con almacenes, destino y líneas resueltas (sin N+1)."""
+    return db.query(Despacho).options(
+        joinedload(Despacho.almacen_origen),
+        joinedload(Despacho.almacen_destino),
+        joinedload(Despacho.servicio_destino),
+        joinedload(Despacho.paciente),
+        selectinload(Despacho.detalles)
+        .joinedload(DespachoDetalle.lote)
+        .joinedload(Lote.presentacion)
+        .joinedload(Presentacion.insumo),
+        selectinload(Despacho.detalles)
+        .joinedload(DespachoDetalle.lote)
+        .joinedload(Lote.almacen),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Requisiciones
 # ---------------------------------------------------------------------------
 
@@ -84,7 +116,7 @@ def crear_requisicion(
 
     db.commit()
     db.refresh(req)
-    return req
+    return _query_requisiciones(db).filter(Requisicion.id == req.id).first()
 
 
 def listar_requisiciones(
@@ -96,7 +128,7 @@ def listar_requisiciones(
     skip: int = 0,
     limit: int = 20,
 ) -> dict:
-    query = db.query(Requisicion)
+    query = _query_requisiciones(db)
     if activo is not None:
         query = query.filter(Requisicion.activo == activo)
     if estado:
@@ -109,7 +141,10 @@ def listar_requisiciones(
 
 
 def obtener_requisicion(requisicion_id: int, db: Session) -> Requisicion:
-    return obtener_o_404(db, Requisicion, requisicion_id, "Requisición no encontrada")
+    req = _query_requisiciones(db).filter(Requisicion.id == requisicion_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Requisición no encontrada")
+    return req
 
 
 def _cambiar_estado_requisicion(
@@ -131,7 +166,7 @@ def _cambiar_estado_requisicion(
         req.usuario_aprueba_id = usuario_id
     db.commit()
     db.refresh(req)
-    return req
+    return _query_requisiciones(db).filter(Requisicion.id == req.id).first()
 
 
 def aprobar_requisicion(
@@ -232,7 +267,7 @@ def crear_despacho(data: DespachoCreate, usuario_id: int | None, db: Session) ->
 
     db.commit()
     db.refresh(despacho)
-    return despacho
+    return _query_despachos(db).filter(Despacho.id == despacho.id).first()
 
 
 def _trasladar_a_destino(
@@ -322,7 +357,7 @@ def despachar_despacho(despacho_id: int, usuario_id: int | None, db: Session) ->
 
     db.commit()
     db.refresh(despacho)
-    return despacho
+    return _query_despachos(db).filter(Despacho.id == despacho.id).first()
 
 
 def anular_despacho(despacho_id: int, db: Session) -> Despacho:
@@ -337,7 +372,7 @@ def anular_despacho(despacho_id: int, db: Session) -> Despacho:
     despacho.activo = False
     db.commit()
     db.refresh(despacho)
-    return despacho
+    return _query_despachos(db).filter(Despacho.id == despacho.id).first()
 
 
 def listar_despachos(
@@ -348,11 +383,13 @@ def listar_despachos(
     servicio_id: int | None = None,
     paciente_id: int | None = None,
     numero: str | None = None,
+    desde: datetime | None = None,
+    hasta: datetime | None = None,
     activo: bool | None = True,
     skip: int = 0,
     limit: int = 20,
 ) -> dict:
-    query = db.query(Despacho)
+    query = _query_despachos(db)
     if activo is not None:
         query = query.filter(Despacho.activo == activo)
     if tipo:
@@ -367,11 +404,18 @@ def listar_despachos(
         query = query.filter(Despacho.paciente_id == paciente_id)
     if numero:
         query = query.filter(Despacho.numero.ilike(f"%{numero.strip()}%"))
+    if desde is not None:
+        query = query.filter(Despacho.fecha >= desde)
+    if hasta is not None:
+        query = query.filter(Despacho.fecha < hasta)
     return paginar(query, skip, limit, Despacho.id.desc())
 
 
 def obtener_despacho(despacho_id: int, db: Session) -> Despacho:
-    return obtener_o_404(db, Despacho, despacho_id, "Despacho no encontrado")
+    despacho = _query_despachos(db).filter(Despacho.id == despacho_id).first()
+    if not despacho:
+        raise HTTPException(status_code=404, detail="Despacho no encontrado")
+    return despacho
 
 
 # ---------------------------------------------------------------------------
@@ -412,7 +456,10 @@ def listar_atenciones(
     skip: int = 0,
     limit: int = 20,
 ) -> dict:
-    query = db.query(Atencion)
+    query = db.query(Atencion).options(
+        joinedload(Atencion.paciente),
+        joinedload(Atencion.servicio),
+    )
     if activo is not None:
         query = query.filter(Atencion.activo == activo)
     if paciente_id is not None:
@@ -431,7 +478,22 @@ def listar_atenciones(
 
 
 def obtener_atencion(atencion_id: int, db: Session) -> Atencion:
-    return obtener_o_404(db, Atencion, atencion_id, "Atención no encontrada")
+    atencion = (
+        db.query(Atencion)
+        .options(
+            joinedload(Atencion.paciente),
+            joinedload(Atencion.servicio),
+            selectinload(Atencion.insumos_consumidos)
+            .joinedload(AtencionInsumo.lote)
+            .joinedload(Lote.presentacion)
+            .joinedload(Presentacion.insumo),
+        )
+        .filter(Atencion.id == atencion_id)
+        .first()
+    )
+    if not atencion:
+        raise HTTPException(status_code=404, detail="Atención no encontrada")
+    return atencion
 
 
 def finalizar_atencion(atencion_id: int, db: Session) -> Atencion:
@@ -541,7 +603,10 @@ def listar_unidosis(
     skip: int = 0,
     limit: int = 20,
 ) -> dict:
-    query = db.query(Unidosis)
+    query = db.query(Unidosis).options(
+        joinedload(Unidosis.paciente),
+        joinedload(Unidosis.almacen_origen),
+    )
     if activo is not None:
         query = query.filter(Unidosis.activo == activo)
     if paciente_id is not None:
@@ -556,7 +621,22 @@ def listar_unidosis(
 
 
 def obtener_unidosis(unidosis_id: int, db: Session) -> Unidosis:
-    return obtener_o_404(db, Unidosis, unidosis_id, "Unidosis no encontrada")
+    uni = (
+        db.query(Unidosis)
+        .options(
+            joinedload(Unidosis.paciente),
+            joinedload(Unidosis.almacen_origen),
+            selectinload(Unidosis.detalles)
+            .joinedload(UnidosisDetalle.lote)
+            .joinedload(Lote.presentacion)
+            .joinedload(Presentacion.insumo),
+        )
+        .filter(Unidosis.id == unidosis_id)
+        .first()
+    )
+    if not uni:
+        raise HTTPException(status_code=404, detail="Unidosis no encontrada")
+    return uni
 
 
 def administrar_unidosis(unidosis_id: int, db: Session) -> Unidosis:

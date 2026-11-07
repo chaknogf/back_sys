@@ -612,11 +612,7 @@ class TestIntervencionesQuirurgicas:
             assert "Apendicectomía" in ciclo.contenido
             q = ciclo.quirofano
             assert q["intervencion_id"] == iid
-            assert q["procedimientos"] == ["Apendicectomía", "Lavado de cavidad"]
-            assert q["area_cuerpo_intervenida"] == "Abdomen"
-            assert q["quirofano_numero"]["nombre"] == quirofano["nombre"]
-            assert q["horas"]["inicio_anestesia"].startswith("07:45")
-            assert q["observaciones"] == "Urgencia"
+            # El JSONB conserva solo el enlace; el detalle se resuelve al leer.
         finally:
             db.close()
 

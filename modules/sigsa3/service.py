@@ -947,6 +947,7 @@ def sincronizar_sigsa3(db: Session, dry_run: bool = False) -> dict:
             "personal_salud_asociados": 0,
             "especialidades_actualizadas": 0,
             "sin_match": 0,
+            "personal_salud_sin_match": _personal_salud_sin_match(db),
             "personal_salud_baja_confianza": [],
         }
 

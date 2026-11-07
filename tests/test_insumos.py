@@ -9,6 +9,7 @@ eliminan al final del módulo en orden de dependencias de FK.
 """
 
 import uuid
+from datetime import date, timedelta
 
 import pytest
 
@@ -237,6 +238,16 @@ class TestCatalogo:
         )
         assert r5.status_code == 409
 
+        # Búsqueda por nombre del insumo padre, con etiquetas para el select.
+        r6 = client.get(
+            "/insumos/presentaciones",
+            headers=auth_headers,
+            params={"q": "Test Pres Base", "limit": 50},
+        )
+        assert r6.status_code == 200
+        encontrada = next(p for p in r6.json()["items"] if p["id"] == pres_id)
+        assert encontrada["insumo_nombre"] == "Test Pres Base"
+
 
 # =====================================================================
 # 2. ALMACÉN: lotes, kardex, requisición → despacho, traslado
@@ -300,6 +311,18 @@ class TestAlmacenFlujos:
         assert len(items) == 1
         assert items[0]["tipo_movimiento"] == "entrada"
         assert float(items[0]["saldo_resultante"]) == 100.0
+        assert items[0]["insumo_nombre"] == "Test Flujo"
+        assert items[0]["lote_numero"]
+        assert items[0]["almacen_nombre"]
+
+        # Los lotes traen etiquetas legibles en vez de solo IDs.
+        lote = client.get(
+            f"/insumos/lotes?presentacion_id={self.presentacion_id}",
+            headers=auth_headers,
+        ).json()["items"][0]
+        assert lote["insumo_nombre"] == "Test Flujo"
+        assert lote["presentacion_codigo"].startswith("TP")
+        assert lote["almacen_nombre"]
 
         # Recarga del mismo lote (upsert por presentación+almacén+número)
         r2 = client.post(
@@ -329,10 +352,11 @@ class TestAlmacenFlujos:
         assert float(k["items"][0]["saldo_resultante"]) == 90.0
 
     def test_03_requisicion_y_despacho(self, client, auth_headers):
+        nombre_servicio = f"TEST-INSUMOS-{_suf()}"
         r = client.post(
             "/encamamiento/",
             headers=auth_headers,
-            json={"nombre_servicio": f"TEST-INSUMOS-{_suf()}", "camas_censables": 5},
+            json={"nombre_servicio": nombre_servicio, "camas_censables": 5},
         )
         assert r.status_code in (200, 201), r.text
         self.servicio_id = r.json()["id"]
@@ -351,6 +375,10 @@ class TestAlmacenFlujos:
         _reg["requisiciones"].append(req["id"])
         assert req["estado"] == "pendiente"
         assert req["numero"].startswith("REQ-")
+        # El frontend recibe etiquetas, no solo IDs.
+        assert req["servicio_solicitante_nombre"] == nombre_servicio
+        assert req["detalles"][0]["insumo_nombre"] == "Test Flujo"
+        assert req["detalles"][0]["presentacion_codigo"].startswith("TP")
 
         r3 = client.post(
             f"/insumos/requisiciones/{req['id']}/aprobar",
@@ -377,6 +405,10 @@ class TestAlmacenFlujos:
         _reg["despachos"].append(desp["id"])
         assert desp["estado"] == "borrador"
         assert desp["numero"].startswith("DES-")
+        assert desp["almacen_origen_nombre"]
+        assert desp["servicio_destino_nombre"] == nombre_servicio
+        assert desp["detalles"][0]["insumo_nombre"] == "Test Flujo"
+        assert desp["detalles"][0]["lote_numero"].startswith("L")
 
         r5 = client.post(
             f"/insumos/despachos/{desp['id']}/despachar", headers=auth_headers
@@ -398,6 +430,25 @@ class TestAlmacenFlujos:
         ).json()
         assert req_final["estado"] == "despachada"
         assert float(req_final["detalles"][0]["cantidad_despachada"]) == 10.0
+
+        # Filtro por rango de fechas del informe (hasta es exclusivo).
+        hoy = date.today().isoformat()
+        manana = (date.today() + timedelta(days=1)).isoformat()
+        rango = client.get(
+            "/insumos/despachos"
+            f"?almacen_origen_id={self.bodega_id}&desde={hoy}&hasta={manana}",
+            headers=auth_headers,
+        )
+        assert rango.status_code == 200, rango.text
+        assert any(d["id"] == desp["id"] for d in rango.json()["items"])
+
+        vacio = client.get(
+            "/insumos/despachos"
+            f"?almacen_origen_id={self.bodega_id}&desde=2000-01-01&hasta=2000-01-02",
+            headers=auth_headers,
+        )
+        assert vacio.status_code == 200, vacio.text
+        assert vacio.json()["total"] == 0
 
     def test_04_despacho_stock_insuficiente(self, client, auth_headers):
         r = client.post(
@@ -491,6 +542,12 @@ class TestAtencionUnidosis:
         atencion_id = r.json()["id"]
         _reg["atenciones"].append(atencion_id)
         assert r.json()["estado"] == "abierta"
+        assert r.json()["paciente_nombre"]  # etiqueta, no solo ID
+
+        listado = client.get(
+            "/insumos/atenciones", headers=auth_headers
+        ).json()["items"]
+        assert next(a for a in listado if a["id"] == atencion_id)["paciente_nombre"]
 
         lote_id = TestAlmacenFlujos.lote_id
         stock_antes = next(
@@ -508,6 +565,14 @@ class TestAtencionUnidosis:
             json={"lote_id": lote_id, "cantidad": 2, "origen": "directo"},
         )
         assert r2.status_code == 201, r2.text
+
+        detalle = client.get(
+            f"/insumos/atenciones/{atencion_id}", headers=auth_headers
+        ).json()
+        consumido = detalle["insumos_consumidos"][0]
+        assert consumido["insumo_nombre"] == "Test Flujo"
+        assert consumido["lote_numero"]
+        assert consumido["presentacion_codigo"].startswith("TP")
 
         stock_despues = next(
             float(l["cantidad_actual"])
@@ -567,6 +632,10 @@ class TestAtencionUnidosis:
         _reg["unidosis"].append(uni_id)
         assert r.json()["estado"] == "preparada"
         assert r.json()["numero"].startswith("UNI-")
+        assert r.json()["paciente_nombre"]
+        assert r.json()["almacen_origen_nombre"]
+        assert r.json()["detalles"][0]["insumo_nombre"] == "Test Flujo"
+        assert r.json()["detalles"][0]["lote_numero"]
         assert stock() == antes - 3
 
         r2 = client.post(f"/insumos/unidosis/{uni_id}/cancelar", headers=auth_headers)

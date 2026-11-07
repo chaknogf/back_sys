@@ -1,5 +1,6 @@
 """Requisiciones (servicio pide → aprueba → despacha) y despachos/traslados."""
 
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -103,6 +104,8 @@ def listar_despachos(
     servicio_id: Optional[int] = Query(None),
     paciente_id: Optional[int] = Query(None),
     numero: Optional[str] = Query(None, description="Correlativo parcial (ej. 'DES-2026')"),
+    desde: Optional[datetime] = Query(None, description="Incluye despachos desde esta fecha/hora"),
+    hasta: Optional[datetime] = Query(None, description="Excluye despachos desde esta fecha/hora"),
     activo: Optional[bool] = Query(True),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=200),
@@ -112,7 +115,7 @@ def listar_despachos(
     return service_flujo.listar_despachos(
         db=db, tipo=tipo, estado=estado, almacen_origen_id=almacen_origen_id,
         servicio_id=servicio_id, paciente_id=paciente_id, numero=numero,
-        activo=activo, skip=skip, limit=limit,
+        desde=desde, hasta=hasta, activo=activo, skip=skip, limit=limit,
     )
 
 

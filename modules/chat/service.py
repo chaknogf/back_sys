@@ -1,19 +1,8 @@
 """Adapta el chat HTTP al intérprete determinístico de consultas estadísticas."""
 
-import re
-import time
 from typing import List, Optional
 
-from sqlalchemy import text
 from sqlalchemy.orm import Session
-
-SQL_BLOCKED_KEYWORDS = re.compile(
-    r'\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|REPLACE|'
-    r'GRANT|REVOKE|EXECUTE|CALL|MERGE|COPY|LOAD|IMPORT|'
-    r'FETCH|SET\s+(SESSION|ROLE|TRANSACTION)|RESET\s+(SESSION|ROLE)|'
-    r'DEALLOCATE|PREPARE|EXPLAIN\s+(ANALYZE|VERBOSE)|VACUUM|ANALYZE)\b',
-    re.IGNORECASE,
-)
 
 TABLAS_CONOCIDAS = {
     "pacientes": "Pacientes del hospital. Datos demográficos, estado, CUI, expediente. JSONB: nombre (nombre1,nombre2,nombre3), apellido1...5, datos_extra (socioeconomicos, neonatales, etc.)",
@@ -41,68 +30,6 @@ TABLAS_CONOCIDAS = {
     "personal_salud": "Catálogo de trabajadores de salud para SIGSA-3",
     "expediente_control": "Control de correlativos de expedientes. tipo, año, ultimo_numero",
 }
-
-
-def _validar_sql(sql: str) -> bool:
-    sql_sin_comentarios = re.sub(r'--.*', '', sql)
-    sql_sin_comentarios = re.sub(r'/\*.*?\*/', '', sql_sin_comentarios, flags=re.DOTALL)
-    sql_sin_strings = re.sub(r"'[^']*'", '', sql_sin_comentarios)
-    sql_sin_strings = re.sub(r'"\s*[^"]*"', '', sql_sin_strings)
-
-    if SQL_BLOCKED_KEYWORDS.search(sql_sin_strings):
-        return False
-
-    stripped = sql_sin_strings.strip().upper()
-    return stripped.startswith('SELECT') or stripped.startswith('WITH')
-
-
-def _extraer_sql(texto: str) -> str:
-    patrones = [
-        r'```sql\s*(.*?)\s*```',
-        r'```\s*(.*?)\s*```',
-        r'SELECT.*?;',
-    ]
-    for patron in patrones:
-        match = re.search(patron, texto, re.DOTALL | re.IGNORECASE)
-        if match:
-            sql = match.group(1) if match.lastindex else match.group(0)
-            if not sql.upper().startswith('SELECT') and not sql.upper().startswith('WITH'):
-                continue
-            return sql.strip()
-    if texto.upper().startswith('SELECT') or texto.upper().startswith('WITH'):
-        return texto.strip()
-    return ""
-
-
-def _obtener_tablas_relevantes(mensajes: List[dict], tablas_filtro: Optional[List[str]]) -> List[str]:
-    texto = " ".join(m["content"] for m in mensajes).lower()
-    if tablas_filtro:
-        return [t for t in tablas_filtro if t in TABLAS_CONOCIDAS]
-    return sorted(TABLAS_CONOCIDAS.keys())
-
-
-def _construir_schema_context(tablas: List[str]) -> str:
-    lineas: List[str] = []
-    for nombre in tablas:
-        desc = TABLAS_CONOCIDAS.get(nombre, "")
-        lineas.append(f"- {nombre}: {desc}")
-    return "\n".join(lineas)
-
-
-def _ejecutar_sql(sql: str, db: Session, max_filas: int) -> tuple:
-    inicio = time.time()
-    result = db.execute(text(sql))
-    filas = [dict(r._mapping) for r in result.fetchmany(max_filas)]
-    # Convertir tipos no serializables
-    for fila in filas:
-        for k, v in fila.items():
-            if hasattr(v, 'isoformat'):
-                fila[k] = v.isoformat()
-            elif isinstance(v, (bytes, bytearray)):
-                fila[k] = str(v)
-    columnas = list(filas[0].keys()) if filas else []
-    ejecucion_ms = int((time.time() - inicio) * 1000)
-    return filas, columnas, ejecucion_ms
 
 
 def consultar(

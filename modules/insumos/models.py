@@ -71,6 +71,16 @@ class Presentacion(Base):
 
     insumo = relationship("Insumo", back_populates="presentaciones")
 
+    @property
+    def insumo_nombre(self) -> str | None:
+        """Nombre del insumo padre para búsquedas y selects legibles."""
+        return self.insumo.nombre if self.insumo else None
+
+    @property
+    def insumo_codigo(self) -> str | None:
+        """Código del insumo padre (el usuario busca por él)."""
+        return self.insumo.codigo_insumo if self.insumo else None
+
 
 class Almacen(Base):
     """Áreas de almacenamiento: bodega, farmacia, productos afines o servicio."""
@@ -117,6 +127,26 @@ class Lote(Base):
     presentacion = relationship("Presentacion", lazy="joined")
     almacen = relationship("Almacen", lazy="joined")
 
+    @property
+    def almacen_nombre(self) -> str | None:
+        return self.almacen.nombre if self.almacen else None
+
+    @property
+    def presentacion_codigo(self) -> str | None:
+        return self.presentacion.codigo_presentacion if self.presentacion else None
+
+    @property
+    def presentacion_nombre(self) -> str | None:
+        return self.presentacion.nombre if self.presentacion else None
+
+    @property
+    def cantidad_unidad(self) -> str | None:
+        return self.presentacion.cantidad_unidad if self.presentacion else None
+
+    @property
+    def insumo_nombre(self) -> str | None:
+        return self.presentacion.insumo_nombre if self.presentacion else None
+
 
 class KardexMovimiento(Base):
     """Libro mayor de movimientos de stock (entrada/salida/traslado/consumo/ajuste)."""
@@ -145,6 +175,22 @@ class KardexMovimiento(Base):
 
     lote = relationship("Lote", lazy="joined")
     almacen = relationship("Almacen", lazy="joined")
+
+    @property
+    def lote_numero(self) -> str | None:
+        return self.lote.numero_lote if self.lote else None
+
+    @property
+    def insumo_nombre(self) -> str | None:
+        return self.lote.insumo_nombre if self.lote else None
+
+    @property
+    def presentacion_nombre(self) -> str | None:
+        return self.lote.presentacion_nombre if self.lote else None
+
+    @property
+    def almacen_nombre(self) -> str | None:
+        return self.almacen.nombre if self.almacen else None
 
 
 class Requisicion(Base):
@@ -177,6 +223,12 @@ class Requisicion(Base):
         "RequisicionDetalle", back_populates="requisicion",
         lazy="selectin", cascade="all, delete-orphan",
     )
+    servicio_solicitante = relationship("EncamamientoModel", lazy="joined")
+
+    @property
+    def servicio_solicitante_nombre(self) -> str | None:
+        """Nombre del servicio que solicita, para no mostrar el ID crudo."""
+        return self.servicio_solicitante.nombre_servicio if self.servicio_solicitante else None
 
 
 class RequisicionDetalle(Base):
@@ -199,6 +251,22 @@ class RequisicionDetalle(Base):
 
     requisicion = relationship("Requisicion", back_populates="detalles")
     presentacion = relationship("Presentacion", lazy="joined")
+
+    @property
+    def presentacion_codigo(self) -> str | None:
+        return self.presentacion.codigo_presentacion if self.presentacion else None
+
+    @property
+    def presentacion_nombre(self) -> str | None:
+        return self.presentacion.nombre if self.presentacion else None
+
+    @property
+    def cantidad_unidad(self) -> str | None:
+        return self.presentacion.cantidad_unidad if self.presentacion else None
+
+    @property
+    def insumo_nombre(self) -> str | None:
+        return self.presentacion.insumo_nombre if self.presentacion else None
 
 
 class Despacho(Base):
@@ -244,6 +312,28 @@ class Despacho(Base):
         lazy="selectin", cascade="all, delete-orphan",
     )
     requisicion = relationship("Requisicion", lazy="joined")
+    almacen_origen = relationship("Almacen", foreign_keys=[almacen_origen_id], lazy="joined")
+    almacen_destino = relationship("Almacen", foreign_keys=[almacen_destino_id], lazy="joined")
+    servicio_destino = relationship(
+        "EncamamientoModel", foreign_keys=[servicio_destino_id], lazy="joined",
+    )
+    paciente = relationship("PacienteModel", foreign_keys=[paciente_id], lazy="joined")
+
+    @property
+    def almacen_origen_nombre(self) -> str | None:
+        return self.almacen_origen.nombre if self.almacen_origen else None
+
+    @property
+    def almacen_destino_nombre(self) -> str | None:
+        return self.almacen_destino.nombre if self.almacen_destino else None
+
+    @property
+    def servicio_destino_nombre(self) -> str | None:
+        return self.servicio_destino.nombre_servicio if self.servicio_destino else None
+
+    @property
+    def paciente_nombre(self) -> str | None:
+        return self.paciente.nombre_completo if self.paciente else None
 
 
 class DespachoDetalle(Base):
@@ -266,6 +356,25 @@ class DespachoDetalle(Base):
 
     despacho = relationship("Despacho", back_populates="detalles")
     lote = relationship("Lote", lazy="joined")
+
+    @property
+    def lote_numero(self) -> str | None:
+        return self.lote.numero_lote if self.lote else None
+
+    @property
+    def presentacion_codigo(self) -> str | None:
+        return self.lote.presentacion.codigo_presentacion if self.lote and self.lote.presentacion else None
+
+    @property
+    def presentacion_nombre(self) -> str | None:
+        return self.lote.presentacion.nombre if self.lote and self.lote.presentacion else None
+
+    @property
+    def insumo_nombre(self) -> str | None:
+        return (
+            self.lote.presentacion.insumo_nombre
+            if self.lote and self.lote.presentacion else None
+        )
 
 
 class Atencion(Base):
@@ -299,6 +408,16 @@ class Atencion(Base):
     insumos_consumidos = relationship(
         "AtencionInsumo", back_populates="atencion", lazy="selectin",
     )
+    paciente = relationship("PacienteModel", foreign_keys=[paciente_id], lazy="joined")
+    servicio = relationship("EncamamientoModel", foreign_keys=[servicio_id], lazy="joined")
+
+    @property
+    def paciente_nombre(self) -> str | None:
+        return self.paciente.nombre_completo if self.paciente else None
+
+    @property
+    def servicio_nombre(self) -> str | None:
+        return self.servicio.nombre_servicio if self.servicio else None
 
 
 class AtencionInsumo(Base):
@@ -326,6 +445,26 @@ class AtencionInsumo(Base):
 
     atencion = relationship("Atencion", back_populates="insumos_consumidos")
     lote = relationship("Lote", lazy="joined")
+
+    @property
+    def lote_numero(self) -> str | None:
+        return self.lote.numero_lote if self.lote else None
+
+    @property
+    def presentacion_codigo(self) -> str | None:
+        return self.lote.presentacion_codigo if self.lote else None
+
+    @property
+    def presentacion_nombre(self) -> str | None:
+        return self.lote.presentacion_nombre if self.lote else None
+
+    @property
+    def cantidad_unidad(self) -> str | None:
+        return self.lote.cantidad_unidad if self.lote else None
+
+    @property
+    def insumo_nombre(self) -> str | None:
+        return self.lote.insumo_nombre if self.lote else None
 
 
 class Unidosis(Base):
@@ -365,6 +504,16 @@ class Unidosis(Base):
         "UnidosisDetalle", back_populates="unidosis",
         lazy="selectin", cascade="all, delete-orphan",
     )
+    paciente = relationship("PacienteModel", foreign_keys=[paciente_id], lazy="joined")
+    almacen_origen = relationship("Almacen", foreign_keys=[almacen_origen_id], lazy="joined")
+
+    @property
+    def paciente_nombre(self) -> str | None:
+        return self.paciente.nombre_completo if self.paciente else None
+
+    @property
+    def almacen_origen_nombre(self) -> str | None:
+        return self.almacen_origen.nombre if self.almacen_origen else None
 
 
 class UnidosisDetalle(Base):
@@ -388,3 +537,23 @@ class UnidosisDetalle(Base):
 
     unidosis = relationship("Unidosis", back_populates="detalles")
     lote = relationship("Lote", lazy="joined")
+
+    @property
+    def lote_numero(self) -> str | None:
+        return self.lote.numero_lote if self.lote else None
+
+    @property
+    def presentacion_codigo(self) -> str | None:
+        return self.lote.presentacion_codigo if self.lote else None
+
+    @property
+    def presentacion_nombre(self) -> str | None:
+        return self.lote.presentacion_nombre if self.lote else None
+
+    @property
+    def cantidad_unidad(self) -> str | None:
+        return self.lote.cantidad_unidad if self.lote else None
+
+    @property
+    def insumo_nombre(self) -> str | None:
+        return self.lote.insumo_nombre if self.lote else None

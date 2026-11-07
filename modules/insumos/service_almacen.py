@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from fastapi import HTTPException
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from modules.insumos.models import (
     Almacen,
@@ -108,7 +108,14 @@ def listar_lotes(
     skip: int = 0,
     limit: int = 50,
 ) -> dict:
-    query = db.query(Lote).filter(Lote.activo == True)  # noqa: E712
+    query = (
+        db.query(Lote)
+        .options(
+            joinedload(Lote.almacen),
+            joinedload(Lote.presentacion).joinedload(Presentacion.insumo),
+        )
+        .filter(Lote.activo == True)  # noqa: E712
+    )
     if almacen_id is not None:
         query = query.filter(Lote.almacen_id == almacen_id)
     if presentacion_id is not None:
@@ -222,7 +229,12 @@ def listar_kardex(
     skip: int = 0,
     limit: int = 50,
 ) -> dict:
-    query = db.query(KardexMovimiento)
+    query = db.query(KardexMovimiento).options(
+        joinedload(KardexMovimiento.lote)
+        .joinedload(Lote.presentacion)
+        .joinedload(Presentacion.insumo),
+        joinedload(KardexMovimiento.almacen),
+    )
     if lote_id is not None:
         query = query.filter(KardexMovimiento.lote_id == lote_id)
     if almacen_id is not None:
@@ -244,7 +256,16 @@ def listar_kardex(
 def obtener_kardex_lote(lote_id: int, db: Session, skip: int = 0, limit: int = 50) -> dict:
     """Página de movimientos del lote ordenados del más reciente al más antiguo."""
     _obtener_lote(db, lote_id)
-    query = db.query(KardexMovimiento).filter(KardexMovimiento.lote_id == lote_id)
+    query = (
+        db.query(KardexMovimiento)
+        .options(
+            joinedload(KardexMovimiento.lote)
+            .joinedload(Lote.presentacion)
+            .joinedload(Presentacion.insumo),
+            joinedload(KardexMovimiento.almacen),
+        )
+        .filter(KardexMovimiento.lote_id == lote_id)
+    )
     total = query.count()
     items = (
         query.order_by(KardexMovimiento.fecha.desc(), KardexMovimiento.id.desc())

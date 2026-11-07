@@ -407,7 +407,11 @@ def listar_presentaciones(
     skip: int = 0,
     limit: int = 20,
 ) -> dict:
-    query = db.query(Presentacion)
+    query = (
+        db.query(Presentacion)
+        .join(Presentacion.insumo)
+        .options(joinedload(Presentacion.insumo))
+    )
     if activo is not None:
         query = query.filter(Presentacion.activo == activo)
     if insumo_id is not None:
@@ -416,14 +420,18 @@ def listar_presentaciones(
         query = query.filter(Presentacion.codigo_presentacion == codigo.strip())
     if q:
         like = f"%{q.strip()}%"
+        # Buscar también por el insumo padre: el usuario conoce el nombre
+        # ("acetaminofén"), no el código de presentación.
         query = query.filter(
             or_(
                 Presentacion.nombre.ilike(like),
                 Presentacion.cantidad_unidad.ilike(like),
                 Presentacion.codigo_presentacion.ilike(like),
+                Insumo.nombre.ilike(like),
+                Insumo.codigo_insumo.ilike(like),
             )
         )
-    return paginar(query, skip, limit, Presentacion.id)
+    return paginar(query, skip, limit, [Insumo.nombre, Presentacion.id])
 
 
 def obtener_presentacion(presentacion_id: int, db: Session) -> Presentacion:

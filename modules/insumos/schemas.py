@@ -76,6 +76,9 @@ class PresentacionUpdate(BaseModel):
 
 class Presentacion(PresentacionBase):
     id: int
+    # Datos del insumo padre para que el frontend no muestre IDs crudos.
+    insumo_nombre: Optional[str] = None
+    insumo_codigo: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -160,6 +163,12 @@ class LoteOut(BaseModel):
     activo: bool
     created_at: datetime
     updated_at: datetime
+    # Etiquetas resueltas para no mostrar IDs crudos en el frontend.
+    almacen_nombre: Optional[str] = None
+    presentacion_codigo: Optional[str] = None
+    presentacion_nombre: Optional[str] = None
+    cantidad_unidad: Optional[str] = None
+    insumo_nombre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -204,6 +213,11 @@ class KardexOut(BaseModel):
     observacion: str
     usuario_id: Optional[int] = None
     fecha: datetime
+    # Etiquetas resueltas para no mostrar IDs crudos en el frontend.
+    lote_numero: Optional[str] = None
+    insumo_nombre: Optional[str] = None
+    presentacion_nombre: Optional[str] = None
+    almacen_nombre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -231,6 +245,11 @@ class RequisicionDetalleCreate(RequisicionDetalleBase):
 class RequisicionDetalle(RequisicionDetalleBase):
     id: int
     cantidad_despachada: Decimal
+    # Etiquetas de lectura para la bandeja de farmacia.
+    presentacion_codigo: Optional[str] = None
+    presentacion_nombre: Optional[str] = None
+    cantidad_unidad: Optional[str] = None
+    insumo_nombre: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -248,6 +267,7 @@ class RequisicionOut(BaseModel):
     id: int
     numero: str
     servicio_solicitante_id: int
+    servicio_solicitante_nombre: Optional[str] = None
     personal_solicita_id: Optional[int] = None
     usuario_solicita_id: Optional[int] = None
     estado: str
@@ -291,6 +311,11 @@ class DespachoDetalleCreate(DespachoDetalleBase):
 
 class DespachoDetalle(DespachoDetalleBase):
     id: int
+    # Etiquetas del lote/presentación para las tablas de despacho.
+    lote_numero: Optional[str] = None
+    presentacion_codigo: Optional[str] = None
+    presentacion_nombre: Optional[str] = None
+    insumo_nombre: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -314,6 +339,10 @@ class DespachoOut(BaseModel):
     numero: str
     tipo: str
     almacen_origen_id: int
+    almacen_origen_nombre: Optional[str] = None
+    almacen_destino_nombre: Optional[str] = None
+    servicio_destino_nombre: Optional[str] = None
+    paciente_nombre: Optional[str] = None
     almacen_destino_id: Optional[int] = None
     requisicion_id: Optional[int] = None
     servicio_destino_id: Optional[int] = None
@@ -362,6 +391,12 @@ class AtencionInsumo(AtencionInsumoCreate):
     usuario_id: Optional[int] = None
     fecha: datetime
     created_at: datetime
+    # Etiquetas del lote/presentación para listados legibles.
+    lote_numero: Optional[str] = None
+    presentacion_codigo: Optional[str] = None
+    presentacion_nombre: Optional[str] = None
+    cantidad_unidad: Optional[str] = None
+    insumo_nombre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -378,6 +413,8 @@ class AtencionOut(BaseModel):
     activo: bool
     created_at: datetime
     updated_at: datetime
+    paciente_nombre: Optional[str] = None
+    servicio_nombre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -411,6 +448,12 @@ class UnidosisDetalle(UnidosisDetalleBase):
     id: int
     fecha_administracion: Optional[datetime] = None
     created_at: datetime
+    # Etiquetas del lote/presentación para listados legibles.
+    lote_numero: Optional[str] = None
+    presentacion_codigo: Optional[str] = None
+    presentacion_nombre: Optional[str] = None
+    cantidad_unidad: Optional[str] = None
+    insumo_nombre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -440,6 +483,8 @@ class UnidosisOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     detalles: List[UnidosisDetalle] = []
+    paciente_nombre: Optional[str] = None
+    almacen_origen_nombre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
